@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI):
           ALTER TABLE screenings ADD CONSTRAINT screenings_no_overlap
           EXCLUDE USING gist (auditorium_id WITH =, tstzrange(starts_at, ends_at, '[)') WITH &&)
           WHERE (status = 'scheduled');
-        EXCEPTION WHEN duplicate_object THEN NULL; END $$;"""))
+        EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;"""))
     yield
 
 app = FastAPI(title="Booking System API", version="0.1.0", lifespan=lifespan)
