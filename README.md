@@ -1,25 +1,36 @@
 # Parda Cinema
 
-An Uzbek first cinema discovery and seat booking product. The frontend is a Vite/React app, the API is FastAPI, and shared accounts, screening inventory, payment attempts, OTP challenges, and booking history live in PostgreSQL. Prices are UZS and showtimes use `Asia/Tashkent`.
+An Uzbek-first cinema discovery and seat-booking demo. Visitors browse TMDB movie and cast details, choose a Tashkent screening, select seats, and place a ten-minute hold before completing a clearly labeled no-charge payment simulation. The Vite/React frontend uses a FastAPI backend and hosted PostgreSQL. Prices are in UZS; showtimes use Asia/Tashkent.
+
+**Live demo:** https://sana-booking.vercel.app/  
+**API and interactive docs:** https://parda-cinema-api.onrender.com/docs  
+**Source:** https://github.com/oktambek7/booking-system
+
+> Portfolio/demo only. SMS verification is in mock mode and displays the demo OTP in the checkout page. Payment methods are simulated; no card number or CVV is requested and no money is collected. A real SMS gateway and payment provider are not connected.
 
 ## Delivery checklist
 
 ### Product and API
-- [x] Public repository: https://github.com/oktambek7/booking-system
-- [x] Account registration with unique nickname and email; password hashing and bearer authentication
-- [x] Film catalog, cinemas/halls, seat layouts, showtimes, supported hall formats (2D/3D/IMAX)
-- [x] Date based showtimes, current seat inventory, premium pricing, and a responsive seat selector
-- [x] Temporary pending seat holds, cancellation, booking history, and booking statuses
-- [x] PostgreSQL persistence for accounts, phone verification state, screenings, bookings, and payment attempts
-- [x] Four digit SMS verification flow; OTP is HMAC hashed, expires, and has an attempt limit
-- [x] Demo payment choices (Uzcard, Humo, Visa, Mastercard); no card number/CVV collected and no money charged
-- [x] TMDB catalog integration for current and upcoming movies, posters, cast, rating, release date, and trailer key
-- [x] Light/dark theme and responsive UI
-- [x] Admin protected API for films, halls, screenings, catalog sync, booking review/status changes
-- [x] API reference at `/docs`; Render API deployment blueprint at `render.yaml`
-- [x] Configure hosted PostgreSQL and deploy the API`n- [ ] Configure TMDB credential and real SMS gateway
-- [x] Deploy the configured API and connect the Vercel frontend using `VITE_API_URL`
-- [ ] Configure real admin account, halls, seat plans, screening schedules, and review the launched flow
+- [x] Public GitHub repository and public Vercel demo
+- [x] Registration with unique nickname/email, password hashing, and bearer authentication
+- [x] TMDB current and upcoming catalog with posters, cast, ratings, release dates, and trailers
+- [x] Cinema/hall administration, seat layout, showtimes, and 2D/3D/IMAX formats
+- [x] Date-based Tashkent showtimes, live seat availability, premium pricing, and responsive seat selection
+- [x] Ten-minute pending holds, cancellation, booking history, and pending/confirmed/cancelled/completed statuses
+- [x] Hosted PostgreSQL persistence for users, screenings, seat holds/bookings, and payment/OTP attempts
+- [x] Four-digit demo SMS OTP flow with expiry and attempt limits
+- [x] Uzcard, Humo, Visa, and Mastercard demo choices; no charge is made
+- [x] Admin tools for TMDB sync, cinema/halls, schedules, and booking status management
+- [x] Light/dark theme, API documentation, and setup instructions
+- [x] Render API and Vercel frontend configured; public catalog and seat map loaded from the hosted API
+- [ ] Configure and verify a real SMS gateway before sending real OTP messages
+- [ ] Connect a payment provider before accepting real payments
+
+### Current hosted demo data
+- [x] TMDB token is configured on the API server; movie catalog is synced into PostgreSQL
+- [x] Demo cinema, 80-seat hall, and Oct 1, 2026 screenings published in 2D, 3D, and IMAX
+- [x] Public visitor page shows screening times and the live seat map
+- [ ] Verify full customer checkout with a newly registered visitor account
 
 ## Run locally
 
@@ -29,64 +40,59 @@ Requires Python 3.12+, Node.js, and Docker Desktop.
 docker compose up --build
 ```
 
-API: `http://localhost:8000`; docs: `http://localhost:8000/docs`. Copy `backend/.env.example` to `backend/.env` and set a long random `JWT_SECRET` and `OTP_SECRET`. In a separate terminal:
+The API runs at http://localhost:8000 and its docs at http://localhost:8000/docs. Copy backend/.env.example to backend/.env and set strong random JWT_SECRET and OTP_SECRET values. In another terminal:
 
 ```sh
 cd frontend
 npm install
 ```
 
-Create `frontend/.env.local` with `VITE_API_URL=http://localhost:8000`, then run `npm run dev`. Build the UI with `npm run build`.
+Create frontend/.env.local with VITE_API_URL=http://localhost:8000, then run npm run dev. Run npm run build to create the frontend production bundle.
 
-Create an administrator account with:
+Create a local admin account with:
 
 ```sh
 docker compose exec -e ADMIN_EMAIL=admin@example.com -e ADMIN_PASSWORD='use-a-long-unique-password' api python -m app.bootstrap_admin
 ```
 
-The local default `SMS_MODE=mock` displays a four digit code in the checkout response/UI. This is a development helper only. To send real OTPs, configure the SMS gateway credentials and set `SMS_MODE=eskiz`. TMDB credentials are never sent to the browser.
+The default SMS_MODE=mock shows the four-digit OTP in the checkout response/UI for development. To send real messages, configure the supported SMS gateway credentials and set SMS_MODE=eskiz. TMDB and SMS credentials belong only in server-side environment variables; never commit them.
 
 ## Hosted setup
 
-1. Create a managed PostgreSQL database (Neon or Render PostgreSQL). Keep its connection URL private.
-2. In Render, create a Blueprint from this repository and select `render.yaml`. Set the private `DATABASE_URL`, `TMDB_READ_TOKEN`, SMS credentials, and `CORS_ORIGINS` in the Render service environment. `JWT_SECRET` and `OTP_SECRET` are generated by the blueprint.
-3. Set `SMS_MODE=mock` for a clearly labeled non charging demo, or `SMS_MODE=eskiz` once the SMS sender is approved and credentials are configured.
-4. Set Vercel's `VITE_API_URL` to the deployed API origin and redeploy. Set API `CORS_ORIGINS` to the exact Vercel site origin.
-5. Bootstrap an administrator, create each cinema hall and seat layout, publish screening schedules and supported formats, then run the TMDB catalog sync from the admin interface.
+1. Create a managed PostgreSQL database and keep its connection URL private.
+2. Deploy the API from render.yaml. Configure DATABASE_URL, TMDB_READ_TOKEN, CORS_ORIGINS, and SMS settings in the Render service environment. Keep JWT_SECRET and OTP_SECRET strong and private.
+3. For the portfolio demo, set SMS_MODE=mock. Configure an approved SMS sender and credentials before changing it to a real gateway mode.
+4. Set Vercel VITE_API_URL to the API origin and allow the exact Vercel origin in CORS_ORIGINS.
+5. Bootstrap an administrator, create the cinema/hall and seat plan, publish screening schedules, then sync the TMDB catalog from the admin interface.
 
-Do not commit secrets or send them through Git. Put provider credentials into the host's environment variable settings. The public Vercel app now uses the deployed SQL backed API. The catalog remains intentionally empty until an administrator adds the TMDB credential, creates the first administrator account, and publishes halls and screenings.
+The free Render instance may sleep between visits, so the first API request can take longer while it wakes. Its data remains in PostgreSQL.
 
-## Data design and race protection
+## Architecture and booking safeguards
 
-- `users` stores normalized email/nickname, password hash, and verified phone status. The OTP value itself is never stored. The database records an HMAC digest, expiry, attempt count, and consumed time.
-- `movies` includes TMDB identity and release metadata. `auditoriums` owns format capabilities and a fixed seat layout. `screenings` stores timezone aware UTC instants and format; runtime determines the end time.
-- `bookings` keep the status/history record. `booking_seats` records seat ownership and whether a seat assignment is active. `payments` record simulated method, amount, reference, and last four phone digits; they do not contain card credentials.
-- A seat request is revalidated on the server. Sorted row locks and a PostgreSQL partial unique index on active `(screening_id, seat_id)` assignments ensure that competing requests cannot both reserve one seat. A collision returns HTTP 409 and the customer must refresh.
-- Screenings have a PostgreSQL exclusion constraint per hall so their time ranges cannot overlap. A pending booking holds seats for ten minutes; expired holds are cancelled during availability/booking operations and free their seats while retaining history.
-- The API calculates price from current screening pricing and seat tier. It rejects duplicate/foreign seats, more than eight seats, past screenings, invalid formats, unauthorized booking changes, invalid status transitions, expired OTPs, and excessive OTP attempts.
-- Booking confirmation only happens after OTP validation. Payment status is `succeeded_demo`: it means the no charge simulation completed, not that funds were collected.
+- PostgreSQL stores accounts, films, cinemas, auditoriums, seat inventory, screenings, bookings, seat assignments, and payment/OTP attempt records. Passwords are hashed; OTP values are stored as HMAC digests with expiry and attempt limits.
+- FastAPI validates requests and derives ticket prices from the screening and seat type. The browser cannot set a booking's final price or another user's booking status.
+- Booking checks current seat availability and holds chosen seats for ten minutes. PostgreSQL row locks and a partial unique constraint on active (screening, seat) assignments prevent two concurrent users from holding the same seat. A conflict returns HTTP 409 so the client can refresh the seat map.
+- A hall time-range constraint prevents overlapping screenings. Expired/cancelled holds release seats while preserving booking history. Invalid, duplicate, foreign, or excessive seat selections and invalid status transitions are rejected.
+- The payment step is explicitly simulated. An OTP-confirmed booking is marked successful in demo mode; this is not evidence that funds were transferred.
+- A film with no known runtime cannot be scheduled until its duration is supplied; the system does not guess an end time.
+
+## Original brief mapped to cinema
+
+| Booking brief | Cinema implementation |
+| --- | --- |
+| Services and price/duration | Films and priced screenings with runtime |
+| Providers/employees | Cinemas and auditoriums |
+| Availability | Screening times, hall formats, and seat inventory |
+| View available times | Date-filtered showtimes in Asia/Tashkent |
+| Make a booking | Authenticated seat hold followed by OTP confirmation |
+| Booking statuses/history | Pending, confirmed, cancelled, completed, with customer history |
+| Prevent double booking | Database locks and unique active seat assignments |
+| Backend API and authentication | FastAPI, JWT authentication, validation, PostgreSQL |
 
 ## TMDB attribution
 
-Catalog metadata and artwork are fetched from TMDB on the server. TMDB access tokens belong in server environment variables. This product uses the TMDB API but is not endorsed or certified by TMDB. See [TMDB](https://www.themoviedb.org/) and its [API documentation](https://developer.themoviedb.org/docs).
-
-## Original appointment booking brief: cinema mapping
-
-| Original requirement | Cinema equivalent / status |
-|---|---|
-| Services: name, description, duration, price | Movies plus priced screenings |
-| Providers/employees | Cinemas and auditoriums |
-| Availability | Screenings, hall capabilities, and live seat inventory |
-| User can see available times | Date filtered showtimes in `Asia/Tashkent` |
-| User can book | Authenticated, short seat hold followed by SMS verification |
-| Pending/confirmed/cancelled/completed | All four statuses in the API and SQL enum |
-| Prevent double booking | Row locks plus partial unique seat assignment index |
-| Backend API/auth/validation/history | FastAPI, JWT, validation, per customer history |
-
-### Current product readiness
-
-The core application code is implemented, but its public Vercel link is **not yet a shared, SQL backed production deployment**. A production SQL database, TMDB token, SMS gateway, and their deployment environment values still need to be supplied/configured. Until that is done, this README intentionally does not mark production deployment complete or claim the public demo saves visitor bookings to a shared database.
+Movie metadata and artwork are provided by TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB. See https://www.themoviedb.org/ and https://developer.themoviedb.org/docs.
 
 ## AI assistance
 
-AI assistance was used to draft and revise the API/data model, integration scaffolding, UI copy, and edge case documentation. The implementation choices are documented above. Before production, deploy against a staging PostgreSQL database, configure the real SMS sender, run concurrent seat booking checks, and confirm the provider's rate limits and delivery behavior.
+AI tools helped draft and revise API/data-model scaffolding, UI copy, integration code, and edge-case documentation. The implementation uses database constraints and server-side validation for booking correctness. Before using this as a commercial service, connect a real SMS provider and payment processor, exercise checkout and concurrent booking on staging, and review operational/security requirements.
