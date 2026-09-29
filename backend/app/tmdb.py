@@ -1,4 +1,5 @@
-from datetime import date
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 from decimal import Decimal
 import httpx
 from sqlalchemy import select
@@ -23,11 +24,27 @@ def sync_catalog(db: Session) -> tuple[int, int]:
     counts = {"now_playing": 0, "upcoming": 0}
     try:
         with httpx.Client(base_url=BASE, headers=headers, timeout=httpx.Timeout(12.0)) as client:
+            today = datetime.now(ZoneInfo(settings.business_timezone)).date().isoformat()
+            for stale in db.scalars(select(Movie).where(Movie.catalog_status == "upcoming")):
+                stale.active = False
             for category in ("now_playing", "upcoming"):
-                params = {"language": "en-US", "page": 1, "include_adult": "false"}
-                if category == "now_playing":
-                    params["region"] = settings.tmdb_region
-                listing = client.get(f"/movie/{category}", params=params)
+                if category == "upcoming":
+                    listing = client.get("/discover/movie", params={
+                        "region": settings.tmdb_region,
+                        "language": "en-US",
+                        "page": 1,
+                        "include_adult": "false",
+                        "primary_release_date.gte": today,
+                        "with_release_type": "2|3",
+                        "sort_by": "popularity.desc",
+                    })
+                else:
+                    listing = client.get(f"/movie/{category}", params={
+                        "region": settings.tmdb_region,
+                        "language": "en-US",
+                        "page": 1,
+                        "include_adult": "false",
+                    })
                 listing.raise_for_status()
                 for item in listing.json().get("results", [])[:10]:
                     tmdb_id = item.get("id")
