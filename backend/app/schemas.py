@@ -1,4 +1,4 @@
-from datetime import date, datetime, time
+from datetime import datetime
 from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from .models import BookingStatus
@@ -16,53 +16,91 @@ class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
 
-class ServiceIn(BaseModel):
-    name: str = Field(min_length=1, max_length=120)
-    description: str = Field(default="", max_length=2000)
-    duration_minutes: int = Field(gt=0, le=480)
-    price: Decimal = Field(ge=0, max_digits=10, decimal_places=2)
+class MovieIn(BaseModel):
+    title: str = Field(min_length=1, max_length=180)
+    synopsis: str = Field(default="", max_length=5000)
+    duration_minutes: int = Field(gt=0, le=360)
+    genre: str = Field(default="Drama", max_length=100)
+    age_rating: str = Field(default="13+", max_length=12)
+    language: str = Field(default="O‘zbekcha", max_length=60)
+    poster_url: str = Field(default="", max_length=800)
 
-class ServiceOut(ServiceIn):
+class MovieOut(MovieIn):
     id: int
     active: bool
     model_config = ConfigDict(from_attributes=True)
 
-class ProviderIn(BaseModel):
-    name: str = Field(min_length=1, max_length=120)
-    bio: str = Field(default="", max_length=2000)
-    service_ids: list[int] = Field(default_factory=list)
+class AuditoriumIn(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    cinema_name: str = Field(min_length=1, max_length=140)
+    city: str = Field(default="Tashkent", max_length=100)
+    address: str = Field(default="", max_length=300)
+    timezone: str = "Asia/Tashkent"
+    row_count: int = Field(ge=1, le=26)
+    seats_per_row: int = Field(ge=1, le=30)
 
-class ProviderOut(BaseModel):
+class AuditoriumOut(BaseModel):
     id: int
     name: str
-    bio: str
-    active: bool
-    service_ids: list[int]
+    cinema_name: str
+    city: str
+    address: str
+    timezone: str
+    seat_count: int
 
-class AvailabilityIn(BaseModel):
-    weekday: int = Field(ge=0, le=6)
-    starts_at: time
-    ends_at: time
-    timezone: str = "Asia/Tashkent"
+class ScreeningIn(BaseModel):
+    movie_id: int
+    auditorium_id: int
+    starts_at: datetime
+    base_price: Decimal = Field(ge=0, max_digits=12, decimal_places=2)
+    premium_surcharge: Decimal = Field(default=0, ge=0, max_digits=12, decimal_places=2)
 
-class SlotOut(BaseModel):
+class ScreeningOut(BaseModel):
+    id: int
+    movie_id: int
+    auditorium_id: int
     starts_at: datetime
     ends_at: datetime
+    base_price: Decimal
+    premium_surcharge: Decimal
+    movie_title: str
+    duration_minutes: int
+    cinema_name: str
+    auditorium_name: str
+    city: str
+    timezone: str
+    available_seats: int
+
+class SeatOut(BaseModel):
+    id: int
+    row_label: str
+    seat_number: int
+    seat_type: str
+    price: Decimal
+    available: bool
+
+class ScreeningSeatsOut(BaseModel):
+    screening: ScreeningOut
+    seats: list[SeatOut]
 
 class BookingIn(BaseModel):
-    service_id: int
-    provider_id: int
-    starts_at: datetime
+    screening_id: int
+    seat_ids: list[int] = Field(min_length=1, max_length=8)
 
 class BookingOut(BaseModel):
     id: int
-    service_id: int
-    provider_id: int
-    starts_at: datetime
-    ends_at: datetime
+    customer_id: int
+    screening_id: int
     status: BookingStatus
-    price_at_booking: Decimal
-    model_config = ConfigDict(from_attributes=True)
+    seat_count: int
+    total_price: Decimal
+    hold_expires_at: datetime | None
+    created_at: datetime
+    movie_title: str
+    starts_at: datetime
+    cinema_name: str
+    auditorium_name: str
+    seats: list[str]
 
-class StatusIn(BaseModel):
+class BookingStatusIn(BaseModel):
     status: BookingStatus

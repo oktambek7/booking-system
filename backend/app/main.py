@@ -13,9 +13,9 @@ async def lifespan(app: FastAPI):
     with engine.begin() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS btree_gist"))
         conn.execute(text("""DO $$ BEGIN
-          ALTER TABLE bookings ADD CONSTRAINT bookings_no_overlap
-          EXCLUDE USING gist (provider_id WITH =, tstzrange(starts_at, ends_at, '[)') WITH &&)
-          WHERE (status <> 'CANCELLED');
+          ALTER TABLE screenings ADD CONSTRAINT screenings_no_overlap
+          EXCLUDE USING gist (auditorium_id WITH =, tstzrange(starts_at, ends_at, '[)') WITH &&)
+          WHERE (status = 'scheduled');
         EXCEPTION WHEN duplicate_object THEN NULL; END $$;"""))
     yield
 
