@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     sms_sender: str = "4546"
     otp_secret: str = ""
     app_environment: str = "development"
+    admin_email: str = ""
+    admin_password: str = ""
+    admin_nickname: str = "admin"
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 settings = Settings()

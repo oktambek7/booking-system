@@ -17,8 +17,8 @@ An Uzbek first cinema discovery and seat booking product. The frontend is a Vite
 - [x] Light/dark theme and responsive UI
 - [x] Admin protected API for films, halls, screenings, catalog sync, booking review/status changes
 - [x] API reference at `/docs`; Render API deployment blueprint at `render.yaml`
-- [ ] Configure hosted PostgreSQL, TMDB credential, and real SMS gateway
-- [ ] Deploy the configured API and connect the Vercel frontend using `VITE_API_URL`
+- [x] Configure hosted PostgreSQL and deploy the API`n- [ ] Configure TMDB credential and real SMS gateway
+- [x] Deploy the configured API and connect the Vercel frontend using `VITE_API_URL`
 - [ ] Configure real admin account, halls, seat plans, screening schedules, and review the launched flow
 
 ## Run locally
@@ -54,7 +54,7 @@ The local default `SMS_MODE=mock` displays a four digit code in the checkout res
 4. Set Vercel's `VITE_API_URL` to the deployed API origin and redeploy. Set API `CORS_ORIGINS` to the exact Vercel site origin.
 5. Bootstrap an administrator, create each cinema hall and seat layout, publish screening schedules and supported formats, then run the TMDB catalog sync from the admin interface.
 
-Do not commit secrets or send them through Git. Put provider credentials into the host's environment variable settings. The current public Vercel URL is still the earlier browser demo until these hosted services are configured; the SQL backed product is not yet live.
+Do not commit secrets or send them through Git. Put provider credentials into the host's environment variable settings. The public Vercel app now uses the deployed SQL backed API. The catalog remains intentionally empty until an administrator adds the TMDB credential, creates the first administrator account, and publishes halls and screenings.
 
 ## Data design and race protection
 
