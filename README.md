@@ -7,18 +7,18 @@ Mini appointment booking platform for a service business. Customers can browse s
 ### Part 0 — Repository and project plan
 - [x] Create project repository locally
 - [x] Define implementation parts and completion checklist
-- [ ] Publish public GitHub repository
+- [x] Publish public GitHub repository
 
 ### Part 1 — Backend API
-- [ ] Choose and document architecture and database schema
-- [ ] Authentication and role-based access (customer, admin/provider)
-- [ ] Service and provider management endpoints
-- [ ] Weekly availability and exception dates
-- [ ] Availability search endpoint
-- [ ] Booking creation, status transitions, cancellation, and history
-- [ ] Validate input, ownership, business hours, and past dates
-- [ ] Prevent overlapping bookings under concurrent requests
-- [ ] API documentation
+- [x] Choose and document architecture and database schema
+- [x] Authentication and role-based access (customer, admin/provider)
+- [x] Service and provider management endpoints
+- [x] Weekly availability and exception dates
+- [x] Availability search endpoint
+- [x] Booking creation, status transitions, cancellation, and history
+- [x] Validate input, ownership, business hours, and past dates
+- [x] Prevent overlapping bookings under concurrent requests
+- [x] API documentation (OpenAPI at `/docs`)
 
 ### Part 2 — Frontend booking experience
 - [ ] Responsive service and provider discovery
@@ -49,9 +49,45 @@ Mini appointment booking platform for a service business. Customers can browse s
 - Store timestamps consistently (UTC) and display them in the business/customer timezone. Handle daylight-saving transitions explicitly.
 - Reject malformed dates, invalid durations/prices, unavailable providers, and requests for inactive services.
 
-## Development
+## Run locally (backend)
 
-Setup instructions will be added with the backend and frontend stacks in their respective parts.
+Prerequisites: Docker Desktop and Docker Compose. From the repository root:
+
+```sh
+docker compose up --build
+```
+
+The API is at `http://localhost:8000`; interactive API documentation is at `http://localhost:8000/docs`. For anything beyond local development, set a unique high-entropy `JWT_SECRET` in the environment before starting Compose. The local database credentials in Compose are only for development.
+
+Create the first admin in another terminal:
+
+```sh
+docker compose exec -e ADMIN_EMAIL=admin@example.com -e ADMIN_PASSWORD='change-this-to-a-long-password' api python -m app.bootstrap_admin
+```
+
+Register customers at `POST /api/auth/register`, then sign in at `POST /api/auth/login`. Use the returned bearer token for protected routes. Admins create services and providers, then set weekly rules with `POST /api/providers/{id}/availability` (`weekday`: Monday=0 through Sunday=6). Customers query `GET /api/availability?service_id=1&provider_id=1&date=2026-10-01` and book with `POST /api/bookings` using an ISO-8601 `starts_at` that includes a timezone offset.
+
+## Backend architecture
+
+FastAPI exposes REST endpoints and generated OpenAPI docs. SQLAlchemy maps users, services, providers, provider/service assignments, weekly availability, and bookings to PostgreSQL. Passwords use Argon2 hashes; signed JWT bearer tokens carry user identity and role. Public reads expose active catalog and available times; catalog and schedule writes require an admin. Customers only access their own booking history and may cancel their own appointments. Providers linked to a user account may manage their own bookings.
+
+Availability uses recurring weekday rules, local wall-clock times, and an IANA timezone per rule. Booking timestamps are stored as timezone-aware instants. Prices and service durations are copied to the booking at creation so later catalog edits do not alter existing appointments. PostgreSQL's GiST exclusion constraint over provider and half-open timestamp ranges is the final concurrency guard; the second simultaneous overlapping insert gets HTTP 409. `[start, end)` allows adjacent appointments. Cancelled bookings release a slot; other statuses continue to block it.
+
+`backend/migrations/001_booking_overlap.sql` documents the required database constraint. The API applies it on startup as well. In production, use a managed PostgreSQL instance, a strong secret, HTTPS, and a controlled schema migration process.
+
+## Edge cases and current scope
+
+- Booking time must be in the future and include an explicit timezone offset.
+- A service must be active and assigned to the selected provider; requested duration and price come from the server.
+- Slots are offered at 15-minute increments and must fit wholly inside a weekly availability window.
+- A database constraint resolves simultaneous requests, including requests from separate API workers.
+- Status transitions are restricted: pending → confirmed/cancelled; confirmed → cancelled/completed. Cancelled and completed are terminal.
+- Weekly availability is implemented; one-off closures, holidays, and split-shift overlap validation are follow-up work.
+- Email notifications, calendar sync, and customer-facing frontend are follow-up parts.
+
+## AI assistance
+
+AI helped draft the initial schemas, API routes, and documentation. The design decisions are described above: PostgreSQL exclusion constraints protect the race condition, JWT roles protect management actions, and price snapshots preserve booking history. Review the code and exercise the OpenAPI flows before using it with real customers.
 
 ## Architecture
 
