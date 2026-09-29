@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: parda-cinema-api
+    runtime: docker
+    rootDir: backend
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: OTP_SECRET
+        generateValue: true
+      - key: TMDB_READ_TOKEN
+        sync: false
+      - key: SMS_MODE
+        value: mock
+      - key: SMS_EMAIL
+        sync: false
+      - key: SMS_PASSWORD
+        sync: false
+      - key: APP_ENVIRONMENT
+        value: production
+      - key: CORS_ORIGINS
+        sync: false

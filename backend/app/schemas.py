@@ -1,10 +1,12 @@
-from datetime import datetime
+from datetime import date, datetime
+from enum import Enum
+from typing import Literal
 from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from .models import BookingStatus
 
 class UserCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=120)
+    nickname: str = Field(min_length=2, max_length=40, pattern=r"^[\w.-]+$")
     email: EmailStr
     password: str = Field(min_length=10, max_length=128)
 
@@ -19,7 +21,7 @@ class Token(BaseModel):
 class MovieIn(BaseModel):
     title: str = Field(min_length=1, max_length=180)
     synopsis: str = Field(default="", max_length=5000)
-    duration_minutes: int = Field(gt=0, le=360)
+    duration_minutes: int | None = Field(default=None, gt=0, le=360)
     genre: str = Field(default="Drama", max_length=100)
     age_rating: str = Field(default="13+", max_length=12)
     language: str = Field(default="O‘zbekcha", max_length=60)
@@ -28,6 +30,13 @@ class MovieIn(BaseModel):
 class MovieOut(MovieIn):
     id: int
     active: bool
+    backdrop_url: str = ""
+    tmdb_id: int | None = None
+    release_date: date | None = None
+    vote_average: Decimal | None = None
+    cast_names: list[str] = Field(default_factory=list)
+    trailer_key: str | None = None
+    catalog_status: str = "now_playing"
     model_config = ConfigDict(from_attributes=True)
 
 class AuditoriumIn(BaseModel):
@@ -36,6 +45,7 @@ class AuditoriumIn(BaseModel):
     city: str = Field(default="Tashkent", max_length=100)
     address: str = Field(default="", max_length=300)
     timezone: str = "Asia/Tashkent"
+    formats: list[Literal["2D", "3D", "IMAX"]] = Field(default_factory=lambda: ["2D"], min_length=1, max_length=3)
     row_count: int = Field(ge=1, le=26)
     seats_per_row: int = Field(ge=1, le=30)
 
@@ -46,6 +56,7 @@ class AuditoriumOut(BaseModel):
     city: str
     address: str
     timezone: str
+    formats: list[str] = Field(default_factory=lambda: ["2D"])
     seat_count: int
 
 class ScreeningIn(BaseModel):
@@ -54,6 +65,8 @@ class ScreeningIn(BaseModel):
     starts_at: datetime
     base_price: Decimal = Field(ge=0, max_digits=12, decimal_places=2)
     premium_surcharge: Decimal = Field(default=0, ge=0, max_digits=12, decimal_places=2)
+    format_type: str = Field(default="2D", pattern=r"^(2D|3D|IMAX)$")
+
 
 class ScreeningOut(BaseModel):
     id: int
@@ -63,8 +76,9 @@ class ScreeningOut(BaseModel):
     ends_at: datetime
     base_price: Decimal
     premium_surcharge: Decimal
+    format_type: str
     movie_title: str
-    duration_minutes: int
+    duration_minutes: int | None
     cinema_name: str
     auditorium_name: str
     city: str
@@ -104,3 +118,39 @@ class BookingOut(BaseModel):
 
 class BookingStatusIn(BaseModel):
     status: BookingStatus
+
+class PaymentMethod(str, Enum):
+    UZCARD = "uzcard"
+    HUMO = "humo"
+    VISA = "visa"
+    MASTERCARD = "mastercard"
+
+class PaymentStartIn(BaseModel):
+    method: PaymentMethod
+    phone: str = Field(pattern=r"^\+[1-9]\d{7,14}$")
+
+class PaymentStartOut(BaseModel):
+    payment_id: int
+    reference: str
+    method: PaymentMethod
+    phone_masked: str
+    amount: Decimal
+    expires_at: datetime
+    demo_mode: bool
+    demo_code: str | None = None
+
+class OtpVerifyIn(BaseModel):
+    code: str = Field(pattern=r"^\d{4}$")
+
+class PaymentVerifyOut(BaseModel):
+    payment_id: int
+    reference: str
+    status: str
+    booking: BookingOut
+
+class CatalogSyncOut(BaseModel):
+    imported_now_playing: int
+    imported_upcoming: int
+
+class MovieDetailsOut(MovieOut):
+    trailer_url: str | None = None

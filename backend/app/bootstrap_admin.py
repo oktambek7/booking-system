@@ -15,7 +15,11 @@ def main():
         if user:
             print("Admin account already exists")
             return
-        db.add(User(email=email, name="Administrator", password_hash=hash_password(password), role=Role.ADMIN))
+        nickname = email.split("@", 1)[0][:32].lower()
+        if db.scalar(select(User).where(User.nickname == nickname)):
+            nickname = f"admin-{email.split('@', 1)[0][:24].lower()}"
+        db.add(User(email=email, name=nickname, nickname=nickname,
+                    password_hash=hash_password(password), role=Role.ADMIN))
         db.commit()
         print("Admin account created")
 

@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
@@ -11,6 +12,10 @@ from .database import Base, engine
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     with engine.begin() as conn:
+        migration = Path(__file__).resolve().parent.parent / "migrations" / "002_persistent_product_data.sql"
+        for statement in migration.read_text(encoding="utf-8").split(";"):
+            if statement.strip():
+                conn.exec_driver_sql(statement)
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS btree_gist"))
         conn.execute(text("""DO $$ BEGIN
           ALTER TABLE screenings ADD CONSTRAINT screenings_no_overlap
