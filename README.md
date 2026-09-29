@@ -28,9 +28,9 @@ Mini appointment booking platform for a service business. Customers can browse s
 - [x] Loading, empty, validation, and error states
 
 ### Part 3 — Business dashboard
-- [ ] Manage services and providers
-- [ ] Configure availability and exception dates
-- [ ] View and update bookings
+- [x] Manage services and providers
+- [x] Configure weekly availability
+- [x] View and update bookings
 
 ### Part 4 — Integration and delivery
 - [ ] Connect frontend and backend
@@ -94,6 +94,10 @@ Availability uses recurring weekday rules, local wall-clock times, and an IANA t
 - Status transitions are restricted: pending → confirmed/cancelled; confirmed → cancelled/completed. Cancelled and completed are terminal.
 - Weekly availability is implemented; one-off closures, holidays, and split-shift overlap validation are follow-up work.
 - Email notifications, calendar sync, and customer-facing frontend are follow-up parts.
+
+## Business dashboard
+
+Create an admin using the bootstrap instructions above, then sign in from the site. Admin accounts get a **Studio Admin** entry to manage appointments, create services and providers, and configure recurring weekly provider hours. Availability is configured in `Asia/Tashkent`. Provider accounts can view and update bookings assigned to them through the API; customer accounts only see their own history.
 
 ## AI assistance
 
