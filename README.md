@@ -21,11 +21,11 @@ Mini appointment booking platform for a service business. Customers can browse s
 - [x] API documentation (OpenAPI at `/docs`)
 
 ### Part 2 — Frontend booking experience
-- [ ] Responsive service and provider discovery
-- [ ] Date and available-time selection
-- [ ] Sign-up/sign-in and booking confirmation
-- [ ] Customer booking history and cancellation
-- [ ] Loading, empty, validation, and error states
+- [x] Responsive service and provider discovery
+- [x] Date and available-time selection
+- [x] Sign-up/sign-in and booking confirmation
+- [x] Customer booking history and cancellation
+- [x] Loading, empty, validation, and error states
 
 ### Part 3 — Business dashboard
 - [ ] Manage services and providers
@@ -58,6 +58,16 @@ docker compose up --build
 ```
 
 The API is at `http://localhost:8000`; interactive API documentation is at `http://localhost:8000/docs`. For anything beyond local development, set a unique high-entropy `JWT_SECRET` in the environment before starting Compose. The local database credentials in Compose are only for development.
+
+## Run locally (frontend)
+
+```sh
+cd frontend
+npm install
+npm run dev
+```
+
+Without `VITE_API_URL`, the interface runs in interactive demo mode and stores demo bookings in this browser. To connect the API, copy `frontend/.env.example` to `frontend/.env.local`, set `VITE_API_URL` to the backend origin, and add the frontend origin to the backend `CORS_ORIGINS` value. Build with `npm run build` from `frontend/`. The frontend is a static Vite app and `frontend/vercel.json` handles SPA routes on Vercel.
 
 Create the first admin in another terminal:
 
