@@ -24,8 +24,10 @@ def sync_catalog(db: Session) -> tuple[int, int]:
     try:
         with httpx.Client(base_url=BASE, headers=headers, timeout=httpx.Timeout(12.0)) as client:
             for category in ("now_playing", "upcoming"):
-                listing = client.get(f"/movie/{category}", params={"region": settings.tmdb_region,
-                    "language": "en-US", "page": 1, "include_adult": "false"})
+                params = {"language": "en-US", "page": 1, "include_adult": "false"}
+                if category == "now_playing":
+                    params["region"] = settings.tmdb_region
+                listing = client.get(f"/movie/{category}", params=params)
                 listing.raise_for_status()
                 for item in listing.json().get("results", [])[:10]:
                     tmdb_id = item.get("id")
