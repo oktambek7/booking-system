@@ -28,7 +28,7 @@ def _expire_holds(db: Session):
     db.execute(update(Booking).where(Booking.status == BookingStatus.PENDING,
                                     Booking.hold_expires_at <= now).values(status=BookingStatus.CANCELLED))
     db.execute(update(BookingSeat).where(BookingSeat.active.is_(True), BookingSeat.booking_id.in_(
-        sa.select(Booking.id).where(Booking.status == BookingStatus.CANCELLED))))
+        sa.select(Booking.id).where(Booking.status == BookingStatus.CANCELLED))).values(active=False))
 
 def _screening_out(db: Session, screening: Screening) -> ScreeningOut:
     _expire_holds(db)
