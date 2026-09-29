@@ -86,6 +86,8 @@ npm run dev
 
 Without `VITE_API_URL`, the frontend provides a local interactive demo and saves demo account/bookings in that browser. To use the API, copy `.env.example` to `.env.local`, set `VITE_API_URL` to the API origin, and configure backend CORS for the frontend origin. Build using `npm run build`. `frontend/vercel.json` routes single-page app paths to the app shell.
 
+The public Vercel preview currently runs this browser-only demo mode: sample bookings are stored in each visitor's browser and are not shared across visitors. The FastAPI/PostgreSQL backend provides shared booking state and the database race-condition guarantees when deployed and connected with `VITE_API_URL`; this repository includes the local Docker setup, but no production database credentials were supplied.
+
 ## API outline
 
 - `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`
