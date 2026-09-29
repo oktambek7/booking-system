@@ -1,0 +1,25 @@
+{
+  "name": "Parda Cinema",
+  "direction": "The Cinema Programme Board",
+  "description": "Light Uzbek-first repertory and seat-booking interface.",
+  "colors": {
+    "ink": "#252624",
+    "muted": "#777970",
+    "paper": "#f8f7f3",
+    "white": "#fffefa",
+    "cream": "#efeee9",
+    "line": "#e5e3db",
+    "sage": "#52664f",
+    "sage-light": "#e5ebdf",
+    "coral": "#c96850"
+  },
+  "typography": {
+    "display": "Playfair Display, Georgia, serif",
+    "body": "DM Sans, sans-serif"
+  },
+  "principles": [
+    "Film, showtime, seats, and total remain clear at every step.",
+    "Seat status has text labels and distinct visual states.",
+    "The demo confirms reservations without charging a payment."
+  ]
+}

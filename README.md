@@ -1,65 +1,82 @@
-﻿# Booking System
+# Parda Cinema
 
-Mini appointment booking platform for a service business. Customers can browse services and providers, view available times, and manage bookings. Business staff can manage the catalog, availability, and appointments.
+Lightweight cinema discovery and seat booking for moviegoers, with a cinema admin API. Uzbek-first interface, UZS prices, and Asia/Tashkent showtimes. The demo uses fictional sample films and a no-payment checkout; a payment provider can be added later.
 
-## Project progress
+## Project checklist
 
-### Part 0 — Repository and project plan
-- [x] Create project repository locally
-- [x] Define implementation parts and completion checklist
-- [x] Publish public GitHub repository
+### Part 0 — Project setup
+- [x] Public GitHub repository: https://github.com/oktambek7/booking-system
+- [x] Product brief and staged delivery plan
 
-### Part 1 — Backend API
-- [x] Choose and document architecture and database schema
-- [x] Authentication and role-based access (customer, admin/provider)
-- [x] Service and provider management endpoints
-- [x] Weekly availability and exception dates
-- [x] Availability search endpoint
-- [x] Booking creation, status transitions, cancellation, and history
-- [x] Validate input, ownership, business hours, and past dates
-- [x] Prevent overlapping bookings under concurrent requests
-- [x] API documentation (OpenAPI at `/docs`)
+### Part 1 — Cinema backend
+- [x] Authentication and customer/admin roles
+- [x] Manage movies, cinemas, halls, and screenings
+- [x] Create seats from an auditorium layout
+- [x] Browse screenings by local date, movie, and city
+- [x] Read live seat availability and tiered prices
+- [x] Place a temporary seat hold, confirm, cancel, and view booking history
+- [x] Validate inputs, ownership, future showtimes, and status transitions
+- [x] Prevent double booking with row locks and a PostgreSQL partial unique index
+- [x] Prevent overlapping screenings in a hall with a PostgreSQL exclusion constraint
+- [x] OpenAPI reference at `/docs`
 
-### Part 2 — Frontend booking experience
-- [x] Responsive service and provider discovery
-- [x] Date and available-time selection
-- [x] Sign-up/sign-in and booking confirmation
-- [x] Customer booking history and cancellation
-- [x] Loading, empty, validation, and error states
+### Part 2 — Customer cinema experience
+- [x] Uzbek-first film discovery and date browsing
+- [x] Showtime selection and clear auditorium context
+- [x] Responsive seat map, explicit seat states, and ticket summary
+- [x] Sign-up/sign-in, 10-minute seat hold, and no-payment confirmation
+- [x] Booking history, cancellation, and hold-expiry states
+- [x] Responsive, loading, empty, error, and seat-conflict states
 
-### Part 3 — Business dashboard
-- [x] Manage services and providers
-- [x] Configure weekly availability
-- [x] View and update bookings
+### Part 3 — Cinema administration
+- [x] Demo/admin panel to manage films, create screenings, and review bookings
+- [x] Confirm and cancel booking status
+- [x] Schedule visibility; hall/seat-layout creation through the admin API
 
-### Part 4 — Integration and delivery
-- [ ] Connect frontend and backend
-- [ ] Seed demo data and document demo credentials
-- [ ] Document setup, architecture, tradeoffs, and edge cases
-- [ ] Review AI-assisted work and explain key implementation decisions
-- [ ] Deploy and add public demo URL
+### Part 4 — Delivery and explanation
+- [x] Frontend can use the API through `VITE_API_URL`; browser-only demo seed included
+- [x] Architecture, edge cases, and AI-assisted work documented
+- [ ] Production Vercel deployment and public URL
 
 ## Booking rules and edge cases
 
-- A provider cannot have overlapping active bookings. Booking creation must enforce this atomically in the database/transaction so simultaneous requests for the same time cannot both succeed.
-- Cancelled bookings do not block availability. Pending, confirmed, and completed bookings do.
-- A booking must fit completely within provider availability and must not be in the past.
-- Duration comes from the selected service; clients cannot override price or duration.
-- Booking status transitions are validated, and customers can only view or cancel their own bookings.
-- Store timestamps consistently (UTC) and display them in the business/customer timezone. Handle daylight-saving transitions explicitly.
-- Reject malformed dates, invalid durations/prices, unavailable providers, and requests for inactive services.
+- The server accepts seat IDs and a screening ID; price is always calculated from the screening and each seat's tier.
+- A booking starts as `pending` and holds its seats for ten minutes. The customer confirms within that window. Expired holds become cancelled and release their seats while preserving booking history.
+- A PostgreSQL partial unique index permits only one active assignment for a `(screening_id, seat_id)`. Sorted row locks serialize competing requests; the uniqueness constraint remains the final guard across API workers. A losing request receives HTTP 409 and must refresh the seat map.
+- Duplicate seats, more than eight seats, seats from another hall, started screenings, expired holds, and unauthorized booking access are rejected.
+- Cancelling releases seat assignments. Confirmed bookings may be cancelled; completed and cancelled bookings are terminal. The demo has no charge or refund workflow.
+- Showtimes are stored as timezone-aware instants. The auditorium timezone controls date filtering and display (default `Asia/Tashkent`). Adjacent screenings can meet at their boundary; overlapping screenings in one hall are rejected by a database exclusion constraint.
+- Movie runtime determines the screening end time, so the client cannot submit an inconsistent duration.
 
-## Run locally (backend)
+## Architecture
 
-Prerequisites: Docker Desktop and Docker Compose. From the repository root:
+FastAPI provides REST endpoints and generated OpenAPI docs. SQLAlchemy maps users, movies, auditoriums, seats, screenings, bookings, and seat assignments to PostgreSQL. Passwords are hashed; signed JWT bearer tokens protect booking and administration endpoints. Movie and screening reads are public, while writes require the admin role. Customers see only their own booking history and can only act on their own seats.
+
+The seat map reports availability at read time; booking always rechecks inside a transaction. This avoids treating stale UI data as a reservation. Holds expire on API reads and booking actions, and the partial index is the authoritative race-condition guard. Production should run the SQL in `backend/migrations/001_cinema_constraints.sql` through a controlled migration process; application startup also ensures the constraints for this demo.
+
+## Run locally
+
+Prerequisites: Docker Desktop and Docker Compose.
 
 ```sh
 docker compose up --build
 ```
 
-The API is at `http://localhost:8000`; interactive API documentation is at `http://localhost:8000/docs`. For anything beyond local development, set a unique high-entropy `JWT_SECRET` in the environment before starting Compose. The local database credentials in Compose are only for development.
+The API runs at `http://localhost:8000`; interactive documentation is at `http://localhost:8000/docs`. Seed the fictional cinema catalog and screenings:
 
-## Run locally (frontend)
+```sh
+docker compose exec api python -m app.seed_demo
+```
+
+Create the first administrator:
+
+```sh
+docker compose exec -e ADMIN_EMAIL=admin@example.com -e ADMIN_PASSWORD='use-a-long-unique-password' api python -m app.bootstrap_admin
+```
+
+Set a unique `JWT_SECRET` before any shared deployment. Local database credentials are development-only. Register customers at `POST /api/auth/register`, then sign in at `POST /api/auth/login` and send the returned bearer token to protected endpoints.
+
+### Frontend
 
 ```sh
 cd frontend
@@ -67,46 +84,25 @@ npm install
 npm run dev
 ```
 
-Without `VITE_API_URL`, the interface runs in interactive demo mode and stores demo bookings in this browser. To connect the API, copy `frontend/.env.example` to `frontend/.env.local`, set `VITE_API_URL` to the backend origin, and add the frontend origin to the backend `CORS_ORIGINS` value. Build with `npm run build` from `frontend/`. The frontend is a static Vite app and `frontend/vercel.json` handles SPA routes on Vercel.
+Without `VITE_API_URL`, the frontend provides a local interactive demo and saves demo account/bookings in that browser. To use the API, copy `.env.example` to `.env.local`, set `VITE_API_URL` to the API origin, and configure backend CORS for the frontend origin. Build using `npm run build`. `frontend/vercel.json` routes single-page app paths to the app shell.
 
-Create the first admin in another terminal:
+## API outline
 
-```sh
-docker compose exec -e ADMIN_EMAIL=admin@example.com -e ADMIN_PASSWORD='change-this-to-a-long-password' api python -m app.bootstrap_admin
-```
+- `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`
+- `GET/POST/PATCH/DELETE /api/movies` (writes require admin)
+- `GET/POST /api/cinemas` (writes require admin; create a hall layout)
+- `GET /api/screenings?date=YYYY-MM-DD&movie_id=…&city=…`
+- `POST /api/screenings` (admin)
+- `GET /api/screenings/{id}/seats`
+- `POST /api/bookings`, `POST /api/bookings/{id}/confirm`
+- `GET /api/bookings`, `PATCH /api/bookings/{id}/status`
 
-Register customers at `POST /api/auth/register`, then sign in at `POST /api/auth/login`. Use the returned bearer token for protected routes. Admins create services and providers, then set weekly rules with `POST /api/providers/{id}/availability` (`weekday`: Monday=0 through Sunday=6). Customers query `GET /api/availability?service_id=1&provider_id=1&date=2026-10-01` and book with `POST /api/bookings` using an ISO-8601 `starts_at` that includes a timezone offset.
+## AI-assisted work
 
-## Backend architecture
+AI assistance was used to draft the cinema schema, endpoint flow, interface implementation, and documentation. The implementation is reviewed against the actual SQLAlchemy models, authorization rules, server-side pricing, transaction behavior, and the PostgreSQL constraints. The user-facing checkout has no payment integration: it places and confirms a seat reservation only. The author should be ready to explain why a UI availability check is advisory, how the database resolves concurrent seat claims, and how expiring a hold releases seats without deleting its history.
 
-FastAPI exposes REST endpoints and generated OpenAPI docs. SQLAlchemy maps users, services, providers, provider/service assignments, weekly availability, and bookings to PostgreSQL. Passwords use Argon2 hashes; signed JWT bearer tokens carry user identity and role. Public reads expose active catalog and available times; catalog and schedule writes require an admin. Customers only access their own booking history and may cancel their own appointments. Providers linked to a user account may manage their own bookings.
+## Deployment
 
-Availability uses recurring weekday rules, local wall-clock times, and an IANA timezone per rule. Booking timestamps are stored as timezone-aware instants. Prices and service durations are copied to the booking at creation so later catalog edits do not alter existing appointments. PostgreSQL's GiST exclusion constraint over provider and half-open timestamp ranges is the final concurrency guard; the second simultaneous overlapping insert gets HTTP 409. `[start, end)` allows adjacent appointments. Cancelled bookings release a slot; other statuses continue to block it.
-
-`backend/migrations/001_booking_overlap.sql` documents the required database constraint. The API applies it on startup as well. In production, use a managed PostgreSQL instance, a strong secret, HTTPS, and a controlled schema migration process.
-
-## Edge cases and current scope
-
-- Booking time must be in the future and include an explicit timezone offset.
-- A service must be active and assigned to the selected provider; requested duration and price come from the server.
-- Slots are offered at 15-minute increments and must fit wholly inside a weekly availability window.
-- A database constraint resolves simultaneous requests, including requests from separate API workers.
-- Status transitions are restricted: pending → confirmed/cancelled; confirmed → cancelled/completed. Cancelled and completed are terminal.
-- Weekly availability is implemented; one-off closures, holidays, and split-shift overlap validation are follow-up work.
-- Email notifications, calendar sync, and customer-facing frontend are follow-up parts.
-
-## Business dashboard
-
-Create an admin using the bootstrap instructions above, then sign in from the site. Admin accounts get a **Studio Admin** entry to manage appointments, create services and providers, and configure recurring weekly provider hours. Availability is configured in `Asia/Tashkent`. Provider accounts can view and update bookings assigned to them through the API; customer accounts only see their own history.
-
-## AI assistance
-
-AI helped draft the initial schemas, API routes, and documentation. The design decisions are described above: PostgreSQL exclusion constraints protect the race condition, JWT roles protect management actions, and price snapshots preserve booking history. Review the code and exercise the OpenAPI flows before using it with real customers.
-
-## Architecture
-
-To be documented alongside Part 1 once the stack and persistence model are selected.
-
-## AI assistance
-
-AI assistance may be used during implementation. The final documentation will identify the assisted areas, explain the resulting code and design choices, and record how the implementation was reviewed.
+- GitHub: https://github.com/oktambek7/booking-system
+- Public Vercel demo: pending cinema UI deployment
+- Payment provider, email notifications, and calendar integrations: future work
