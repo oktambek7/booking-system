@@ -19,6 +19,7 @@ def sync_catalog(db: Session) -> tuple[int, int]:
     if not settings.tmdb_read_token:
         raise TMDBUnavailable("TMDB_READ_TOKEN is not configured")
     headers = {"Authorization": f"Bearer {settings.tmdb_read_token}", "accept": "application/json"}
+    seen_tmdb_ids: set[int] = set()
     counts = {"now_playing": 0, "upcoming": 0}
     try:
         with httpx.Client(base_url=BASE, headers=headers, timeout=httpx.Timeout(12.0)) as client:
@@ -27,6 +28,11 @@ def sync_catalog(db: Session) -> tuple[int, int]:
                     "language": "en-US", "page": 1, "include_adult": "false"})
                 listing.raise_for_status()
                 for item in listing.json().get("results", [])[:10]:
+                    tmdb_id = item.get("id")
+                    if not tmdb_id or tmdb_id in seen_tmdb_ids:
+                        continue
+                    seen_tmdb_ids.add(tmdb_id)
+                    
                     detail_response = client.get(f"/movie/{item['id']}", params={
                         "language": "en-US", "append_to_response": "credits,videos,release_dates"})
                     detail_response.raise_for_status()
