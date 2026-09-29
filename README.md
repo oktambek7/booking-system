@@ -36,7 +36,7 @@ Lightweight cinema discovery and seat booking for moviegoers, with a cinema admi
 ### Part 4 — Delivery and explanation
 - [x] Frontend can use the API through `VITE_API_URL`; browser-only demo seed included
 - [x] Architecture, edge cases, and AI-assisted work documented
-- [ ] Production Vercel deployment and public URL
+- [x] Production Vercel deployment and public URL
 
 ## Booking rules and edge cases
 
@@ -104,5 +104,5 @@ AI assistance was used to draft the cinema schema, endpoint flow, interface impl
 ## Deployment
 
 - GitHub: https://github.com/oktambek7/booking-system
-- Public Vercel demo: pending cinema UI deployment
+- Public Vercel demo: https://sana-booking.vercel.app (Parda Cinema; public access enabled)
 - Payment provider, email notifications, and calendar integrations: future work
