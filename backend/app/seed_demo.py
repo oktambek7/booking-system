@@ -48,3 +48,49 @@ def main():
         print(f"Seeded {len(films)} fictional sample films, {len(halls)} halls, {len(screening_rows)} screenings")
 
 if __name__=="__main__":main()
+
+
+def ensure_current_demo_schedule() -> int:
+    """Create a rolling Parda-owned schedule only when the managed calendar is empty.
+
+    This keeps the public demo usable without altering an operator-managed schedule.
+    It uses existing films and halls, so the same seat inventory and constraints are
+    exercised as a normal booking.
+    """
+    tz = ZoneInfo("Asia/Tashkent")
+    now = datetime.now(timezone.utc)
+    with SessionLocal() as db:
+        existing = db.scalar(select(Screening.id).where(
+            Screening.status == "scheduled", Screening.starts_at > now
+        ).limit(1))
+        if existing:
+            return 0
+        halls = db.scalars(select(Auditorium).where(Auditorium.active.is_(True))).all()
+        films = db.scalars(select(Movie).where(
+            Movie.active.is_(True), Movie.duration_minutes.is_not(None)
+        ).order_by(Movie.release_date.desc().nullslast(), Movie.id).limit(24)).all()
+        if not halls or not films:
+            return 0
+        created = 0
+        for day_offset in range(7):
+            local_day = (now.astimezone(tz) + timedelta(days=day_offset)).date()
+            for hall_index, hall in enumerate(halls):
+                formats = hall.formats or ["2D"]
+                for slot_index, hour in enumerate((10, 14, 18)):
+                    local_start = datetime.combine(local_day, time(hour, 0), tzinfo=tz)
+                    if local_start.astimezone(timezone.utc) <= now + timedelta(minutes=15):
+                        continue
+                    movie = films[(day_offset * 3 + hall_index + slot_index) % len(films)]
+                    start = local_start.astimezone(timezone.utc)
+                    db.add(Screening(
+                        movie_id=movie.id,
+                        auditorium_id=hall.id,
+                        starts_at=start,
+                        ends_at=start + timedelta(minutes=movie.duration_minutes),
+                        base_price=35000 if hall.hall_type == "vip" else 30000,
+                        premium_surcharge=10000 if hall.hall_type == "vip" else 5000,
+                        format_type="2D" if "2D" in formats else formats[0],
+                    ))
+                    created += 1
+        db.commit()
+        return created

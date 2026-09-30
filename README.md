@@ -20,6 +20,7 @@ Parda is an Uzbek-first cinema discovery and seat-booking app. The React/Vite fr
 - [x] Seat selection, ten-minute pending holds, booking history, cancellation, and status transitions
 - [x] Customer history clearing for cancelled/completed bookings (soft-archived; audit rows and active bookings are retained)
 - [x] In-app demo card payment: Uzcard, Humo, Visa, and Mastercard test credentials, booking summary, email code verification, expiry, resend limits, and no real charge
+- [x] Rolling Parda-owned demo sessions when the managed calendar has no future schedule
 - [x] PostgreSQL protection against concurrent double booking and overlapping hall schedules
 - [x] Uzbek/English/Russian UI, light/dark themes, accessible date chips, and responsive cinema artwork
 - [ ] Configure production SMTP sender and deliverability for payment verification emails
@@ -30,6 +31,8 @@ Parda is an Uzbek-first cinema discovery and seat-booking app. The React/Vite fr
 ## Demo checkout
 
 The checkout is intentionally a **demo payment**. It validates only the published test credentials, emails a four-digit confirmation code, and then marks the Parda booking as confirmed. No processor is contacted and no money moves.
+
+When an empty deployment starts, Parda creates seven days of managed demo screenings from its existing active films and halls. It does not add anything while a future managed schedule already exists.
 
 | Method | Demo card | CVV |
 | --- | --- | --- |

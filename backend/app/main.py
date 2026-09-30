@@ -12,6 +12,7 @@ from .config import settings
 from .database import Base, SessionLocal, engine
 from .models import Role, User
 from .security import hash_password
+from .seed_demo import ensure_current_demo_schedule
 from .tmdb import TMDBUnavailable, sync_catalog
 
 logger = logging.getLogger(__name__)
@@ -51,6 +52,9 @@ async def lifespan(app: FastAPI):
           WHERE (status = 'scheduled');
         EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;"""))
     _ensure_initial_admin()
+    created = ensure_current_demo_schedule()
+    if created:
+        logger.info("Created %s rolling Parda demo screenings", created)
     refresh_task = None
     if settings.tmdb_read_token:
         refresh_task = asyncio.create_task(_tmdb_refresh_loop())
