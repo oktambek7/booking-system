@@ -27,6 +27,7 @@ class User(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     phone: Mapped[str | None] = mapped_column(String(20))
     phone_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 class Movie(Base):
@@ -58,6 +59,7 @@ class Auditorium(Base):
     address: Mapped[str] = mapped_column(String(300), default="")
     timezone: Mapped[str] = mapped_column(String(64), default="Asia/Tashkent")
     formats: Mapped[list[str]] = mapped_column(JSON, default=lambda: ["2D"])
+    hall_type: Mapped[str] = mapped_column(String(12), default="standard")
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     seats: Mapped[list["Seat"]] = relationship(back_populates="auditorium", cascade="all, delete-orphan")
 
@@ -135,6 +137,16 @@ class OtpChallenge(Base):
     payment_id: Mapped[int] = mapped_column(ForeignKey("payments.id", ondelete="CASCADE"), index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     phone: Mapped[str] = mapped_column(String(20))
+    code_hash: Mapped[str] = mapped_column(String(64))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+class EmailOtpChallenge(Base):
+    __tablename__ = "email_otp_challenges"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     code_hash: Mapped[str] = mapped_column(String(64))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     attempts: Mapped[int] = mapped_column(Integer, default=0)

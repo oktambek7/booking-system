@@ -7,16 +7,17 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException, Query
 from .database import get_db
-from .models import (Auditorium, Booking, BookingSeat, BookingStatus, Movie, OtpChallenge,
+from .models import (Auditorium, Booking, BookingSeat, BookingStatus, EmailOtpChallenge, Movie, OtpChallenge,
                      Payment, Role, Screening, Seat, User)
 from .schemas import (AuditoriumIn, AuditoriumOut, BookingIn, BookingOut, BookingStatusIn,
-                      CatalogSyncOut, Login, MovieIn, MovieOut, OtpVerifyIn, PaymentStartIn,
+                      CatalogSyncOut, EmailChallengeOut, EmailCodeVerify, EmailResend, Login, MovieIn, MovieOut, OtpVerifyIn, PaymentStartIn,
                       PaymentStartOut, PaymentVerifyOut, ScreeningIn, ScreeningOut,
                       ScreeningSeatsOut, SeatOut, Token, UserCreate)
 from .security import current_user, hash_password, make_token, require_roles, verify_password
 from .config import settings
 from .otp import SmsDeliveryError, code_hash, code_matches, new_code, send_code
 from .tmdb import TMDBUnavailable, sync_catalog
+from .mail import EmailDeliveryError, email_code_hash, email_code_matches, send_email_code
 
 router = APIRouter(prefix="/api")
 admin = Depends(require_roles(Role.ADMIN))
@@ -42,6 +43,7 @@ def _screening_out(db: Session, screening: Screening) -> ScreeningOut:
         format_type=screening.format_type,
         movie_title=screening.movie.title, duration_minutes=screening.movie.duration_minutes,
         cinema_name=screening.auditorium.cinema_name, auditorium_name=screening.auditorium.name,
+        hall_type=screening.auditorium.hall_type,
         city=screening.auditorium.city, timezone=screening.auditorium.timezone,
         available_seats=max(total-taken, 0))
 
@@ -61,17 +63,84 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
                 password_hash=hash_password(data.password), role=Role.CUSTOMER)
     db.add(user)
     try:
+        db.flush()
+        recent = db.scalar(sa.select(sa.func.count(EmailOtpChallenge.id)).where(
+            EmailOtpChallenge.user_id == user.id,
+            EmailOtpChallenge.created_at >= datetime.now(timezone.utc) - timedelta(minutes=10))) or 0
+        if recent >= 3:
+            raise HTTPException(429, "Too many verification emails. Try again in 10 minutes")
+        code = new_code()
+        challenge = EmailOtpChallenge(user_id=user.id, code_hash=email_code_hash(user.id, code),
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=10))
+        is_demo = send_email_code(user.email, code)
+        db.add(challenge)
         db.commit()
     except IntegrityError:
         db.rollback()
         raise HTTPException(409, "This email or nickname is already registered")
-    return {"id": user.id, "name": user.nickname, "nickname": user.nickname, "email": user.email}
+    except EmailDeliveryError as exc:
+        db.rollback()
+        raise HTTPException(503, str(exc)) from exc
+    return EmailChallengeOut(email=user.email, expires_at=challenge.expires_at,
+        demo_mode=is_demo, demo_code=code if is_demo else None)
+
+@router.post("/auth/email/resend", response_model=EmailChallengeOut)
+def resend_email_code(data: EmailResend, db: Session = Depends(get_db)):
+    email = str(data.email).lower()
+    user = db.scalar(sa.select(User).where(User.email == email, User.active.is_(True)))
+    if not user or user.email_verified:
+        raise HTTPException(404, "Account awaiting verification was not found")
+    recent = db.scalar(sa.select(sa.func.count(EmailOtpChallenge.id)).where(
+        EmailOtpChallenge.user_id == user.id,
+        EmailOtpChallenge.created_at >= datetime.now(timezone.utc) - timedelta(minutes=10))) or 0
+    if recent >= 3:
+        raise HTTPException(429, "Too many verification emails. Try again in 10 minutes")
+    code = new_code()
+    challenge = EmailOtpChallenge(user_id=user.id, code_hash=email_code_hash(user.id, code),
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=10))
+    try:
+        is_demo = send_email_code(user.email, code)
+        db.add(challenge)
+        db.commit()
+    except EmailDeliveryError as exc:
+        db.rollback()
+        raise HTTPException(503, str(exc)) from exc
+    return EmailChallengeOut(email=user.email, expires_at=challenge.expires_at,
+        demo_mode=is_demo, demo_code=code if is_demo else None)
+
+@router.post("/auth/email/verify")
+def verify_email(data: EmailCodeVerify, db: Session = Depends(get_db)):
+    user = db.scalar(sa.select(User).where(User.email == str(data.email).lower()).with_for_update())
+    if not user or not user.active:
+        raise HTTPException(404, "Account awaiting verification was not found")
+    if user.email_verified:
+        return {"access_token": make_token(user), "token_type": "bearer"}
+    challenge = db.scalar(sa.select(EmailOtpChallenge).where(
+        EmailOtpChallenge.user_id == user.id, EmailOtpChallenge.consumed_at.is_(None)
+    ).order_by(EmailOtpChallenge.created_at.desc()).with_for_update())
+    now = datetime.now(timezone.utc)
+    if not challenge or challenge.expires_at <= now:
+        raise HTTPException(410, "Verification code expired. Request another email")
+    if challenge.attempts >= 5:
+        raise HTTPException(429, "Too many incorrect codes. Request a new email")
+    if not email_code_matches(user.id, data.code, challenge.code_hash):
+        challenge.attempts += 1
+        db.commit()
+        raise HTTPException(422, "Incorrect verification code")
+    challenge.consumed_at = now
+    user.email_verified = True
+    db.commit()
+    return {"access_token": make_token(user), "token_type": "bearer",
+        "user": {"id": user.id, "name": user.nickname, "nickname": user.nickname,
+                 "email": user.email, "role": user.role.value}}
 
 @router.post("/auth/login", response_model=Token)
 def login(data: Login, db: Session = Depends(get_db)):
     user = db.scalar(sa.select(User).where(User.email == data.email.lower()))
     if not user or not verify_password(data.password, user.password_hash) or not user.active:
         raise HTTPException(401, "Email or password is incorrect")
+    if not user.email_verified:
+        raise HTTPException(403, "Verify your email before signing in")
     return Token(access_token=make_token(user))
 
 @router.get("/auth/me")
@@ -123,7 +192,8 @@ def archive_movie(movie_id: int, db: Session = Depends(get_db), _: User = admin)
 @router.get("/cinemas", response_model=list[AuditoriumOut])
 def cinemas(db: Session = Depends(get_db)):
     return [AuditoriumOut(id=a.id, name=a.name, cinema_name=a.cinema_name, city=a.city,
-        address=a.address, timezone=a.timezone, formats=a.formats or ["2D"], seat_count=len(a.seats))
+        address=a.address, timezone=a.timezone, formats=a.formats or ["2D"],
+        hall_type=a.hall_type, seat_count=len(a.seats))
         for a in db.scalars(sa.select(Auditorium).where(Auditorium.active.is_(True)).order_by(Auditorium.cinema_name)).all()]
 
 @router.post("/cinemas", response_model=AuditoriumOut, status_code=201)
@@ -131,7 +201,8 @@ def create_cinema(data: AuditoriumIn, db: Session = Depends(get_db), _: User = a
     try: ZoneInfo(data.timezone)
     except ZoneInfoNotFoundError: raise HTTPException(422, "Unknown timezone")
     auditorium = Auditorium(name=data.name.strip(), cinema_name=data.cinema_name.strip(), city=data.city,
-                            address=data.address, timezone=data.timezone, formats=list(dict.fromkeys(data.formats)))
+                            address=data.address, timezone=data.timezone, formats=list(dict.fromkeys(data.formats)),
+                            hall_type=data.hall_type)
     alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     auditorium.seats=[Seat(row_label=alphabet[row], seat_number=n,
                             seat_type="premium" if row < 2 else "standard")
@@ -139,16 +210,18 @@ def create_cinema(data: AuditoriumIn, db: Session = Depends(get_db), _: User = a
     db.add(auditorium); db.commit(); db.refresh(auditorium)
     return AuditoriumOut(id=auditorium.id,name=auditorium.name,cinema_name=auditorium.cinema_name,
         city=auditorium.city,address=auditorium.address,timezone=auditorium.timezone,
-        formats=auditorium.formats,seat_count=len(auditorium.seats))
+        formats=auditorium.formats,hall_type=auditorium.hall_type,seat_count=len(auditorium.seats))
 
 @router.get("/screenings", response_model=list[ScreeningOut])
 def screenings(day: date = Query(alias="date"), movie_id: int | None = None,
+               hall_type: str | None = Query(default=None, pattern=r"^(standard|vip)$"),
                city: str | None = None, db: Session = Depends(get_db)):
     _expire_holds(db)
     db.commit()
     rows=[]
     q=sa.select(Screening).join(Movie).join(Auditorium).where(Screening.status=="scheduled", Movie.active.is_(True), Auditorium.active.is_(True))
     if movie_id is not None: q=q.where(Screening.movie_id==movie_id)
+    if hall_type is not None: q=q.where(Auditorium.hall_type==hall_type)
     if city: q=q.where(Auditorium.city.ilike(city))
     candidates=db.scalars(q.order_by(Screening.starts_at)).all()
     for screening in candidates:
@@ -251,6 +324,8 @@ def _payment_start_out(payment: Payment, phone: str, demo_code: str | None) -> P
 
 @router.post("/bookings/{booking_id}/payment",response_model=PaymentStartOut,status_code=201)
 def start_payment(booking_id:int,data:PaymentStartIn,db:Session=Depends(get_db),user:User=Depends(current_user)):
+    if settings.app_environment.lower() == "production":
+        raise HTTPException(503, "Card checkout is unavailable until a payment provider is connected")
     item=_owned_pending_booking(booking_id,db,user)
     phone=data.phone
     recent=db.scalar(sa.select(sa.func.count(OtpChallenge.id)).where(OtpChallenge.user_id==user.id,

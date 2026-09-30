@@ -10,6 +10,19 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str = Field(min_length=10, max_length=128)
 
+class EmailCodeVerify(BaseModel):
+    email: EmailStr
+    code: str = Field(pattern=r"^\d{4}$")
+
+class EmailResend(BaseModel):
+    email: EmailStr
+
+class EmailChallengeOut(BaseModel):
+    email: EmailStr
+    expires_at: datetime
+    demo_mode: bool
+    demo_code: str | None = None
+
 class Login(BaseModel):
     email: EmailStr
     password: str
@@ -46,6 +59,7 @@ class AuditoriumIn(BaseModel):
     address: str = Field(default="", max_length=300)
     timezone: str = "Asia/Tashkent"
     formats: list[Literal["2D", "3D", "IMAX"]] = Field(default_factory=lambda: ["2D"], min_length=1, max_length=3)
+    hall_type: Literal["standard", "vip"] = "standard"
     row_count: int = Field(ge=1, le=26)
     seats_per_row: int = Field(ge=1, le=30)
 
@@ -57,6 +71,7 @@ class AuditoriumOut(BaseModel):
     address: str
     timezone: str
     formats: list[str] = Field(default_factory=lambda: ["2D"])
+    hall_type: Literal["standard", "vip"] = "standard"
     seat_count: int
 
 class ScreeningIn(BaseModel):
@@ -81,6 +96,7 @@ class ScreeningOut(BaseModel):
     duration_minutes: int | None
     cinema_name: str
     auditorium_name: str
+    hall_type: Literal["standard", "vip"] = "standard"
     city: str
     timezone: str
     available_seats: int

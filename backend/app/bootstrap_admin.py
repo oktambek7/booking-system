@@ -19,7 +19,8 @@ def main():
         if db.scalar(select(User).where(User.nickname == nickname)):
             nickname = f"admin-{email.split('@', 1)[0][:24].lower()}"
         db.add(User(email=email, name=nickname, nickname=nickname,
-                    password_hash=hash_password(password), role=Role.ADMIN))
+                    password_hash=hash_password(password), role=Role.ADMIN,
+                    email_verified=True))
         db.commit()
         print("Admin account created")
 

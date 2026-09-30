@@ -1,6 +1,7 @@
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 from decimal import Decimal
+from concurrent.futures import ThreadPoolExecutor
 import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -27,38 +28,47 @@ def sync_catalog(db: Session) -> tuple[int, int]:
             today = datetime.now(ZoneInfo(settings.business_timezone)).date().isoformat()
             for stale in db.scalars(select(Movie).where(Movie.catalog_status == "upcoming")):
                 stale.active = False
+            max_pages = max(1, min(settings.tmdb_max_pages, 20))
             for category in ("now_playing", "upcoming"):
+                params = {"region": settings.tmdb_region, "language": "en-US", "page": 1,
+                          "include_adult": "false"}
                 if category == "upcoming":
-                    listing = client.get("/discover/movie", params={
-                        "region": settings.tmdb_region,
-                        "language": "en-US",
-                        "page": 1,
-                        "include_adult": "false",
-                        "primary_release_date.gte": today,
-                        "with_release_type": "2|3",
-                        "sort_by": "popularity.desc",
-                    })
+                    path = "/discover/movie"
+                    params.update({"primary_release_date.gte": today, "with_release_type": "2|3",
+                                   "sort_by": "popularity.desc"})
                 else:
-                    listing = client.get(f"/movie/{category}", params={
-                        "region": settings.tmdb_region,
-                        "language": "en-US",
-                        "page": 1,
-                        "include_adult": "false",
-                    })
-                listing.raise_for_status()
-                for item in listing.json().get("results", [])[:10]:
+                    path = f"/movie/{category}"
+                first = client.get(path, params=params)
+                first.raise_for_status()
+                payload = first.json()
+                page_count = min(max_pages, max(1, int(payload.get("total_pages", 1))))
+                listing_rows = list(payload.get("results", []))
+                for page in range(2, page_count + 1):
+                    response = client.get(path, params={**params, "page": page})
+                    response.raise_for_status()
+                    listing_rows.extend(response.json().get("results", []))
+                listings = []
+                for item in listing_rows:
                     tmdb_id = item.get("id")
                     if not tmdb_id or tmdb_id in seen_tmdb_ids:
                         continue
                     seen_tmdb_ids.add(tmdb_id)
-                    
-                    detail_response = client.get(f"/movie/{item['id']}", params={
+                    listings.append((tmdb_id, item))
+
+                def fetch_detail(entry: tuple[int, dict]) -> tuple[int, dict]:
+                    tmdb_id, _ = entry
+                    response = client.get(f"/movie/{tmdb_id}", params={
                         "language": "en-US", "append_to_response": "credits,videos,release_dates"})
-                    detail_response.raise_for_status()
-                    detail = detail_response.json()
+                    response.raise_for_status()
+                    return tmdb_id, response.json()
+
+                with ThreadPoolExecutor(max_workers=4) as pool:
+                    details = dict(pool.map(fetch_detail, listings))
+                for tmdb_id, item in listings:
+                    detail = details[tmdb_id]
                     movie = db.scalar(select(Movie).where(Movie.tmdb_id == int(detail["id"])))
                     if movie is None:
-                        movie = Movie(tmdb_id=int(detail["id"]), title=detail.get("title") or item.get("title") or "Untitled")
+                        movie = Movie(tmdb_id=int(detail["id"]), title=detail.get("original_title") or detail.get("title") or item.get("title") or "Untitled")
                         db.add(movie)
                     release = _uz_release(detail, item.get("release_date"))
                     rating = _uz_rating(detail)
@@ -67,7 +77,7 @@ def sync_catalog(db: Session) -> tuple[int, int]:
                     trailer = next((video.get("key") for video in detail.get("videos", {}).get("results", [])
                                     if video.get("site") == "YouTube" and video.get("type") == "Trailer"
                                     and video.get("key")), None)
-                    movie.title = detail.get("title") or item.get("title") or movie.title
+                    movie.title = detail.get("original_title") or detail.get("title") or item.get("original_title") or item.get("title") or movie.title
                     movie.synopsis = detail.get("overview") or item.get("overview") or ""
                     movie.duration_minutes = detail.get("runtime") or None
                     movie.genre = " · ".join(g.get("name", "") for g in detail.get("genres", []) if g.get("name")) or "Genre not listed"
@@ -87,7 +97,6 @@ def sync_catalog(db: Session) -> tuple[int, int]:
         db.rollback()
         raise TMDBUnavailable("TMDB catalog request failed; try again later") from exc
     return counts["now_playing"], counts["upcoming"]
-
 def _uz_release(detail: dict, fallback: str | None) -> date | None:
     dates = detail.get("release_dates", {}).get("results", [])
     uz_dates = next((country.get("release_dates", []) for country in dates if country.get("iso_3166_1") == settings.tmdb_region), [])

@@ -1,4 +1,6 @@
 from contextlib import asynccontextmanager
+import asyncio
+import logging
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,15 +11,34 @@ from .config import settings
 from .database import Base, SessionLocal, engine
 from .models import Role, User
 from .security import hash_password
+from .tmdb import TMDBUnavailable, sync_catalog
+
+logger = logging.getLogger(__name__)
+
+def _refresh_tmdb_catalog() -> None:
+    with SessionLocal() as db:
+        now_playing, upcoming = sync_catalog(db)
+    logger.info("TMDB refresh complete: %s now playing, %s upcoming", now_playing, upcoming)
+
+async def _tmdb_refresh_loop() -> None:
+    while True:
+        try:
+            await asyncio.to_thread(_refresh_tmdb_catalog)
+        except TMDBUnavailable:
+            logger.exception("TMDB catalog refresh failed")
+        except Exception:
+            logger.exception("Unexpected TMDB catalog refresh error")
+        await asyncio.sleep(max(1, settings.tmdb_sync_interval_hours) * 60 * 60)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     with engine.begin() as conn:
-        migration = Path(__file__).resolve().parent.parent / "migrations" / "002_persistent_product_data.sql"
-        for statement in migration.read_text(encoding="utf-8").split(";"):
-            if statement.strip():
-                conn.exec_driver_sql(statement)
+        migrations = Path(__file__).resolve().parent.parent / "migrations"
+        for migration in sorted(migrations.glob("*.sql")):
+            for statement in migration.read_text(encoding="utf-8").split(";"):
+                if statement.strip():
+                    conn.exec_driver_sql(statement)
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS btree_gist"))
         conn.execute(text("""DO $$ BEGIN
           ALTER TABLE screenings ADD CONSTRAINT screenings_no_overlap
@@ -25,7 +46,18 @@ async def lifespan(app: FastAPI):
           WHERE (status = 'scheduled');
         EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;"""))
     _ensure_initial_admin()
-    yield
+    refresh_task = None
+    if settings.tmdb_read_token:
+        refresh_task = asyncio.create_task(_tmdb_refresh_loop())
+    try:
+        yield
+    finally:
+        if refresh_task:
+            refresh_task.cancel()
+            try:
+                await refresh_task
+            except asyncio.CancelledError:
+                pass
 
 def _ensure_initial_admin() -> None:
     if not settings.admin_email and not settings.admin_password:
@@ -46,12 +78,15 @@ def _ensure_initial_admin() -> None:
         if existing:
             if existing.role != Role.ADMIN:
                 raise RuntimeError("ADMIN_EMAIL already belongs to a non-admin account")
+            if not existing.email_verified:
+                existing.email_verified = True
+                db.commit()
             return
         if db.scalar(select(User).where(User.nickname == nickname)):
             raise RuntimeError("ADMIN_NICKNAME is already in use")
         db.add(User(email=email, name=nickname, nickname=nickname,
                     password_hash=hash_password(settings.admin_password), role=Role.ADMIN,
-                    active=True, phone_verified=False))
+                    active=True, phone_verified=False, email_verified=True))
         db.commit()
 
 app = FastAPI(title="Booking System API", version="0.1.0", lifespan=lifespan)
