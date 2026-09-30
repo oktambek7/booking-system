@@ -45,7 +45,7 @@ export default function App(){
  const filtered=movies.filter(m=>m.title.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
  const visibleScreenings=screenings.filter(s=>hallType==='all'||(hallType==='vip'?/vip|premium|lux/i.test(s.auditorium_name):!/vip|premium|lux/i.test(s.auditorium_name)))
  const heroMovie=movies.find(m=>m.backdrop_url)||movies.find(m=>m.poster_url)
- const isVipHall=(name:string)=>/vip|premium|lux/i.test(name)
+ // Hall names determine the selected auditorium filter.
  const total=seats.filter(s=>chosen.includes(s.id)).reduce((n,s)=>n+Number(s.price),0)
  async function openSeats(s:Screening){setSelected(s);setChosen([]);setError('');setBusy(true);try{const r=await fetch(`${API}/api/screenings/${s.id}/seats`);const p=await r.json();if(!r.ok)throw Error(p.detail||'Joylar yuklanmadi');setSeats(p.seats)}catch(e){setError(e instanceof Error?e.message:'Xatolik')}finally{setBusy(false)}}
  async function bookSeats(){if(!user){setMode('login');setShowAuth(true);return}if(!selected||!chosen.length)return;setBusy(true);setError('');try{const r=await fetch(`${API}/api/bookings`,{method:'POST',headers,body:JSON.stringify({screening_id:selected.id,seat_ids:chosen})});const b=await r.json();if(!r.ok){if(r.status===409){const fresh=await fetch(`${API}/api/screenings/${selected.id}/seats`);if(fresh.ok)setSeats((await fresh.json()).seats)}throw Error(b.detail||'Joylar band qilinmadi')}setHold(b);setSelected(null)}catch(e){setError(e instanceof Error?e.message:'Band qilishda xatolik')}finally{setBusy(false)}}
