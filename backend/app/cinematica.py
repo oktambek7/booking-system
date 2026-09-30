@@ -1,6 +1,7 @@
 """Read-only adapter for Cinematica's public movie and repertory endpoints.
 
-Ticket sales and seat inventory stay on Cinematica's own hosted checkout.
+This adapter is used only for discovery and schedule previews. It never hands a
+customer into an external checkout or treats the source's inventory as Parda's.
 """
 from datetime import datetime
 from threading import Lock
@@ -101,11 +102,8 @@ def movie_screenings(movie_id: int):
         except (KeyError, TypeError, ValueError):
             continue
         name = str(item.get("hall") or "")
-        listing_id = int(item.get("movie_id") or 0)
-        cinema_id = int(item.get("cinema_id") or item.get("c_id") or 0)
-        hall_id = int(item.get("hall_id") or 0)
         repertory_id = int(item.get("id") or 0)
-        if not all((listing_id, cinema_id, hall_id, repertory_id)):
+        if not repertory_id:
             continue
         result.append({
             "id": repertory_id,
@@ -115,6 +113,5 @@ def movie_screenings(movie_id: int):
             "hall_name": name,
             "hall_type": "vip" if any(word in name.casefold() for word in ("vip", "lounge")) else "standard",
             "price": item.get("price"),
-            "booking_url": f"https://cinematica.uz/movies/{movie_id}/{cinema_id}/{hall_id}/{listing_id}/{repertory_id}/",
         })
     return sorted(result, key=lambda item: (item["date"], item["time"], item["cinema_name"]))

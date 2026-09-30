@@ -39,7 +39,7 @@ async def lifespan(app: FastAPI):
         # Apply only additive schema migrations here. 001_cinema_constraints.sql
         # contains a PL/pgSQL DO block and must not be split on semicolons; the
         # exclusion constraint is installed idempotently just below.
-        for migration_name in ("002_persistent_product_data.sql", "003_email_verification_and_hall_type.sql", "004_booking_history_archive.sql"):
+        for migration_name in ("002_persistent_product_data.sql", "003_email_verification_and_hall_type.sql", "004_booking_history_archive.sql", "005_demo_card_payments.sql"):
             migration = migrations / migration_name
             for statement in migration.read_text(encoding="utf-8").split(";"):
                 if statement.strip():

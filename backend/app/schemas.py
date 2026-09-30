@@ -143,17 +143,21 @@ class PaymentMethod(str, Enum):
 
 class PaymentStartIn(BaseModel):
     method: PaymentMethod
-    phone: str = Field(pattern=r"^\+[1-9]\d{7,14}$")
+    booking_id: int
+    card_number: str = Field(min_length=12, max_length=24)
+    cardholder_name: str = Field(min_length=2, max_length=80)
+    expiry_date: str = Field(pattern=r"^\d{2}\s*/\s*\d{2}$")
+    cvv: str | None = Field(default=None, max_length=4)
 
 class PaymentStartOut(BaseModel):
     payment_id: int
     reference: str
     method: PaymentMethod
-    phone_masked: str
+    card_last4: str
+    email_masked: str
     amount: Decimal
     expires_at: datetime
     demo_mode: bool
-    demo_code: str | None = None
 
 class OtpVerifyIn(BaseModel):
     code: str = Field(pattern=r"^\d{4}$")

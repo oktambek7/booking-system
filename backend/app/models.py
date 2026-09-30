@@ -123,7 +123,12 @@ class Payment(Base):
     booking_id: Mapped[int] = mapped_column(ForeignKey("bookings.id", ondelete="CASCADE"), index=True)
     reference: Mapped[str] = mapped_column(String(40), unique=True, index=True)
     method: Mapped[str] = mapped_column(String(20))
-    phone_last4: Mapped[str] = mapped_column(String(4))
+    # A card's final four digits are sufficient for a receipt. Full PANs and
+    # CVVs must never enter this model or the database.
+    card_last4: Mapped[str] = mapped_column(String(4))
+    # Kept nullable only for compatibility with the retired SMS migration.
+    # New payment code never reads or writes it.
+    legacy_phone_last4: Mapped[str | None] = mapped_column("phone_last4", String(4), nullable=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     status: Mapped[str] = mapped_column(String(24), default="awaiting_verification")
     provider: Mapped[str] = mapped_column(String(24), default="mock")
@@ -147,6 +152,17 @@ class OtpChallenge(Base):
 class EmailOtpChallenge(Base):
     __tablename__ = "email_otp_challenges"
     id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    code_hash: Mapped[str] = mapped_column(String(64))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+class PaymentEmailChallenge(Base):
+    __tablename__ = "payment_email_challenges"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    payment_id: Mapped[int] = mapped_column(ForeignKey("payments.id", ondelete="CASCADE"), index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     code_hash: Mapped[str] = mapped_column(String(64))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
