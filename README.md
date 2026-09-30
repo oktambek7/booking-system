@@ -6,16 +6,19 @@ Parda is an Uzbek-first cinema discovery and seat-booking app. The React/Vite fr
 - **API docs:** https://parda-cinema-api.onrender.com/docs
 - **Source:** https://github.com/oktambek7/booking-system
 
-> The public site is a portfolio/demo deployment. Some sample cinema and screening records may be present. They are not confirmation of a real cinema partnership or current operator inventory. Production card checkout is disabled; do not use the site to purchase tickets.
+> Parda reads Cinematica's public film and repertory feeds for discovery. The feed is read-only: clicking a published showtime opens Cinematica's own ticket flow, where its live seat map and checkout are handled. Parda does not claim to own or reserve Cinematica seats or to receive Cinematica purchases in Parda booking history.
 
 ## Delivery state
 
 - [x] PostgreSQL models for accounts, movies, halls, seats, showtimes, seat holds, bookings, and verification attempts
 - [x] Four-digit email verification flow with expiring, limited-attempt hashed codes
 - [x] TMDB region-aware current/upcoming catalog; configurable multi-page import of original titles, cast, posters, trailers, and release dates
+- [x] Cinematica live now-playing/upcoming movie catalog with age marks, posters, audio language, format, and read-only repertory links
+- [x] Film-first discovery: compact paginated posters, animated current-film carousel, and movie-specific dates/hall filters
 - [x] Background TMDB refresh every 24 hours when a server token is configured
 - [x] Explicit Standard/VIP auditorium types and schedule filtering
 - [x] Seat selection, ten-minute pending holds, booking history, cancellation, and status transitions
+- [x] Customer history clearing for cancelled/completed bookings (soft-archived; audit rows and active bookings are retained)
 - [x] PostgreSQL protection against concurrent double booking and overlapping hall schedules
 - [x] Uzbek/English/Russian UI, light/dark themes, accessible date chips, and responsive cinema artwork
 - [ ] Configure production SMTP sender and deliverability
@@ -25,7 +28,7 @@ Parda is an Uzbek-first cinema discovery and seat-booking app. The React/Vite fr
 
 **This is not production-ready ticketing yet.** Parda never collects card numbers, expiry dates, or CVV in its own forms. Card-brand choices are displayed, but the selected provider must collect card data on a hosted checkout page. In production, the current demo payment endpoint returns 503 rather than recording a simulated payment as successful.
 
-TMDB provides movie metadata, not theater schedules or seat inventory. Only an authorized cinema operator can provide real showtimes and seats. Do not present sample schedules as confirmed public inventory.
+TMDB provides movie metadata, not theater schedules or seat inventory. Parda reads Cinematica's public movie and repertory routes with a short cache; that does not give Parda authority to lock seats, sell tickets, or guarantee the source feed. Seat selection, purchase, and any refund/cancellation actions continue on Cinematica. A direct, supported operator integration is needed before Parda can own that booking and payment flow.
 
 ## Run locally
 
@@ -79,6 +82,7 @@ Set `VITE_API_URL` to the API origin and redeploy. Set the API `CORS_ORIGINS` to
 - A PostgreSQL exclusion constraint prevents overlapping screenings in one hall. Cancelled and expired holds release seats while retaining booking history.
 - Duplicate, foreign, past-screening, and excessive seat selections are rejected. Customers can only cancel their own eligible bookings.
 - A production payment provider must verify signed callbacks and transaction amount/order before a booking can be confirmed. The present mock SMS payment route is disabled in production.
+- Customer history clearing archives only cancelled and completed rows. Upcoming active holds/tickets remain visible; users cancel eligible bookings first.
 
 ## TMDB attribution
 
@@ -86,6 +90,6 @@ Movie metadata and artwork are provided by TMDB. This product uses the TMDB API 
 
 ## Architecture and AI use
 
-The React client presents catalog, schedule, hall, and seat inventory. FastAPI owns authentication, validation, catalog synchronization, pricing, inventory, holds, and booking status. PostgreSQL is the source of truth for visitor and booking records. TMDB is a metadata source only.
+The React client presents Cinematica's public catalog and repertory. FastAPI proxies and caches those read-only routes for five minutes; ticket links return the customer to Cinematica for its live seat inventory and checkout. Parda's own PostgreSQL models remain the source of truth for Parda accounts and bookings. TMDB remains a metadata/import source for the admin-managed catalog.
 
 AI tools helped draft and revise UI, API/data-model scaffolding, and edge-case documentation. Review the implementation and provider behavior before production; verify real callbacks and concurrent seat reservations against staging data.

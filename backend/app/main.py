@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select, text
 from . import models
 from .api import router
+from .cinematica import router as cinematica_router
 from .config import settings
 from .database import Base, SessionLocal, engine
 from .models import Role, User
@@ -38,7 +39,7 @@ async def lifespan(app: FastAPI):
         # Apply only additive schema migrations here. 001_cinema_constraints.sql
         # contains a PL/pgSQL DO block and must not be split on semicolons; the
         # exclusion constraint is installed idempotently just below.
-        for migration_name in ("002_persistent_product_data.sql", "003_email_verification_and_hall_type.sql"):
+        for migration_name in ("002_persistent_product_data.sql", "003_email_verification_and_hall_type.sql", "004_booking_history_archive.sql"):
             migration = migrations / migration_name
             for statement in migration.read_text(encoding="utf-8").split(";"):
                 if statement.strip():
@@ -97,6 +98,7 @@ app = FastAPI(title="Booking System API", version="0.1.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=[x.strip() for x in settings.cors_origins.split(",") if x.strip()],
                    allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.include_router(router)
+app.include_router(cinematica_router)
 
 @app.get("/health")
 def health():

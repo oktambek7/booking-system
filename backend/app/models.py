@@ -100,6 +100,7 @@ class Booking(Base):
     total_price: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     hold_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    archived_by_customer: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     customer: Mapped[User] = relationship()
     screening: Mapped[Screening] = relationship()
     seat_assignments: Mapped[list["BookingSeat"]] = relationship(back_populates="booking", cascade="all, delete-orphan")

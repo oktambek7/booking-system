@@ -380,9 +380,22 @@ def verify_payment(payment_id:int,data:OtpVerifyIn,db:Session=Depends(get_db),us
 def booking_history(db:Session=Depends(get_db),user:User=Depends(current_user)):
     _expire_holds(db)
     q=sa.select(Booking).order_by(Booking.created_at.desc())
-    if user.role!=Role.ADMIN: q=q.where(Booking.customer_id==user.id)
+    if user.role!=Role.ADMIN: q=q.where(Booking.customer_id==user.id,Booking.archived_by_customer.is_(False))
     items=db.scalars(q).all();result=[_booking_out(x) for x in items];db.commit()
     return result
+
+@router.delete("/bookings/history")
+def clear_booking_history(db:Session=Depends(get_db),user:User=Depends(current_user)):
+    if user.role==Role.ADMIN:
+        raise HTTPException(403,"Customer history can only be cleared from a customer account")
+    _expire_holds(db)
+    items=db.scalars(sa.select(Booking).where(Booking.customer_id==user.id,
+        Booking.archived_by_customer.is_(False),
+        Booking.status.in_((BookingStatus.CANCELLED,BookingStatus.COMPLETED)))).all()
+    for item in items:
+        item.archived_by_customer=True
+    db.commit()
+    return {"archived_count":len(items)}
 
 @router.patch("/bookings/{booking_id}/status",response_model=BookingOut)
 def update_booking_status(booking_id:int,data:BookingStatusIn,db:Session=Depends(get_db),user:User=Depends(current_user)):
