@@ -60,8 +60,12 @@ def ensure_current_demo_schedule() -> int:
     tz = ZoneInfo("Asia/Tashkent")
     now = datetime.now(timezone.utc)
     with SessionLocal() as db:
-        existing = db.scalar(select(Screening.id).where(
-            Screening.status == "scheduled", Screening.starts_at > now
+        existing = db.scalar(select(Screening.id).join(Auditorium).join(Movie).where(
+            Screening.status == "scheduled",
+            Screening.starts_at > now,
+            Screening.starts_at < now + timedelta(days=7),
+            Auditorium.active.is_(True),
+            Movie.active.is_(True),
         ).limit(1))
         if existing:
             return 0
