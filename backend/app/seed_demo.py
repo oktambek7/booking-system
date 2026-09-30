@@ -60,15 +60,6 @@ def ensure_current_demo_schedule() -> int:
     tz = ZoneInfo("Asia/Tashkent")
     now = datetime.now(timezone.utc)
     with SessionLocal() as db:
-        existing = db.scalar(select(Screening.id).join(Auditorium).join(Movie).where(
-            Screening.status == "scheduled",
-            Screening.starts_at > now,
-            Screening.starts_at < now + timedelta(days=7),
-            Auditorium.active.is_(True),
-            Movie.active.is_(True),
-        ).limit(1))
-        if existing:
-            return 0
         halls = db.scalars(select(Auditorium).where(Auditorium.active.is_(True))).all()
         films = db.scalars(select(Movie).where(
             Movie.active.is_(True), Movie.duration_minutes.is_not(None)
@@ -86,11 +77,20 @@ def ensure_current_demo_schedule() -> int:
                         continue
                     movie = films[(day_offset * 3 + hall_index + slot_index) % len(films)]
                     start = local_start.astimezone(timezone.utc)
+                    end = start + timedelta(minutes=movie.duration_minutes)
+                    overlaps = db.scalar(select(Screening.id).where(
+                        Screening.auditorium_id == hall.id,
+                        Screening.status == "scheduled",
+                        Screening.starts_at < end,
+                        Screening.ends_at > start,
+                    ).limit(1))
+                    if overlaps:
+                        continue
                     db.add(Screening(
                         movie_id=movie.id,
                         auditorium_id=hall.id,
                         starts_at=start,
-                        ends_at=start + timedelta(minutes=movie.duration_minutes),
+                        ends_at=end,
                         base_price=35000 if hall.hall_type == "vip" else 30000,
                         premium_surcharge=10000 if hall.hall_type == "vip" else 5000,
                         format_type="2D" if "2D" in formats else formats[0],
