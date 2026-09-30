@@ -35,7 +35,11 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     with engine.begin() as conn:
         migrations = Path(__file__).resolve().parent.parent / "migrations"
-        for migration in sorted(migrations.glob("*.sql")):
+        # Apply only additive schema migrations here. 001_cinema_constraints.sql
+        # contains a PL/pgSQL DO block and must not be split on semicolons; the
+        # exclusion constraint is installed idempotently just below.
+        for migration_name in ("002_persistent_product_data.sql", "003_email_verification_and_hall_type.sql"):
+            migration = migrations / migration_name
             for statement in migration.read_text(encoding="utf-8").split(";"):
                 if statement.strip():
                     conn.exec_driver_sql(statement)
