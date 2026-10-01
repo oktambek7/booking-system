@@ -27,6 +27,7 @@ HOLD_MINUTES = 10
 PAYMENT_CODE_MINUTES = 5
 PAYMENT_CODE_MAX_ATTEMPTS = 5
 PAYMENT_RESEND_LIMIT = 3
+EMAIL_RESEND_COOLDOWN_SECONDS = 120
 PASSWORD_RESET_CODE_MINUTES = 10
 PASSWORD_RESET_MAX_ATTEMPTS = 5
 PASSWORD_RESET_REQUEST_LIMIT = 3
@@ -36,6 +37,17 @@ TEST_CARDS = {
     "visa": "4242424242424242",
     "mastercard": "5555555555554444",
 }
+
+def _resend_available_at(now: datetime | None = None) -> datetime:
+    return (now or datetime.now(timezone.utc)) + timedelta(seconds=EMAIL_RESEND_COOLDOWN_SECONDS)
+
+def _enforce_resend_cooldown(created_at: datetime | None, label: str) -> None:
+    if not created_at:
+        return
+    available_at = _resend_available_at(created_at)
+    remaining = max(0, int((available_at - datetime.now(timezone.utc)).total_seconds() + 0.999))
+    if remaining:
+        raise HTTPException(429, f"Wait {remaining} seconds before requesting another {label} code")
 
 def _expire_holds(db: Session):
     now = datetime.now(timezone.utc)
@@ -95,7 +107,7 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(503, str(exc)) from exc
     return EmailChallengeOut(email=user.email, expires_at=challenge.expires_at,
-        demo_mode=is_demo, demo_code=code if is_demo else None)
+        resend_available_at=_resend_available_at(), demo_mode=is_demo, demo_code=code if is_demo else None)
 
 @router.post("/auth/email/resend", response_model=EmailChallengeOut)
 def resend_email_code(data: EmailResend, db: Session = Depends(get_db)):
@@ -103,6 +115,9 @@ def resend_email_code(data: EmailResend, db: Session = Depends(get_db)):
     user = db.scalar(sa.select(User).where(User.email == email, User.active.is_(True)))
     if not user or user.email_verified:
         raise HTTPException(404, "Account awaiting verification was not found")
+    latest = db.scalar(sa.select(EmailOtpChallenge).where(EmailOtpChallenge.user_id == user.id)
+        .order_by(EmailOtpChallenge.created_at.desc()))
+    _enforce_resend_cooldown(latest.created_at if latest else None, "email verification")
     recent = db.scalar(sa.select(sa.func.count(EmailOtpChallenge.id)).where(
         EmailOtpChallenge.user_id == user.id,
         EmailOtpChallenge.created_at >= datetime.now(timezone.utc) - timedelta(minutes=10))) or 0
@@ -119,7 +134,7 @@ def resend_email_code(data: EmailResend, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(503, str(exc)) from exc
     return EmailChallengeOut(email=user.email, expires_at=challenge.expires_at,
-        demo_mode=is_demo, demo_code=code if is_demo else None)
+        resend_available_at=_resend_available_at(), demo_mode=is_demo, demo_code=code if is_demo else None)
 
 @router.post("/auth/email/verify")
 def verify_email(data: EmailCodeVerify, db: Session = Depends(get_db)):
@@ -160,11 +175,15 @@ def login(data: Login, db: Session = Depends(get_db)):
 def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get_db)):
     """Start a reset without revealing whether an address owns an account."""
     email = str(data.email).lower()
-    generic = EmailChallengeOut(email=email, expires_at=datetime.now(timezone.utc) + timedelta(minutes=PASSWORD_RESET_CODE_MINUTES),
-                                demo_mode=False, demo_code=None)
+    now = datetime.now(timezone.utc)
+    generic = EmailChallengeOut(email=email, expires_at=now + timedelta(minutes=PASSWORD_RESET_CODE_MINUTES),
+                                resend_available_at=_resend_available_at(now), demo_mode=False, demo_code=None)
     user = db.scalar(sa.select(User).where(User.email == email, User.active.is_(True), User.email_verified.is_(True)))
     if not user:
         return generic
+    latest = db.scalar(sa.select(PasswordResetChallenge).where(PasswordResetChallenge.user_id == user.id)
+        .order_by(PasswordResetChallenge.created_at.desc()))
+    _enforce_resend_cooldown(latest.created_at if latest else None, "password reset")
     recent = db.scalar(sa.select(sa.func.count(PasswordResetChallenge.id)).where(
         PasswordResetChallenge.user_id == user.id,
         PasswordResetChallenge.created_at >= datetime.now(timezone.utc) - timedelta(minutes=10))) or 0
@@ -181,7 +200,7 @@ def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get
         db.rollback()
         raise HTTPException(503, str(exc)) from exc
     return EmailChallengeOut(email=email, expires_at=challenge.expires_at,
-                             demo_mode=is_demo, demo_code=code if is_demo else None)
+                             resend_available_at=_resend_available_at(), demo_mode=is_demo, demo_code=code if is_demo else None)
 
 @router.post("/auth/password-reset/confirm")
 def confirm_password_reset(data: PasswordResetConfirm, db: Session = Depends(get_db)):
@@ -410,7 +429,7 @@ def _validate_demo_card(data: PaymentStartIn) -> str:
 def _payment_start_out(payment: Payment, email: str, expires_at: datetime, demo_mode: bool) -> PaymentStartOut:
     return PaymentStartOut(payment_id=payment.id, reference=payment.reference, method=payment.method,
         card_last4=payment.card_last4, email_masked=_masked_email(email), amount=payment.amount,
-        expires_at=expires_at, demo_mode=demo_mode)
+        expires_at=expires_at, resend_available_at=_resend_available_at(), demo_mode=demo_mode)
 
 def _send_payment_code(payment: Payment, booking: Booking, user: User, db: Session) -> PaymentStartOut:
     code = new_code()
@@ -469,6 +488,9 @@ def resend_payment_code(payment_id: int, db: Session = Depends(get_db), user: Us
     booking = _owned_pending_booking(payment.booking_id, db, user, lock=True)
     if payment.status != "awaiting_verification":
         raise HTTPException(409, "This payment attempt can no longer be verified")
+    latest = db.scalar(sa.select(PaymentEmailChallenge).where(PaymentEmailChallenge.payment_id == payment.id)
+        .order_by(PaymentEmailChallenge.created_at.desc()))
+    _enforce_resend_cooldown(latest.created_at if latest else None, "payment verification")
     recent = db.scalar(sa.select(sa.func.count(PaymentEmailChallenge.id)).where(
         PaymentEmailChallenge.payment_id == payment.id,
         PaymentEmailChallenge.created_at >= datetime.now(timezone.utc) - timedelta(minutes=10))) or 0

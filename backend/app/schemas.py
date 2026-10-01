@@ -28,6 +28,7 @@ class PasswordResetConfirm(BaseModel):
 class EmailChallengeOut(BaseModel):
     email: EmailStr
     expires_at: datetime
+    resend_available_at: datetime | None = None
     demo_mode: bool
     demo_code: str | None = None
 
@@ -165,6 +166,7 @@ class PaymentStartOut(BaseModel):
     email_masked: str
     amount: Decimal
     expires_at: datetime
+    resend_available_at: datetime | None = None
     demo_mode: bool
 
 class OtpVerifyIn(BaseModel):
