@@ -197,7 +197,10 @@ def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get
     now = datetime.now(timezone.utc)
     generic = EmailChallengeOut(email=email, expires_at=now + timedelta(minutes=PASSWORD_RESET_CODE_MINUTES),
                                 resend_available_at=_resend_available_at(now), demo_mode=False, demo_code=None)
-    user = db.scalar(sa.select(User).where(User.email == email, User.active.is_(True), User.email_verified.is_(True)))
+    # Possession of a reset code proves ownership of the mailbox as well.  Let
+    # people who left registration before email verification recover their
+    # account instead of leaving them unable to sign in or reset their password.
+    user = db.scalar(sa.select(User).where(User.email == email, User.active.is_(True)))
     if not user:
         return generic
     latest = db.scalar(sa.select(PasswordResetChallenge).where(PasswordResetChallenge.user_id == user.id)
@@ -240,6 +243,7 @@ def confirm_password_reset(data: PasswordResetConfirm, db: Session = Depends(get
         raise HTTPException(422, "The code or email is not valid")
     challenge.consumed_at = now
     user.password_hash = hash_password(data.password)
+    user.email_verified = True
     db.commit()
     return {"message": "Password reset complete"}
 
