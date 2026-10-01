@@ -84,7 +84,26 @@ def _booking_out(item: Booking) -> BookingOut:
 @router.post("/auth/register", status_code=201)
 def register(data: UserCreate, db: Session = Depends(get_db)):
     nickname=data.nickname.strip().lower()
-    user = User(name=nickname, nickname=nickname, email=str(data.email).lower(),
+    email = str(data.email).lower()
+    existing = db.scalar(sa.select(User).where(sa.or_(
+        User.email == email, sa.func.lower(User.nickname) == nickname
+    )))
+    if existing:
+        if existing.email == email and existing.active and not existing.email_verified:
+            latest = db.scalar(sa.select(EmailOtpChallenge).where(EmailOtpChallenge.user_id == existing.id)
+                .order_by(EmailOtpChallenge.created_at.desc()))
+            now = datetime.now(timezone.utc)
+            return EmailChallengeOut(
+                email=existing.email,
+                expires_at=latest.expires_at if latest and latest.expires_at > now else now + timedelta(minutes=10),
+                resend_available_at=_resend_available_at(latest.created_at) if latest else now,
+                demo_mode=False,
+                demo_code=None,
+            )
+        if existing.email == email:
+            raise HTTPException(409, "This email is already registered. Sign in or reset the password")
+        raise HTTPException(409, "This nickname is already in use")
+    user = User(name=nickname, nickname=nickname, email=email,
                 password_hash=hash_password(data.password), role=Role.CUSTOMER)
     db.add(user)
     try:
