@@ -90,6 +90,19 @@ class Screening(Base):
     __table_args__ = (CheckConstraint("starts_at < ends_at", name="ck_screening_time_range"),
                       CheckConstraint("base_price >= 0 AND premium_surcharge >= 0", name="ck_screening_price_nonnegative"))
 
+class CatalogScreeningLink(Base):
+    """One owned seat map for one source repertory item.
+
+    The public schedule id is unique.  This lets concurrent visitors select
+    the same time without producing two independent Parda seat inventories.
+    """
+    __tablename__ = "catalog_screening_links"
+    source_repertory_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    screening_id: Mapped[int] = mapped_column(ForeignKey("screenings.id", ondelete="CASCADE"), unique=True, index=True)
+    source_name: Mapped[str] = mapped_column(String(40), default="cinematica")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    screening: Mapped["Screening"] = relationship()
+
 class Booking(Base):
     __tablename__ = "bookings"
     id: Mapped[int] = mapped_column(primary_key=True)
