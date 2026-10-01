@@ -1,0 +1,112 @@
+/* Final visual tokens. This file is loaded last so every interactive state
+   stays legible after the older product styles have been composed. */
+:root {
+  --ink:#16212d;
+  --muted:#586a7a;
+  --paper:#f4f7f9;
+  --white:#ffffff;
+  --cream:#e9f0f4;
+  --line:#cedae2;
+  --sage:#176f91;
+  --sage-light:#dff3fa;
+  --coral:#c84f36;
+  --action:#174d68;
+  --action-hover:#0d688d;
+  --on-action:#ffffff;
+  --accent:#c84f36;
+  --accent-strong:#842f20;
+  --accent-soft:#fde8e2;
+  --focus:#167ca8;
+  --seat-free:#4a8d70;
+  --seat-selected:#176f91;
+  --seat-taken:#7b8791;
+  --seat-premium:#a26a1d;
+  --serif:'Fraunces', Georgia, serif;
+  font-family:'Manrope', ui-sans-serif, system-ui, sans-serif;
+}
+
+:root[data-theme="dark"] {
+  color-scheme:dark;
+  --ink:#edf5f8;
+  --muted:#adc0ca;
+  --paper:#0b131b;
+  --white:#14222d;
+  --cream:#1b2c38;
+  --line:#35505f;
+  --sage:#5ac9e7;
+  --sage-light:#133d4c;
+  --coral:#ff9277;
+  --action:#176c8c;
+  --action-hover:#258cad;
+  --on-action:#f8fcff;
+  --accent:#ff9277;
+  --accent-strong:#ffd6cb;
+  --accent-soft:#452b28;
+  --focus:#70d9f4;
+  --seat-free:#6ac69a;
+  --seat-selected:#67cdea;
+  --seat-taken:#687985;
+  --seat-premium:#f3b85f;
+}
+
+body,.app-shell,.topbar,.programme-section,.footer,.how-section { background:var(--paper); color:var(--ink); }
+button,input,select,textarea { color:var(--ink); }
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible { outline:3px solid var(--focus); outline-offset:3px; }
+
+.button-primary,.carousel-cta,.setup-screen button {
+  background:var(--action)!important;
+  border-color:var(--action)!important;
+  color:var(--on-action)!important;
+  box-shadow:0 10px 26px color-mix(in srgb,var(--action) 22%,transparent);
+}
+.button-primary:hover:not(:disabled),.carousel-cta:hover,.setup-screen button:hover {
+  background:var(--action-hover)!important;
+  border-color:var(--action-hover)!important;
+  color:var(--on-action)!important;
+}
+.button-primary:disabled,.carousel-cta:disabled { background:var(--cream)!important; border-color:var(--line)!important; color:var(--muted)!important; box-shadow:none; }
+
+.signin-button,.account-button,.theme-toggle,.language-picker,.icon-button,.cancel-booking,.release-link,.auth-switch,.payment-resend,.film-pagination button,.detail-back {
+  background:var(--white)!important;
+  color:var(--ink)!important;
+  border-color:var(--line)!important;
+}
+.signin-button:hover,.account-button:hover,.theme-toggle:hover,.icon-button:hover,.cancel-booking:hover,.release-link:hover,.auth-switch:hover,.payment-resend:hover,.film-pagination button:hover:not(:disabled),.detail-back:hover { background:var(--cream)!important; color:var(--ink)!important; }
+.language-picker select { background:transparent!important; color:var(--ink)!important; }
+
+.catalog-switch button,.detail-dates button,.detail-halls button,.payment-methods button,.hall-filter button,.date-chip {
+  background:var(--white)!important;
+  color:var(--ink)!important;
+  border-color:var(--line)!important;
+}
+.catalog-switch .catalog-active,.detail-dates .detail-date-active,.detail-halls .detail-hall-active,.payment-methods button.active,.hall-filter .hall-active,.date-chip.date-current {
+  background:var(--accent-soft)!important;
+  color:var(--accent-strong)!important;
+  border-color:var(--accent)!important;
+  box-shadow:inset 0 -2px 0 var(--accent);
+}
+.detail-dates button span,.detail-dates button b,.detail-halls span,.catalog-switch button { color:inherit!important; }
+
+.auth-dialog,.history-drawer,.admin-dialog,.admin-form,.admin-catalog,.seat-dialog,.payment-dialog,.confirm-dialog,.date-rail,.screening-chip,.search-box,.movie-row { background:var(--white)!important; color:var(--ink)!important; border-color:var(--line)!important; }
+.auth-dialog input,.auth-dialog select,.admin-form input,.admin-form select,.demo-payment-form input,.search-box input,.payment-code {
+  background:var(--paper)!important;
+  color:var(--ink)!important;
+  border-color:var(--line)!important;
+}
+input::placeholder { color:var(--muted)!important; opacity:1; }
+
+.inline-alert { display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--accent-soft)!important; color:var(--accent-strong)!important; border:1px solid var(--accent)!important; }
+.inline-alert button { border:1px solid var(--accent)!important; background:var(--white)!important; color:var(--accent-strong)!important; border-radius:999px; padding:7px 11px; font-weight:800; white-space:nowrap; }
+.inline-alert button:hover { background:var(--accent)!important; color:var(--on-action)!important; }
+
+.seat-legend { background:var(--cream); border:1px solid var(--line); border-radius:12px; padding:10px 12px; }
+.seat-legend span { color:var(--ink)!important; font-weight:750; }
+.seat-dot.seat-open { background:var(--seat-free)!important; }.seat-dot.seat-picked { background:var(--seat-selected)!important; }.seat-dot.seat-busy { background:var(--seat-taken)!important; }.seat-dot.seat-vip { background:var(--seat-premium)!important; }
+.seat:not(.seat-taken) { background:color-mix(in srgb,var(--seat-free) 20%,var(--white))!important; border-color:var(--seat-free)!important; color:var(--ink)!important; }
+.seat.seat-premium:not(.seat-taken) { background:color-mix(in srgb,var(--seat-premium) 20%,var(--white))!important; border-color:var(--seat-premium)!important; }
+.seat.seat-selected { background:var(--seat-selected)!important; border-color:var(--seat-selected)!important; color:var(--on-action)!important; box-shadow:0 0 16px color-mix(in srgb,var(--seat-selected) 55%,transparent); }
+.seat.seat-taken { background:var(--seat-taken)!important; border-color:var(--seat-taken)!important; color:#f6f9fa!important; opacity:.72; }
+
+.film-card:hover .poster-glow { background:radial-gradient(circle at 50% 20%,color-mix(in srgb,var(--accent) 45%,transparent),transparent 70%); opacity:1; }
+.carousel-kicker,.brand-period { color:var(--accent)!important; }
+.payment-methods button.active { color:var(--accent-strong)!important; }

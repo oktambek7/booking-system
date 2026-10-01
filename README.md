@@ -23,10 +23,34 @@ Parda is an Uzbek-first cinema discovery and seat-booking app. The React/Vite fr
 - [x] Rolling Parda-owned demo sessions when the managed calendar has no future schedule
 - [x] PostgreSQL protection against concurrent double booking and overlapping hall schedules
 - [x] Uzbek/English/Russian UI, light/dark themes, accessible date chips, and responsive cinema artwork
-- [x] Resend transactional email delivery for signup verification, payment codes, and password resets
+- [x] Brevo transactional email delivery for signup verification, payment codes, and password resets
 - [ ] Load verified cinema/operator hall layouts, prices, and showtimes
 - [ ] Complete merchant onboarding and payment-provider callback integration
 - [ ] Exercise checkout, refunds/cancellation policy, and concurrent reservations in staging
+
+## Assignment requirement mapping
+
+The original assignment describes appointments. Parda applies the same booking model to a cinema: a **movie** is the service, an **auditorium/cinema operator** is the provider, and a **screening** is the dated availability window.
+
+| Requirement | Parda implementation |
+| --- | --- |
+| Service name, description, duration, price | Admin can create films with title, synopsis, duration, genre, age mark, language, and poster. The screening form sets the server-owned ticket price. |
+| Provider / employee | Admin creates cinema auditoriums with seat plans, timezone, formats, and Standard/VIP category. A cinema operator manages the associated schedules. |
+| Availability | Admin schedules a film in an auditorium. The API rejects past times and overlapping hall intervals. |
+| Users see available times and book | The film page fetches date, hall, format, price, and available-seat data before seat selection. |
+| Pending, confirmed, cancelled, completed | `BookingStatus` supports all four states. A hold starts as pending; a verified demo payment confirms it; customers can cancel eligible tickets; admins complete finished screenings. |
+| No double booking | PostgreSQL row locks plus the partial unique active-seat index return a conflict to competing seat requests. |
+| Backend API, auth, validation, history | FastAPI endpoints are documented at `/docs`; JWT auth, Pydantic validation, email verification, booking history, soft history clearing, and role-gated administration are included. |
+| Timezone, email, dashboard, Docker, docs | `Asia/Tashkent` is stored with halls, Brevo sends OTP email, the admin dashboard manages films/halls/schedule/bookings, Docker Compose and API docs are supplied. |
+
+### Edge cases addressed
+
+- A seat hold expires after ten minutes; expiry releases its seat assignments while preserving the audit record.
+- Two customers selecting the same seat are serialized by the database. One booking succeeds, and the other receives HTTP 409 with current availability on refresh.
+- A user cannot book a past screening, choose a seat outside that auditorium, submit duplicate or more than eight seats, or cancel after a screening begins.
+- A second payment verification attempt cannot confirm someone else’s booking. Codes are hashed, expire, limit attempts, and are rate limited for resend.
+- External discovery data is never the seat source of truth. Cinematica’s read-only programme is cached fresh for five minutes and can serve a bounded stale result for up to 24 hours when its upstream service is temporarily unreachable.
+- New and returning unverified accounts resume the same verification flow without creating duplicate users; password resets are restricted to verified accounts.
 
 ## Demo checkout
 

@@ -5,6 +5,7 @@ customer into an external checkout or treats the source's inventory as Parda's.
 """
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
+import logging
 from threading import Lock
 import time
 
@@ -19,16 +20,27 @@ from .models import Auditorium, Booking, BookingSeat, BookingStatus, CatalogScre
 
 router = APIRouter(prefix="/api/cinematica", tags=["Cinematica catalog"])
 BASE = "https://cinematica.uz/api/v1"
-_cache: dict[str, tuple[float, dict]] = {}
+# The upstream catalogue is a convenience feed.  A temporary upstream timeout
+# must not make a customer-facing programme disappear after its short fresh
+# cache lifetime.  Keep a bounded stale copy as a read-only fallback.
+_FRESH_CACHE_SECONDS = 5 * 60
+_STALE_CACHE_SECONDS = 24 * 60 * 60
+_cache: dict[str, tuple[float, float, dict]] = {}
 _lock = Lock()
+logger = logging.getLogger(__name__)
 
 
 def _get(path: str) -> dict:
     now = time.monotonic()
+    stale_payload: dict | None = None
     with _lock:
         cached = _cache.get(path)
-        if cached and cached[0] > now:
-            return cached[1]
+        if cached:
+            fresh_until, stale_until, payload = cached
+            if fresh_until > now:
+                return payload
+            if stale_until > now:
+                stale_payload = payload
     try:
         response = httpx.get(f"{BASE}/{path.lstrip('/')}", timeout=8.0,
                              headers={"Accept": "application/json", "User-Agent": "PardaCinema/1.0"})
@@ -37,9 +49,12 @@ def _get(path: str) -> dict:
         if payload.get("result") != 0 or not isinstance(payload.get("list"), list):
             raise ValueError("Unexpected catalog response")
     except (httpx.HTTPError, ValueError) as exc:
+        if stale_payload is not None:
+            logger.warning("Serving stale Cinematica catalogue after an upstream failure for %s: %s", path, exc)
+            return stale_payload
         raise HTTPException(502, "Cinematica's live catalog is temporarily unavailable") from exc
     with _lock:
-        _cache[path] = (now + 300, payload)
+        _cache[path] = (now + _FRESH_CACHE_SECONDS, now + _STALE_CACHE_SECONDS, payload)
     return payload
 
 
