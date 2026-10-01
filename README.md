@@ -78,10 +78,10 @@ Deploy from `render.yaml`, attach PostgreSQL, and set these private values in th
 
 - `DATABASE_URL`, `TMDB_READ_TOKEN`, `JWT_SECRET`, `OTP_SECRET`
 - `CORS_ORIGINS` to the exact production frontend origin
-- `EMAIL_MODE=resend`, `RESEND_API_KEY`, `RESEND_FROM`
+- `EMAIL_MODE=brevo`, `BREVO_API_KEY`, `BREVO_FROM` (recommended for production)
 - `APP_ENVIRONMENT=production`
 
-`TMDB_MAX_PAGES` sets the number of pages imported per category (default 5); `TMDB_SYNC_INTERVAL_HOURS` sets the refresh interval (default 24). TMDB tokens must remain server-side. Public signup needs a transactional email sender. Resend's onboarding sender is suitable for the account owner during setup; verify a Parda domain before sending to public customers.
+`TMDB_MAX_PAGES` sets the number of pages imported per category (default 5); `TMDB_SYNC_INTERVAL_HOURS` sets the refresh interval (default 24). TMDB tokens must remain server-side. Public signup needs a transactional email sender. The application supports Brevo's HTTPS API, Resend, and SMTP. For Brevo, register and verify the sender email address, create an API key, and keep both values only in the deployment environment. A custom sending domain improves delivery reputation but is not required for initial sender-email verification.
 
 Bootstrap the admin with `ADMIN_EMAIL` and a unique `ADMIN_PASSWORD` of at least 12 characters. Configure real, operator-provided cinema halls, seat plans, prices, and screening schedules through the admin tools.
 

@@ -28,9 +28,10 @@ def send_email_code(address: str, code: str) -> bool:
 
 def _send_email(address: str, subject: str, content: str) -> bool:
     """Return True only for a local-development mock delivery."""
-    if settings.email_mode == "mock" and settings.app_environment.lower() != "production":
+    email_mode = settings.email_mode.strip().lower()
+    if email_mode == "mock" and settings.app_environment.lower() != "production":
         return True
-    if settings.email_mode == "resend":
+    if email_mode == "resend":
         if not all((settings.resend_api_key, settings.resend_from)):
             raise EmailDeliveryError("Email delivery is not configured")
         try:
@@ -42,9 +43,31 @@ def _send_email(address: str, subject: str, content: str) -> bool:
             )
             response.raise_for_status()
         except httpx.HTTPError as exc:
+            logger.warning("Resend verification email failed (%s)", type(exc).__name__)
             raise EmailDeliveryError("Verification email could not be sent. Try again shortly.") from exc
         return False
-    if settings.email_mode != "smtp" or not all((settings.smtp_host, settings.smtp_username,
+    if email_mode == "brevo":
+        if not all((settings.brevo_api_key, settings.brevo_from)):
+            raise EmailDeliveryError("Email delivery is not configured")
+        try:
+            response = httpx.post(
+                "https://api.brevo.com/v3/smtp/email",
+                headers={"api-key": settings.brevo_api_key, "accept": "application/json"},
+                json={
+                    "sender": {"name": "Parda Cinema", "email": settings.brevo_from},
+                    "to": [{"email": address}],
+                    "subject": subject,
+                    "textContent": content,
+                    "tags": ["parda-verification"],
+                },
+                timeout=15.0,
+            )
+            response.raise_for_status()
+        except httpx.HTTPError as exc:
+            logger.warning("Brevo verification email failed (%s)", type(exc).__name__)
+            raise EmailDeliveryError("Verification email could not be sent. Try again shortly.") from exc
+        return False
+    if email_mode != "smtp" or not all((settings.smtp_host, settings.smtp_username,
             settings.smtp_password, settings.smtp_from)):
         raise EmailDeliveryError("Email delivery is not configured")
     message = EmailMessage()
