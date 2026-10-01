@@ -80,3 +80,9 @@ def send_payment_verification_email(address: str, code: str, *, movie: str, cine
         "This is a demo payment. No real money will be charged. "
         "Do not reply with card or CVV information."
     ))
+
+def send_password_reset_email(address: str, code: str) -> bool:
+    return _send_email(address, "Reset your Parda Cinema password", (
+        f"Your password reset code is: {code}\n\n"
+        "It expires in 10 minutes. If you did not request a password reset, you can ignore this email."
+    ))

@@ -8,9 +8,9 @@ from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException, Query
 from .database import get_db
 from .models import (Auditorium, Booking, BookingSeat, BookingStatus, EmailOtpChallenge, Movie,
-                     Payment, PaymentEmailChallenge, Role, Screening, Seat, User)
+                     PasswordResetChallenge, Payment, PaymentEmailChallenge, Role, Screening, Seat, User)
 from .schemas import (AuditoriumIn, AuditoriumOut, BookingIn, BookingOut, BookingStatusIn,
-                      CatalogSyncOut, EmailChallengeOut, EmailCodeVerify, EmailResend, Login, MovieIn, MovieOut, OtpVerifyIn, PaymentStartIn,
+                      CatalogSyncOut, EmailChallengeOut, EmailCodeVerify, EmailResend, Login, MovieIn, MovieOut, OtpVerifyIn, PasswordResetConfirm, PasswordResetRequest, PaymentStartIn,
                       PaymentStartOut, PaymentVerifyOut, ScreeningIn, ScreeningOut,
                       ScreeningSeatsOut, SeatOut, Token, UserCreate)
 from .security import current_user, hash_password, make_token, require_roles, verify_password
@@ -18,7 +18,7 @@ from .config import settings
 from .otp import code_hash, code_matches, new_code
 from .tmdb import TMDBUnavailable, sync_catalog
 from .mail import (EmailDeliveryError, email_code_hash, email_code_matches, send_email_code,
-                   send_payment_verification_email)
+                   send_password_reset_email, send_payment_verification_email)
 
 router = APIRouter(prefix="/api")
 admin = Depends(require_roles(Role.ADMIN))
@@ -27,6 +27,9 @@ HOLD_MINUTES = 10
 PAYMENT_CODE_MINUTES = 5
 PAYMENT_CODE_MAX_ATTEMPTS = 5
 PAYMENT_RESEND_LIMIT = 3
+PASSWORD_RESET_CODE_MINUTES = 10
+PASSWORD_RESET_MAX_ATTEMPTS = 5
+PASSWORD_RESET_REQUEST_LIMIT = 3
 TEST_CARDS = {
     "uzcard": "8600000000000001",
     "humo": "9860000000000001",
@@ -152,6 +155,55 @@ def login(data: Login, db: Session = Depends(get_db)):
     if not user.email_verified:
         raise HTTPException(403, "Verify your email before signing in")
     return Token(access_token=make_token(user))
+
+@router.post("/auth/password-reset/request", response_model=EmailChallengeOut)
+def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get_db)):
+    """Start a reset without revealing whether an address owns an account."""
+    email = str(data.email).lower()
+    generic = EmailChallengeOut(email=email, expires_at=datetime.now(timezone.utc) + timedelta(minutes=PASSWORD_RESET_CODE_MINUTES),
+                                demo_mode=False, demo_code=None)
+    user = db.scalar(sa.select(User).where(User.email == email, User.active.is_(True), User.email_verified.is_(True)))
+    if not user:
+        return generic
+    recent = db.scalar(sa.select(sa.func.count(PasswordResetChallenge.id)).where(
+        PasswordResetChallenge.user_id == user.id,
+        PasswordResetChallenge.created_at >= datetime.now(timezone.utc) - timedelta(minutes=10))) or 0
+    if recent >= PASSWORD_RESET_REQUEST_LIMIT:
+        return generic
+    code = new_code()
+    challenge = PasswordResetChallenge(user_id=user.id, code_hash=email_code_hash(user.id, code),
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=PASSWORD_RESET_CODE_MINUTES))
+    try:
+        is_demo = send_password_reset_email(user.email, code)
+        db.add(challenge)
+        db.commit()
+    except EmailDeliveryError as exc:
+        db.rollback()
+        raise HTTPException(503, str(exc)) from exc
+    return EmailChallengeOut(email=email, expires_at=challenge.expires_at,
+                             demo_mode=is_demo, demo_code=code if is_demo else None)
+
+@router.post("/auth/password-reset/confirm")
+def confirm_password_reset(data: PasswordResetConfirm, db: Session = Depends(get_db)):
+    user = db.scalar(sa.select(User).where(User.email == str(data.email).lower(), User.active.is_(True)).with_for_update())
+    if not user:
+        raise HTTPException(422, "The code or email is not valid")
+    challenge = db.scalar(sa.select(PasswordResetChallenge).where(
+        PasswordResetChallenge.user_id == user.id, PasswordResetChallenge.consumed_at.is_(None)
+    ).order_by(PasswordResetChallenge.created_at.desc()).with_for_update())
+    now = datetime.now(timezone.utc)
+    if not challenge or challenge.expires_at <= now:
+        raise HTTPException(410, "This reset code has expired. Request a new code")
+    if challenge.attempts >= PASSWORD_RESET_MAX_ATTEMPTS:
+        raise HTTPException(429, "Too many incorrect codes. Request a new code")
+    if not email_code_matches(user.id, data.code, challenge.code_hash):
+        challenge.attempts += 1
+        db.commit()
+        raise HTTPException(422, "The code or email is not valid")
+    challenge.consumed_at = now
+    user.password_hash = hash_password(data.password)
+    db.commit()
+    return {"message": "Password reset complete"}
 
 @router.get("/auth/me")
 def me(user: User = Depends(current_user)):

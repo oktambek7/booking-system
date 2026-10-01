@@ -17,6 +17,14 @@ class EmailCodeVerify(BaseModel):
 class EmailResend(BaseModel):
     email: EmailStr
 
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+class PasswordResetConfirm(BaseModel):
+    email: EmailStr
+    code: str = Field(pattern=r"^\d{4}$")
+    password: str = Field(min_length=10, max_length=128)
+
 class EmailChallengeOut(BaseModel):
     email: EmailStr
     expires_at: datetime
