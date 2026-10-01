@@ -110,3 +110,93 @@ input::placeholder { color:var(--muted)!important; opacity:1; }
 .film-card:hover .poster-glow { background:radial-gradient(circle at 50% 20%,color-mix(in srgb,var(--accent) 45%,transparent),transparent 70%); opacity:1; }
 .carousel-kicker,.brand-period { color:var(--accent)!important; }
 .payment-methods button.active { color:var(--accent-strong)!important; }
+
+/* Header controls use one compact, touch-friendly rhythm and avoid native
+   select menus, which render an unreadable white option surface in dark mode. */
+.language-picker {
+  position:relative;
+  height:44px!important;
+  padding:0!important;
+  border:0!important;
+  background:transparent!important;
+}
+.language-trigger {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  min-width:76px;
+  min-height:44px;
+  padding:0 13px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  background:var(--white);
+  color:var(--ink);
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:.06em;
+  cursor:pointer;
+  transition:background .18s ease,border-color .18s ease,transform .18s ease;
+}
+.language-trigger:hover { background:var(--cream); border-color:var(--sage); transform:translateY(-1px); }
+.language-trigger:focus-visible { outline:0; box-shadow:0 0 0 3px color-mix(in srgb,var(--focus) 38%,transparent); }
+.language-menu {
+  position:absolute;
+  z-index:30;
+  top:calc(100% + 8px);
+  right:0;
+  display:grid;
+  min-width:132px;
+  padding:6px;
+  border:1px solid var(--line);
+  border-radius:15px;
+  background:var(--white);
+  box-shadow:0 18px 42px color-mix(in srgb,#07111a 26%,transparent);
+}
+.language-menu button {
+  width:100%;
+  min-height:38px;
+  padding:0 13px;
+  border:0;
+  border-radius:10px;
+  background:transparent;
+  color:var(--ink);
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:.06em;
+  text-align:left;
+  cursor:pointer;
+}
+.language-menu button:hover,.language-menu .language-active { background:var(--accent-soft); color:var(--accent-strong); }
+.account-button {
+  min-height:44px;
+  padding:4px 13px 4px 5px;
+  border:1px solid var(--line)!important;
+  border-radius:999px;
+  background:var(--white)!important;
+  box-shadow:0 6px 18px color-mix(in srgb,var(--ink) 7%,transparent);
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:.01em;
+}
+.account-button:hover { border-color:var(--sage)!important; box-shadow:0 10px 24px color-mix(in srgb,var(--sage) 17%,transparent); }
+.account-avatar {
+  display:grid;
+  width:32px;
+  height:32px;
+  place-items:center;
+  border-radius:50%;
+  background:var(--accent-soft);
+  color:var(--accent-strong);
+}
+.account-button .account-avatar svg { color:inherit!important; }
+
+/* A slower, keyed cross-fade gives each carousel title and poster time to be
+   read while keeping the transition in motion rather than snapping frames. */
+.carousel-fade { animation:carousel-content-fade 820ms cubic-bezier(.22,.8,.24,1) both; }
+.carousel-backdrop.carousel-fade { animation:carousel-backdrop-fade 1050ms ease-out both; }
+.carousel-poster.carousel-fade { animation:carousel-poster-fade 880ms cubic-bezier(.22,.8,.24,1) both; }
+@keyframes carousel-content-fade { from { opacity:0; transform:translateX(-18px); filter:blur(3px); } to { opacity:1; transform:translateX(0); filter:blur(0); } }
+@keyframes carousel-backdrop-fade { from { opacity:0; transform:scale(1.025); } to { opacity:.96; transform:scale(1); } }
+@keyframes carousel-poster-fade { from { opacity:0; transform:translateY(-47%) translateX(20px) rotate(-1deg); } to { opacity:1; transform:translateY(-50%) translateX(0) rotate(2deg); } }
+@media (prefers-reduced-motion:reduce) { .carousel-fade,.carousel-backdrop.carousel-fade,.carousel-poster.carousel-fade { animation:none; } }
