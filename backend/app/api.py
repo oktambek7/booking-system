@@ -31,13 +31,6 @@ EMAIL_RESEND_COOLDOWN_SECONDS = 120
 PASSWORD_RESET_CODE_MINUTES = 10
 PASSWORD_RESET_MAX_ATTEMPTS = 5
 PASSWORD_RESET_REQUEST_LIMIT = 3
-TEST_CARDS = {
-    "uzcard": "8600000000000001",
-    "humo": "9860000000000001",
-    "visa": "4242424242424242",
-    "mastercard": "5555555555554444",
-}
-
 def _resend_available_at(now: datetime | None = None) -> datetime:
     return (now or datetime.now(timezone.utc)) + timedelta(seconds=EMAIL_RESEND_COOLDOWN_SECONDS)
 
@@ -426,10 +419,10 @@ def _masked_email(address: str) -> str:
     return f"{local[:1]}***@{domain}"
 
 def _validate_demo_card(data: PaymentStartIn) -> str:
-    """Validate only published sandbox credentials. Never persist this input."""
+    """Validate checkout shape without persisting card data or contacting a bank."""
     digits = "".join(char for char in data.card_number if char.isdigit())
-    if digits != TEST_CARDS[data.method.value]:
-        raise HTTPException(422, "Use the published test card for this demo payment method")
+    if not 12 <= len(digits) <= 19:
+        raise HTTPException(422, "Enter a card number with 12 to 19 digits")
     name = " ".join(data.cardholder_name.split())
     if len(name) < 2 or len(name) > 80 or not all(char.isalpha() or char in " -.'" for char in name):
         raise HTTPException(422, "Enter the cardholder name using letters, spaces, apostrophes, or hyphens")
@@ -440,11 +433,14 @@ def _validate_demo_card(data: PaymentStartIn) -> str:
     if not 1 <= month <= 12:
         raise HTTPException(422, "Enter an expiry month from 01 to 12")
     current = datetime.now(timezone.utc)
-    if (2000 + year, month) < (current.year, current.month):
-        raise HTTPException(422, "This test card expiry date has passed")
+    expiry_year = 2000 + year
+    if (expiry_year, month) < (current.year, current.month):
+        raise HTTPException(422, "This card expiry date has passed")
+    if expiry_year > current.year + 30:
+        raise HTTPException(422, "Enter a realistic card expiry date")
     if data.method.value in ("visa", "mastercard"):
         if not data.cvv or not data.cvv.isdigit() or len(data.cvv) not in (3, 4):
-            raise HTTPException(422, "Enter a 3 or 4 digit test CVV")
+            raise HTTPException(422, "Enter a 3 or 4 digit CVV")
     elif data.cvv:
         raise HTTPException(422, "Uzcard and Humo demo cards do not use CVV")
     return digits[-4:]

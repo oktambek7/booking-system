@@ -19,13 +19,13 @@ Parda is an Uzbek-first cinema discovery and seat-booking app. The React/Vite fr
 - [x] Explicit Standard/VIP auditorium types and schedule filtering
 - [x] Seat selection, ten-minute pending holds, booking history, cancellation, and status transitions
 - [x] Customer history clearing for cancelled/completed bookings (soft-archived; audit rows and active bookings are retained)
-- [x] In-app demo card payment: Uzcard, Humo, Visa, and Mastercard test credentials, booking summary, email code verification, expiry, resend limits, and no real charge
+- [x] In-app card-form checkout: Uzcard, Humo, Visa, and Mastercard choices, booking summary, email code verification, current expiry validation, resend limits, and no real charge
 - [x] Rolling Parda-owned demo sessions when the managed calendar has no future schedule
 - [x] PostgreSQL protection against concurrent double booking and overlapping hall schedules
 - [x] Uzbek/English/Russian UI, light/dark themes, accessible date chips, and responsive cinema artwork
 - [x] Brevo transactional email delivery for signup verification, payment codes, and password resets
 - [x] Live Cinematica programme discovery with five-minute refreshes and a bounded stale-cache fallback
-- [x] Self-contained card checkout flow for Uzcard, Humo, Visa, and Mastercard demo cards with email-code confirmation
+- [x] Self-contained card checkout flow for Uzcard, Humo, Visa, and Mastercard with email-code confirmation
 - [x] Customer cancellation, booking-history archival, expiring seat holds, and PostgreSQL protection against competing seat requests
 
 ## Assignment requirement mapping
@@ -54,18 +54,11 @@ The original assignment describes appointments. Parda applies the same booking m
 
 ## Demo checkout
 
-The checkout is intentionally a **demo payment**. It validates only the published test credentials, emails a four-digit confirmation code, and then marks the Parda booking as confirmed. No processor is contacted and no money moves.
+The checkout is intentionally a **demo payment**. It accepts a syntactically valid card number, holder name, current or future expiry date, and CVV for Visa or Mastercard, then emails a four-digit confirmation code and marks the Parda booking as confirmed. No processor is contacted and no money moves.
 
 On startup, Parda fills the next seven days of missing managed demo slots from its existing active films and halls. Existing screenings and conflicting slots are preserved.
 
-| Method | Demo card | CVV |
-| --- | --- | --- |
-| Uzcard | `8600 0000 0000 0001` | Not used |
-| Humo | `9860 0000 0000 0001` | Not used |
-| Visa | `4242 4242 4242 4242` | `123` |
-| Mastercard | `5555 5555 5555 4444` | `123` |
-
-The app accepts a card number, holder name, expiry, and (where relevant) CVV only to validate this one demo attempt. It stores only the last four card digits on the payment receipt. It never stores, logs, returns, or emails a card number, holder name, expiry, or CVV. Payment email codes are HMAC digests, expire after five minutes, allow five attempts, and have resend limits.
+The app accepts card details only to validate this one demo attempt. It stores only the last four card digits on the payment receipt. It never stores, logs, returns, or emails a card number, holder name, expiry, or CVV. Payment email codes are HMAC digests, expire after five minutes, allow five attempts, and have resend limits.
 
 TMDB provides movie metadata, not theater schedules or seat inventory. Cinematica's public data is cached for discovery only. It does not give Parda authority to lock source seats, sell source tickets, or guarantee the source feed. A real release needs operator-owned halls/schedules and a licensed payment provider with hosted or tokenized card entry.
 
