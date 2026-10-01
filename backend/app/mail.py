@@ -1,6 +1,8 @@
 import hashlib
 import hmac
+import html
 import logging
+import re
 import smtplib
 from email.message import EmailMessage
 import httpx
@@ -25,6 +27,25 @@ def send_email_code(address: str, code: str) -> bool:
         f"Your Parda Cinema verification code is {code}. It expires in 10 minutes. "
         "If you did not create this account, you can ignore this message."
     ))
+
+def _email_html(content: str) -> str:
+    """Create a compact, readable email that makes one-time codes easy to find."""
+    code_match = re.search(r"(?:code is:?|code:)\s*(\d{4,6})", content, flags=re.IGNORECASE)
+    code = code_match.group(1) if code_match else None
+    text = html.escape(content).replace("\n", "<br>")
+    code_block = (
+        f'<div style="margin:24px 0;padding:18px;border-radius:12px;background:#101827;'
+        f'color:#fff;font:700 32px/1.1 Arial,sans-serif;letter-spacing:8px;text-align:center;">{code}</div>'
+        if code else ""
+    )
+    return (
+        '<!doctype html><html><body style="margin:0;padding:24px;background:#f3f5f9;">'
+        '<main style="max-width:520px;margin:auto;padding:32px;border-radius:18px;background:#fff;'
+        'color:#172033;font:16px/1.6 Arial,sans-serif;">'
+        '<h1 style="margin:0 0 18px;font-size:24px;">Parda Cinema</h1>'
+        f'{code_block}<p style="margin:0;">{text}</p>'
+        '</main></body></html>'
+    )
 
 def _send_email(address: str, subject: str, content: str) -> bool:
     """Return True only for a local-development mock delivery."""
@@ -57,7 +78,7 @@ def _send_email(address: str, subject: str, content: str) -> bool:
                     "sender": {"name": "Parda Cinema", "email": settings.brevo_from},
                     "to": [{"email": address}],
                     "subject": subject,
-                    "textContent": content,
+                    "htmlContent": _email_html(content),
                     "tags": ["parda-verification"],
                 },
                 timeout=15.0,
