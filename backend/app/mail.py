@@ -1,9 +1,12 @@
 import hashlib
 import hmac
+import logging
 import smtplib
 from email.message import EmailMessage
 import httpx
 from .config import settings
+
+logger = logging.getLogger(__name__)
 
 class EmailDeliveryError(Exception):
     pass
@@ -60,6 +63,7 @@ def _send_email(address: str, subject: str, content: str) -> bool:
                 server.login(settings.smtp_username, settings.smtp_password)
                 server.send_message(message)
     except (OSError, smtplib.SMTPException) as exc:
+        logger.warning("SMTP verification email failed (%s)", type(exc).__name__)
         raise EmailDeliveryError("Verification email could not be sent. Try again shortly.") from exc
     return False
 
