@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     smtp_username: str = ""
     smtp_password: str = ""
     smtp_from: str = ""
+    resend_api_key: str = ""
+    resend_from: str = ""
     otp_secret: str = ""
     app_environment: str = "development"
     admin_email: str = ""
