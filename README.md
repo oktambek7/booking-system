@@ -23,7 +23,7 @@ Parda is an Uzbek-first cinema discovery and seat-booking app. The React/Vite fr
 - [x] Rolling Parda-owned demo sessions when the managed calendar has no future schedule
 - [x] PostgreSQL protection against concurrent double booking and overlapping hall schedules
 - [x] Uzbek/English/Russian UI, light/dark themes, accessible date chips, and responsive cinema artwork
-- [ ] Configure production SMTP sender and deliverability for payment verification emails
+- [x] Resend transactional email delivery for signup verification, payment codes, and password resets
 - [ ] Load verified cinema/operator hall layouts, prices, and showtimes
 - [ ] Complete merchant onboarding and payment-provider callback integration
 - [ ] Exercise checkout, refunds/cancellation policy, and concurrent reservations in staging
@@ -78,10 +78,10 @@ Deploy from `render.yaml`, attach PostgreSQL, and set these private values in th
 
 - `DATABASE_URL`, `TMDB_READ_TOKEN`, `JWT_SECRET`, `OTP_SECRET`
 - `CORS_ORIGINS` to the exact production frontend origin
-- `EMAIL_MODE=smtp`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`
+- `EMAIL_MODE=resend`, `RESEND_API_KEY`, `RESEND_FROM`
 - `APP_ENVIRONMENT=production`
 
-`TMDB_MAX_PAGES` sets the number of pages imported per category (default 5); `TMDB_SYNC_INTERVAL_HOURS` sets the refresh interval (default 24). TMDB tokens must remain server-side. Public signup needs a working SMTP sender.
+`TMDB_MAX_PAGES` sets the number of pages imported per category (default 5); `TMDB_SYNC_INTERVAL_HOURS` sets the refresh interval (default 24). TMDB tokens must remain server-side. Public signup needs a transactional email sender. Resend's onboarding sender is suitable for the account owner during setup; verify a Parda domain before sending to public customers.
 
 Bootstrap the admin with `ADMIN_EMAIL` and a unique `ADMIN_PASSWORD` of at least 12 characters. Configure real, operator-provided cinema halls, seat plans, prices, and screening schedules through the admin tools.
 
