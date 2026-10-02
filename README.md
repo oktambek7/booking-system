@@ -27,6 +27,10 @@ Parda is an Uzbek-first cinema discovery and seat-booking app. The React/Vite fr
 - [x] Live Cinematica programme discovery with five-minute refreshes and a bounded stale-cache fallback
 - [x] Self-contained card checkout flow for Uzcard, Humo, Visa, and Mastercard with email-code confirmation
 - [x] Customer cancellation, booking-history archival, expiring seat holds, and PostgreSQL protection against competing seat requests
+- [x] Cinematica hall-directory sync keyed by public cinema and hall IDs, with traceable source URL and sync time
+- [x] Movie-detail cinema, format, language, Standard/VIP, and price filters
+- [x] User-triggered nearest-cinema sorting using verified hall coordinates only
+- [x] Protected catalog sync, sync-status, nearby-hall, and hall-coordinate API endpoints
 
 ## Assignment requirement mapping
 
@@ -115,6 +119,54 @@ Set `VITE_API_URL` to the API origin and redeploy. Set the API `CORS_ORIGINS` to
 - Duplicate, foreign, past-screening, and excessive seat selections are rejected. Customers can only cancel their own eligible bookings.
 - Demo payment attempts are bound to the authenticated booking and server-calculated total. A production payment provider must verify signed callbacks and transaction amount/order before a booking can be confirmed.
 - Customer history clearing archives only cancelled and completed rows. Upcoming active holds/tickets remain visible; users cancel eligible bookings first.
+
+## Cinema catalogue architecture
+
+```mermaid
+flowchart LR
+  C[Cinematica public catalogue] -->|read-only, cached| S[FastAPI catalogue adapter]
+  S -->|source IDs, URL, sync time| D[(PostgreSQL hall directory)]
+  D --> A[Admin: verify address and coordinates]
+  S --> F[Movie detail / showtime filters]
+  F --> B[Parda seat map and booking]
+  B --> D2[(Parda bookings, holds, receipts)]
+```
+
+### Data policy and synchronization
+
+- Cinematica is used only as a public discovery source. Parda does not access source checkout, source customer data, or source seat inventory.
+- The sync reads current public movie repertory, rejects disabled, malformed, started, and expired rows, then upserts halls by `source_name + external_hall_id`. It stores the source cinema ID, hall ID, source URL, and `last_synced_at`.
+- A scheduled Parda session is hidden when its managed inventory is sold out. A source time that clashes with a managed session in the same imported hall is also hidden before a customer can enter the seat map.
+- Source payloads have a five-minute fresh cache and a 24-hour bounded stale fallback for read-only discovery. A source failure does not block Parda bookings that already exist.
+- Imported locations are deliberately blank until a cinema operator supplies verified address and latitude/longitude through the protected hall update endpoint. The UI never estimates a distance.
+
+### Nearby cinemas and privacy
+
+The site asks for browser location only after the visitor presses **Find cinemas near me**. It calculates a Haversine distance only for halls with verified coordinates, and keeps the browser location in client memory. The API also supports server-side distance sorting through `GET /api/cinemas/nearby?lat=&lng=` for clients that need it.
+
+### Directory and sync API
+
+| Endpoint | Access | Purpose |
+| --- | --- | --- |
+| `GET /api/cinematica/movies/{id}/screenings` | Public | Current valid source showtimes for one movie |
+| `GET /api/cinemas?city=Tashkent` | Public | Active Parda and imported halls |
+| `GET /api/cinemas/nearby?lat=&lng=` | Public | Halls with verified coordinates, ordered by distance |
+| `PATCH /api/cinemas/{id}` | Admin | Verify address, coordinates, formats, hall type, or disable a hall |
+| `POST /api/admin/catalog-sync` | Admin | Run the idempotent source hall-directory sync |
+| `GET /api/admin/catalog-sync/status` | Admin | Inspect imported hall count and most recent sync time |
+
+## Verification
+
+```sh
+python -m unittest discover -s backend/tests -v
+cd frontend && npm run build
+```
+
+The unit checks cover source-showtime normalization, source IDs, disabled/malformed rejection, and Asia/Tashkent-to-UTC conversion. PostgreSQL is responsible for active-seat uniqueness and hall-time exclusion; run concurrent booking checks against the configured PostgreSQL staging database before a commercial release.
+
+## Known source limits
+
+The public Cinematica feed currently provides cinema/hall labels, session time, price, and source identifiers. It does not provide verified street addresses, coordinates, physical capacities, cancellation state, or source seat counts. Parda therefore does not invent those fields. Complete operator verification and a licensed payment provider remain required before taking real money.
 
 ## TMDB attribution
 

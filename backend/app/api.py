@@ -1,4 +1,5 @@
 from datetime import date, datetime, timedelta, timezone
+from math import asin, cos, radians, sin, sqrt
 from secrets import token_urlsafe
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import sqlalchemy as sa
@@ -9,14 +10,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from .database import get_db
 from .models import (Auditorium, Booking, BookingSeat, BookingStatus, EmailOtpChallenge, Movie,
                      PasswordResetChallenge, Payment, PaymentEmailChallenge, Role, Screening, Seat, User)
-from .schemas import (AuditoriumIn, AuditoriumOut, BookingIn, BookingOut, BookingStatusIn,
-                      CatalogSyncOut, EmailChallengeOut, EmailCodeVerify, EmailResend, Login, MovieIn, MovieOut, OtpVerifyIn, PasswordResetConfirm, PasswordResetRequest, PaymentStartIn,
+from .schemas import (AuditoriumIn, AuditoriumOut, AuditoriumUpdate, NearbyAuditoriumOut, BookingIn, BookingOut, BookingStatusIn,
+                      CatalogSyncOut, CinemaDirectorySyncOut, EmailChallengeOut, EmailCodeVerify, EmailResend, Login, MovieIn, MovieOut, OtpVerifyIn, PasswordResetConfirm, PasswordResetRequest, PaymentStartIn,
                       PaymentStartOut, PaymentVerifyOut, ScreeningIn, ScreeningOut,
                       ScreeningSeatsOut, SeatOut, Token, UserCreate)
 from .security import current_user, hash_password, make_token, require_roles, verify_password
 from .config import settings
 from .otp import code_hash, code_matches, new_code
 from .tmdb import TMDBUnavailable, sync_catalog
+from .cinematica import sync_active_cinematica_halls
 from .mail import (EmailDeliveryError, email_code_hash, email_code_matches, send_email_code,
                    send_password_reset_email, send_payment_verification_email)
 
@@ -64,6 +66,23 @@ def _screening_out(db: Session, screening: Screening) -> ScreeningOut:
         hall_type=screening.auditorium.hall_type,
         city=screening.auditorium.city, timezone=screening.auditorium.timezone,
         available_seats=max(total-taken, 0))
+
+def _auditorium_out(auditorium: Auditorium) -> AuditoriumOut:
+    return AuditoriumOut(id=auditorium.id, name=auditorium.name, cinema_name=auditorium.cinema_name,
+        city=auditorium.city, address=auditorium.address, timezone=auditorium.timezone,
+        formats=auditorium.formats or ["2D"], hall_type=auditorium.hall_type,
+        seat_count=len(auditorium.seats), source_name=auditorium.source_name,
+        external_cinema_id=auditorium.external_cinema_id, external_hall_id=auditorium.external_hall_id,
+        source_url=auditorium.source_url, latitude=auditorium.latitude, longitude=auditorium.longitude,
+        last_synced_at=auditorium.last_synced_at)
+
+def _distance_km(lat: float, lng: float, destination_lat: float, destination_lng: float) -> float:
+    """Haversine distance. Only verified, stored hall coordinates reach here."""
+    radius = 6371.0088
+    latitude_delta = radians(destination_lat - lat)
+    longitude_delta = radians(destination_lng - lng)
+    a = sin(latitude_delta / 2) ** 2 + cos(radians(lat)) * cos(radians(destination_lat)) * sin(longitude_delta / 2) ** 2
+    return round(2 * radius * asin(sqrt(a)), 2)
 
 def _booking_out(item: Booking) -> BookingOut:
     return BookingOut(id=item.id, customer_id=item.customer_id, screening_id=item.screening_id,
@@ -260,6 +279,16 @@ def sync_movie_catalog(db: Session = Depends(get_db), _: User = admin):
         raise HTTPException(503, str(exc)) from exc
     return CatalogSyncOut(imported_now_playing=current, imported_upcoming=upcoming)
 
+@router.post("/admin/catalog-sync", response_model=CinemaDirectorySyncOut)
+def sync_cinematica_catalog(db: Session = Depends(get_db), _: User = admin):
+    return sync_active_cinematica_halls(db)
+
+@router.get("/admin/catalog-sync/status")
+def catalog_sync_status(db: Session = Depends(get_db), _: User = admin):
+    latest = db.scalar(sa.select(sa.func.max(Auditorium.last_synced_at)).where(Auditorium.source_name == "cinematica"))
+    halls = db.scalar(sa.select(sa.func.count(Auditorium.id)).where(Auditorium.source_name == "cinematica")) or 0
+    return {"source": "cinematica", "halls": halls, "last_synced_at": latest}
+
 @router.get("/movies/{movie_id}", response_model=MovieOut)
 def movie_details(movie_id: int, db: Session = Depends(get_db)):
     movie=db.get(Movie,movie_id)
@@ -286,12 +315,25 @@ def archive_movie(movie_id: int, db: Session = Depends(get_db), _: User = admin)
     if not movie: raise HTTPException(404, "Movie not found")
     movie.active = False; db.commit()
 
+@router.get("/cinemas/nearby", response_model=list[NearbyAuditoriumOut])
+def nearby_cinemas(lat: float = Query(ge=-90, le=90), lng: float = Query(ge=-180, le=180),
+                   city: str | None = None, db: Session = Depends(get_db)):
+    q = sa.select(Auditorium).where(Auditorium.active.is_(True), Auditorium.latitude.is_not(None), Auditorium.longitude.is_not(None))
+    if city:
+        q = q.where(Auditorium.city.ilike(city.strip()))
+    rows = []
+    for auditorium in db.scalars(q).all():
+        value = _auditorium_out(auditorium).model_dump()
+        value["distance_km"] = _distance_km(lat, lng, float(auditorium.latitude), float(auditorium.longitude))
+        rows.append(NearbyAuditoriumOut(**value))
+    return sorted(rows, key=lambda item: (item.distance_km, item.cinema_name.casefold(), item.name.casefold()))
+
 @router.get("/cinemas", response_model=list[AuditoriumOut])
-def cinemas(db: Session = Depends(get_db)):
-    return [AuditoriumOut(id=a.id, name=a.name, cinema_name=a.cinema_name, city=a.city,
-        address=a.address, timezone=a.timezone, formats=a.formats or ["2D"],
-        hall_type=a.hall_type, seat_count=len(a.seats))
-        for a in db.scalars(sa.select(Auditorium).where(Auditorium.active.is_(True)).order_by(Auditorium.cinema_name)).all()]
+def cinemas(city: str | None = None, db: Session = Depends(get_db)):
+    q = sa.select(Auditorium).where(Auditorium.active.is_(True))
+    if city:
+        q = q.where(Auditorium.city.ilike(city.strip()))
+    return [_auditorium_out(a) for a in db.scalars(q.order_by(Auditorium.cinema_name, Auditorium.name)).all()]
 
 @router.post("/cinemas", response_model=AuditoriumOut, status_code=201)
 def create_cinema(data: AuditoriumIn, db: Session = Depends(get_db), _: User = admin):
@@ -305,9 +347,20 @@ def create_cinema(data: AuditoriumIn, db: Session = Depends(get_db), _: User = a
                             seat_type="premium" if row < 2 else "standard")
                        for row in range(data.row_count) for n in range(1,data.seats_per_row+1)]
     db.add(auditorium); db.commit(); db.refresh(auditorium)
-    return AuditoriumOut(id=auditorium.id,name=auditorium.name,cinema_name=auditorium.cinema_name,
-        city=auditorium.city,address=auditorium.address,timezone=auditorium.timezone,
-        formats=auditorium.formats,hall_type=auditorium.hall_type,seat_count=len(auditorium.seats))
+    return _auditorium_out(auditorium)
+
+@router.patch("/cinemas/{auditorium_id}", response_model=AuditoriumOut)
+def update_cinema(auditorium_id: int, data: AuditoriumUpdate, db: Session = Depends(get_db), _: User = admin):
+    auditorium = db.get(Auditorium, auditorium_id)
+    if not auditorium:
+        raise HTTPException(404, "Cinema hall not found")
+    values = data.model_dump(exclude_unset=True)
+    if ("latitude" in values) != ("longitude" in values):
+        raise HTTPException(422, "Set latitude and longitude together")
+    for key, value in values.items():
+        setattr(auditorium, key, list(dict.fromkeys(value)) if key == "formats" and value else value)
+    db.commit(); db.refresh(auditorium)
+    return _auditorium_out(auditorium)
 
 @router.get("/screenings", response_model=list[ScreeningOut])
 def screenings(day: date = Query(alias="date"), movie_id: int | None = None,

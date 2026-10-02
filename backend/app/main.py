@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select, text
 from . import models
 from .api import router
-from .cinematica import router as cinematica_router
+from .cinematica import router as cinematica_router, sync_active_cinematica_halls
 from .config import settings
 from .database import Base, SessionLocal, engine
 from .models import Role, User
@@ -21,6 +21,11 @@ def _refresh_tmdb_catalog() -> None:
     with SessionLocal() as db:
         now_playing, upcoming = sync_catalog(db)
     logger.info("TMDB refresh complete: %s now playing, %s upcoming", now_playing, upcoming)
+
+def _refresh_cinematica_directory() -> None:
+    with SessionLocal() as db:
+        result = sync_active_cinematica_halls(db)
+    logger.info("Cinematica hall directory refresh complete: %s", result)
 
 async def _tmdb_refresh_loop() -> None:
     while True:
@@ -40,7 +45,7 @@ async def lifespan(app: FastAPI):
         # Apply only additive schema migrations here. 001_cinema_constraints.sql
         # contains a PL/pgSQL DO block and must not be split on semicolons; the
         # exclusion constraint is installed idempotently just below.
-        for migration_name in ("002_persistent_product_data.sql", "003_email_verification_and_hall_type.sql", "004_booking_history_archive.sql", "005_demo_card_payments.sql", "006_catalog_screening_links.sql", "007_password_reset.sql"):
+        for migration_name in ("002_persistent_product_data.sql", "003_email_verification_and_hall_type.sql", "004_booking_history_archive.sql", "005_demo_card_payments.sql", "006_catalog_screening_links.sql", "007_password_reset.sql", "008_cinematica_hall_directory.sql"):
             migration = migrations / migration_name
             for statement in migration.read_text(encoding="utf-8").split(";"):
                 if statement.strip():
@@ -55,6 +60,14 @@ async def lifespan(app: FastAPI):
     created = ensure_current_demo_schedule()
     if created:
         logger.info("Created %s rolling Parda demo screenings", created)
+    # Discovery source failures must never prevent the booking API from
+    # starting. A protected endpoint can retry the same idempotent sync.
+    async def refresh_cinematica_once():
+        try:
+            await asyncio.to_thread(_refresh_cinematica_directory)
+        except Exception:
+            logger.exception("Cinematica hall directory refresh failed")
+    asyncio.create_task(refresh_cinematica_once())
     refresh_task = None
     if settings.tmdb_read_token:
         refresh_task = asyncio.create_task(_tmdb_refresh_loop())

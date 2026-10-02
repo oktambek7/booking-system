@@ -72,6 +72,14 @@ class AuditoriumIn(BaseModel):
     row_count: int = Field(ge=1, le=26)
     seats_per_row: int = Field(ge=1, le=30)
 
+class AuditoriumUpdate(BaseModel):
+    address: str | None = Field(default=None, max_length=300)
+    latitude: Decimal | None = Field(default=None, ge=Decimal("-90"), le=Decimal("90"))
+    longitude: Decimal | None = Field(default=None, ge=Decimal("-180"), le=Decimal("180"))
+    hall_type: Literal["standard", "vip"] | None = None
+    active: bool | None = None
+    formats: list[Literal["2D", "3D", "IMAX"]] | None = None
+
 class AuditoriumOut(BaseModel):
     id: int
     name: str
@@ -82,6 +90,16 @@ class AuditoriumOut(BaseModel):
     formats: list[str] = Field(default_factory=lambda: ["2D"])
     hall_type: Literal["standard", "vip"] = "standard"
     seat_count: int
+    source_name: str | None = None
+    external_cinema_id: int | None = None
+    external_hall_id: int | None = None
+    source_url: str | None = None
+    latitude: Decimal | None = None
+    longitude: Decimal | None = None
+    last_synced_at: datetime | None = None
+
+class NearbyAuditoriumOut(AuditoriumOut):
+    distance_km: float
 
 class ScreeningIn(BaseModel):
     movie_id: int
@@ -181,6 +199,14 @@ class PaymentVerifyOut(BaseModel):
 class CatalogSyncOut(BaseModel):
     imported_now_playing: int
     imported_upcoming: int
+
+class CinemaDirectorySyncOut(BaseModel):
+    cinemas: int
+    halls: int
+    active_showtimes: int
+    skipped: int
+    upstream_failures: int
+    synced_at: datetime
 
 class MovieDetailsOut(MovieOut):
     trailer_url: str | None = None

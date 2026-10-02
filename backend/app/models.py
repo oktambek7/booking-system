@@ -1,7 +1,7 @@
 import enum
 from datetime import date, datetime
 from decimal import Decimal
-from sqlalchemy import (Boolean, CheckConstraint, Date, DateTime, Enum, ForeignKey, Index, JSON,
+from sqlalchemy import (BigInteger, Boolean, CheckConstraint, Date, DateTime, Enum, ForeignKey, Index, JSON,
                         Integer, Numeric, String, Text, UniqueConstraint, func, text)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .database import Base
@@ -61,6 +61,15 @@ class Auditorium(Base):
     formats: Mapped[list[str]] = mapped_column(JSON, default=lambda: ["2D"])
     hall_type: Mapped[str] = mapped_column(String(12), default="standard")
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Source identity is optional for operator-created halls, but required for
+    # imported halls. Human-readable names never act as an import key.
+    source_name: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    external_cinema_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
+    external_hall_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
+    source_url: Mapped[str | None] = mapped_column(String(800), nullable=True)
+    latitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6), nullable=True)
+    longitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6), nullable=True)
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     seats: Mapped[list["Seat"]] = relationship(back_populates="auditorium", cascade="all, delete-orphan")
 
 class Seat(Base):

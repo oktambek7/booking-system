@@ -16,9 +16,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .database import get_db
-from .models import Auditorium, Booking, BookingSeat, BookingStatus, CatalogScreeningLink, Movie, Screening, Seat
+from .models import Auditorium, Booking, BookingSeat, BookingStatus, CatalogScreeningLink, Movie, Role, Screening, Seat, User
+from .schemas import CinemaDirectorySyncOut
+from .security import require_roles
 
 router = APIRouter(prefix="/api/cinematica", tags=["Cinematica catalog"])
+admin = Depends(require_roles(Role.ADMIN))
 BASE = "https://cinematica.uz/api/v1"
 # The upstream catalogue is a convenience feed.  A temporary upstream timeout
 # must not make a customer-facing programme disappear after its short fresh
@@ -119,17 +122,116 @@ def _show_out(item: dict) -> dict | None:
         return None
     if not repertory_id:
         return None
+    try:
+        cinema_id = int(item.get("cinema_id") or item.get("c_id") or 0)
+        hall_id = int(item.get("hall_id") or 0)
+    except (TypeError, ValueError):
+        return None
+    if not cinema_id or not hall_id:
+        return None
     name = str(item.get("hall") or "")
+    cinema_name = str(item.get("cinema") or "").strip()
+    if not cinema_name or not name:
+        return None
     return {
         "id": repertory_id,
         "date": day,
         "time": f"{hour:02d}:{minute:02d}",
-        "cinema_name": str(item.get("cinema") or "Cinematica"),
+        "cinema_name": cinema_name,
+        "cinema_id": cinema_id,
+        "hall_id": hall_id,
         "hall_name": name,
         "hall_type": "vip" if any(word in name.casefold() for word in ("vip", "lounge")) else "standard",
         "format_type": _format_type(item),
         "price": item.get("price"),
     }
+
+
+def _hall_type(name: str) -> str:
+    return "vip" if any(word in name.casefold() for word in ("vip", "lounge")) else "standard"
+
+
+def _catalog_hall(db: Session, show: dict, *, source_url: str | None = None,
+                  fmt: str | None = None, create: bool = False) -> Auditorium | None:
+    """Find a hall by source identity and optionally retain a verified directory row.
+
+    No address or coordinates are inferred here: upstream does not publish
+    them in the feed Parda is allowed to read.
+    """
+    room = db.scalar(sa.select(Auditorium).where(
+        Auditorium.source_name == "cinematica", Auditorium.external_hall_id == show["hall_id"]
+    ).limit(1))
+    if not room:
+        room = db.scalar(sa.select(Auditorium).where(
+            Auditorium.source_name.is_(None), Auditorium.cinema_name == show["cinema_name"],
+            Auditorium.name == show["hall_name"], Auditorium.hall_type == show["hall_type"]
+        ).limit(1))
+    if not room and not create:
+        return None
+    if not room:
+        rows, per_row = (5, 8) if show["hall_type"] == "vip" else (8, 12)
+        room = Auditorium(name=show["hall_name"], cinema_name=show["cinema_name"], city="Tashkent",
+            timezone="Asia/Tashkent", formats=[fmt or show["format_type"]], hall_type=show["hall_type"],
+            source_name="cinematica", external_cinema_id=show["cinema_id"],
+            external_hall_id=show["hall_id"], source_url=source_url)
+        alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        room.seats = [Seat(row_label=alphabet[row], seat_number=number,
+            seat_type="premium" if row < 2 else "standard")
+            for row in range(rows) for number in range(1, per_row + 1)]
+        db.add(room)
+    else:
+        room.name = show["hall_name"]
+        room.cinema_name = show["cinema_name"]
+        room.hall_type = _hall_type(show["hall_name"])
+        room.source_name = "cinematica"
+        room.external_cinema_id = show["cinema_id"]
+        room.external_hall_id = show["hall_id"]
+        if source_url:
+            room.source_url = source_url
+        if fmt and fmt not in (room.formats or []):
+            room.formats = list(dict.fromkeys([*(room.formats or []), fmt]))
+    room.last_synced_at = datetime.now(timezone.utc)
+    return room
+
+
+def sync_active_cinematica_halls(db: Session) -> dict:
+    """Import the source hall directory from current public repertory.
+
+    The operation is idempotent by `(source_name, external_hall_id)` and keeps
+    source references for auditing. It stores no guessed venue location data.
+    """
+    now = datetime.now(timezone.utc)
+    seen_halls: set[int] = set()
+    active_showtimes = skipped = failures = 0
+    try:
+        source_movies = _get("movies/today")["list"]
+    except HTTPException:
+        raise
+    for raw_movie in source_movies:
+        if raw_movie.get("is_disabled") or not raw_movie.get("id"):
+            continue
+        movie_id = int(raw_movie["id"])
+        try:
+            movie = _movie_out(raw_movie, "now_playing")
+            items = _get(f"repertory/movie/{movie_id}/grouped")["list"]
+        except (HTTPException, ValueError, TypeError):
+            failures += 1
+            continue
+        for item in items:
+            show = _show_out(item)
+            if not show or _showtime_starts_at(show) <= now:
+                skipped += 1
+                continue
+            active_showtimes += 1
+            room = _catalog_hall(db, show, source_url=movie["cinematica_url"],
+                                 fmt=_format_type(item, movie["title"]), create=True)
+            if room:
+                seen_halls.add(show["hall_id"])
+    db.commit()
+    return {"cinemas": len({room.cinema_name for room in db.scalars(sa.select(Auditorium).where(
+                Auditorium.source_name == "cinematica", Auditorium.active.is_(True))).all()}),
+            "halls": len(seen_halls), "active_showtimes": active_showtimes, "skipped": skipped,
+            "upstream_failures": failures, "synced_at": now}
 
 
 def _source_movie(movie_id: int) -> dict:
@@ -189,9 +291,7 @@ def _showtime_is_available(db: Session, show: dict, now: datetime | None = None)
         screening = linked.screening
         return (screening.status == "scheduled" and screening.starts_at > now
                 and _available_seats(db, screening, now) > 0)
-    auditorium = db.scalar(sa.select(Auditorium).where(
-        Auditorium.cinema_name == show["cinema_name"], Auditorium.name == show["hall_name"],
-        Auditorium.hall_type == show["hall_type"]).limit(1))
+    auditorium = _catalog_hall(db, show, create=False)
     if not auditorium:
         return True
     # A previous Parda screening in the same imported hall would violate the
@@ -217,8 +317,27 @@ def movie_screenings(movie_id: int, db: Session = Depends(get_db)):
         raise HTTPException(422, "Invalid movie id")
     payload = _get(f"repertory/movie/{movie_id}/grouped")
     now = datetime.now(timezone.utc)
-    result = [parsed for item in payload["list"] if (parsed := _show_out(item)) and _showtime_is_available(db, parsed, now)]
+    source_movie = _source_movie(movie_id)
+    result = []
+    for item in payload["list"]:
+        parsed = _show_out(item)
+        if not parsed or not _showtime_is_available(db, parsed, now):
+            continue
+        room = _catalog_hall(db, parsed, create=False)
+        parsed["format_type"] = _format_type(item, source_movie["title"])
+        parsed["audio_language"] = source_movie["language"]
+        parsed["source_url"] = source_movie["cinematica_url"]
+        if room:
+            parsed["address"] = room.address or None
+            parsed["latitude"] = room.latitude
+            parsed["longitude"] = room.longitude
+        result.append(parsed)
     return sorted(result, key=lambda item: (item["date"], item["time"], item["cinema_name"]))
+
+
+@router.post("/sync", response_model=CinemaDirectorySyncOut)
+def sync_cinema_directory(db: Session = Depends(get_db), _: User = admin):
+    return sync_active_cinematica_halls(db)
 
 
 @router.post("/movies/{movie_id}/screenings/{repertory_id}/ticketing")
@@ -252,18 +371,9 @@ def resolve_ticketing_screening(movie_id: int, repertory_id: int, db: Session = 
                       catalog_status=source_movie["catalog_status"], active=True)
         db.add(movie)
         db.flush()
-    auditorium = db.scalar(sa.select(Auditorium).where(Auditorium.cinema_name == show["cinema_name"],
-        Auditorium.name == show["hall_name"], Auditorium.hall_type == show["hall_type"]).limit(1))
-    if not auditorium:
-        rows, per_row = (5, 8) if show["hall_type"] == "vip" else (8, 12)
-        auditorium = Auditorium(name=show["hall_name"], cinema_name=show["cinema_name"], city="Tashkent",
-            timezone="Asia/Tashkent", formats=[fmt], hall_type=show["hall_type"])
-        alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        auditorium.seats = [Seat(row_label=alphabet[row], seat_number=number,
-            seat_type="premium" if row < 2 else "standard")
-            for row in range(rows) for number in range(1, per_row + 1)]
-        db.add(auditorium)
-        db.flush()
+    auditorium = _catalog_hall(db, show, source_url=source_movie["cinematica_url"], fmt=fmt, create=True)
+    assert auditorium is not None
+    db.flush()
     screening = Screening(movie_id=movie.id, auditorium_id=auditorium.id, starts_at=starts_at,
         ends_at=starts_at + timedelta(minutes=movie.duration_minutes or 120), base_price=amount,
         premium_surcharge=Decimal("0"), format_type=fmt)
