@@ -67,13 +67,18 @@ async def lifespan(app: FastAPI):
             await asyncio.to_thread(_refresh_cinematica_directory)
         except Exception:
             logger.exception("Cinematica hall directory refresh failed")
-    asyncio.create_task(refresh_cinematica_once())
+    directory_task = asyncio.create_task(refresh_cinematica_once())
     refresh_task = None
     if settings.tmdb_read_token:
         refresh_task = asyncio.create_task(_tmdb_refresh_loop())
     try:
         yield
     finally:
+        directory_task.cancel()
+        try:
+            await directory_task
+        except asyncio.CancelledError:
+            pass
         if refresh_task:
             refresh_task.cancel()
             try:
