@@ -24,8 +24,17 @@ STALE_SECONDS = 30 * 60
 # operators. Add a title only after verifying a live public event URL.
 TITLE_SLUGS = {
     "digger": "tckt2-digger-uz",
+    "диггер": "tckt2-digger-uz",
     "приключения мамонтенка. в поисках мамы": "tckt2-priklyucheniya-mamontenka-v-poiskah-mamy-uz",
+    "приключения мамонтёнка. в поисках мамы": "tckt2-priklyucheniya-mamontenka-v-poiskah-mamy-uz",
     "the adventures of the mammoth cub. in search of mom": "tckt2-priklyucheniya-mamontenka-v-poiskah-mamy-uz",
+    "пункт назначения: мост №13": "tckt2-punkt-naznacheniya-most-13-uz",
+    "destination: bridge no. 13": "tckt2-punkt-naznacheniya-most-13-uz",
+    "сердце зверя": "tckt2-serdtse-zverya-uz",
+    "heart of the beast": "tckt2-serdtse-zverya-uz",
+    "на деревню к дедушке. супермиссия": "tckt2-na-derevnyu-k-dedushke-supermissiya-uz",
+    "мой пес гохан": "tckt2-moy-pes-gohan-uz",
+    "my dog gokhan": "tckt2-moy-pes-gohan-uz",
 }
 
 # Coordinates are saved only where a public map listing identifies the venue.
