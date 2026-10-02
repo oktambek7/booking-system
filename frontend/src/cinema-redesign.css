@@ -120,3 +120,25 @@
 @media(max-width:480px){.film-carousel{height:402px}.carousel-content{left:18px;width:69%;padding:34px 0 24px}.carousel-content h1{margin:11px 0}.carousel-visual .carousel-poster{right:12px;width:102px;top:44%}}
 @media(prefers-reduced-motion:reduce){.carousel-moving .carousel-outgoing{display:none}.carousel-moving .carousel-active .carousel-backdrop,.carousel-moving .carousel-active .carousel-poster{animation:none}.carousel-content-enter{animation:carousel-copy-reduced 160ms ease-out both}}
 @keyframes carousel-copy-reduced{from{opacity:0}to{opacity:1}}
+
+/* Venue discovery uses an understated cinema palette. The active state is
+   carried by contrast and a fine underline, not a neon halo. */
+.carousel-cta:hover{box-shadow:0 8px 18px color-mix(in srgb,var(--action) 22%,transparent)}
+.carousel-poster:hover{box-shadow:0 28px 60px #06090c55}
+.carousel-controls button:hover{box-shadow:none;color:var(--accent);border-color:var(--accent)}
+.poster-glow{background:linear-gradient(130deg,color-mix(in srgb,var(--accent) 24%,transparent),transparent 58%);mix-blend-mode:normal}
+.film-card:hover .film-poster-wrap,.film-card:focus-visible .film-poster-wrap{border-color:var(--accent);box-shadow:0 12px 25px color-mix(in srgb,var(--ink) 18%,transparent)}
+:root[data-theme="dark"] .film-card:hover .film-poster-wrap{box-shadow:0 14px 28px #0008;border-color:var(--accent)}
+.showtime-filter-block{padding-top:18px}
+.showtime-filter-title{color:var(--muted);letter-spacing:.1em}
+.detail-halls button{border-radius:6px;padding:8px 12px;color:var(--ink);background:var(--white);transition:background .18s ease,border-color .18s ease,color .18s ease}
+.detail-halls button:hover:not(:disabled){border-color:var(--accent);color:var(--accent-strong);background:var(--accent-soft)}
+.detail-halls button.detail-hall-active{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-strong);box-shadow:inset 0 -2px 0 var(--accent)}
+.nearby-action{margin-left:auto;border-color:var(--line);border-radius:6px;background:var(--white);color:var(--ink);padding:9px 12px}
+.nearby-action:hover{border-color:var(--accent);background:var(--accent-soft);box-shadow:none;color:var(--accent-strong)}
+.location-notice{display:flex;align-items:center;min-height:30px;margin-top:10px;padding:6px 9px;border-left:2px solid var(--accent);background:color-mix(in srgb,var(--accent-soft) 58%,transparent);color:var(--muted);border-radius:0 4px 4px 0}
+.live-showtime{border-radius:6px;background:var(--white);box-shadow:0 2px 8px color-mix(in srgb,var(--ink) 5%,transparent)}
+.live-showtime:hover{border-color:var(--accent);box-shadow:0 10px 20px color-mix(in srgb,var(--ink) 10%,transparent);transform:translateY(-1px)}
+.live-showtime-buy b{color:var(--accent-strong)}
+.detail-dates button.detail-date-active{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-strong);box-shadow:inset 0 -2px 0 var(--accent)}
+.detail-dates button.detail-date-active b{color:var(--accent-strong)}

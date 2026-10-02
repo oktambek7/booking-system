@@ -28,6 +28,7 @@ Parda is an Uzbek-first cinema discovery and seat-booking app. The React/Vite fr
 - [x] Self-contained card checkout flow for Uzcard, Humo, Visa, and Mastercard with email-code confirmation
 - [x] Customer cancellation, booking-history archival, expiring seat holds, and PostgreSQL protection against competing seat requests
 - [x] Cinematica hall-directory sync keyed by public cinema and hall IDs, with traceable source URL and sync time
+- [x] Verified Ticketon cinema feed for public, on-sale sessions where an exact live event page is configured
 - [x] Movie-detail cinema, format, language, Standard/VIP, and price filters
 - [x] User-triggered nearest-cinema sorting using verified hall coordinates only
 - [x] Protected catalog sync, sync-status, nearby-hall, and hall-coordinate API endpoints
@@ -140,15 +141,31 @@ flowchart LR
 - Source payloads have a five-minute fresh cache and a 24-hour bounded stale fallback for read-only discovery. A source failure does not block Parda bookings that already exist.
 - Imported locations are deliberately blank until a cinema operator supplies verified address and latitude/longitude through the protected hall update endpoint. The UI never estimates a distance.
 
+### Tashkent cinema sources
+
+The movie detail page derives cinema filter choices from only the source sessions
+returned for that film and date. This avoids a visitor selecting an operator
+that has no matching time. The Ticketon adapter has a deliberately narrow
+venue allow-list: CinemaPlex, Next Cinema, Compass Cinema, Riviera Cinema,
+Parus Cinema, Magic Cinema, Sergeli Cinema, Premier Cinema — Park in Mall,
+and O‘zbekiston Milliy kino san’ati saroyi. It reads only future sessions marked
+on sale on a mapped public Ticketon event page. `Tashkent City` continues to
+come from the existing Cinematica public feed.
+
+The source page is fetched again when a visitor selects a time. If it has been
+removed or is no longer on sale, Parda returns a clear unavailable response
+instead of constructing an internal booking from stale data.
+
 ### Nearby cinemas and privacy
 
-The site asks for browser location only after the visitor presses **Find cinemas near me**. It calculates a Haversine distance only for halls with verified coordinates, and keeps the browser location in client memory. The API also supports server-side distance sorting through `GET /api/cinemas/nearby?lat=&lng=` for clients that need it.
+The site asks for browser location only after the visitor presses **Find cinemas near me**. It calculates a Haversine distance only for halls with verified map coordinates, and keeps the browser location in client memory. A live source venue can remain selectable without coordinates; it is simply not assigned a made-up distance. The API also supports server-side distance sorting through `GET /api/cinemas/nearby?lat=&lng=` for clients that need it.
 
 ### Directory and sync API
 
 | Endpoint | Access | Purpose |
 | --- | --- | --- |
 | `GET /api/cinematica/movies/{id}/screenings` | Public | Current valid source showtimes for one movie |
+| `POST /api/cinematica/movies/{id}/ticketon/{session_id}/ticketing` | Public | Re-validates an on-sale Ticketon time then creates Parda's owned seat map |
 | `GET /api/cinemas?city=Tashkent` | Public | Active Parda and imported halls |
 | `GET /api/cinemas/nearby?lat=&lng=` | Public | Halls with verified coordinates, ordered by distance |
 | `PATCH /api/cinemas/{id}` | Admin | Verify address, coordinates, formats, hall type, or disable a hall |

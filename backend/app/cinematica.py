@@ -19,6 +19,7 @@ from .database import get_db
 from .models import Auditorium, Booking, BookingSeat, BookingStatus, CatalogScreeningLink, Movie, Role, Screening, Seat, User
 from .schemas import CinemaDirectorySyncOut
 from .security import require_roles
+from .ticketon import show_for_title as ticketon_show_for_title, shows_for_title as ticketon_shows_for_title
 
 router = APIRouter(prefix="/api/cinematica", tags=["Cinematica catalog"])
 admin = Depends(require_roles(Role.ADMIN))
@@ -194,6 +195,45 @@ def _catalog_hall(db: Session, show: dict, *, source_url: str | None = None,
     return room
 
 
+def _ticketon_catalog_hall(db: Session, show: dict, *, create: bool = False) -> Auditorium | None:
+    """Retain a Ticketon venue/hall using its published source identity.
+
+    The session page supplies the venue address. Coordinates are optional and
+    come only from the checked venue map list maintained by the adapter.
+    """
+    external_hall_id = int(show["hall_id"])
+    room = db.scalar(sa.select(Auditorium).where(
+        Auditorium.source_name == "ticketon", Auditorium.external_hall_id == external_hall_id
+    ).limit(1))
+    if not room and not create:
+        return None
+    if not room:
+        rows, per_row = (5, 8) if show["hall_type"] == "vip" else (8, 12)
+        room = Auditorium(name=show["hall_name"], cinema_name=show["cinema_name"], city="Tashkent",
+            address=show.get("address") or "", timezone="Asia/Tashkent", formats=[show["format_type"]],
+            hall_type=show["hall_type"], source_name="ticketon", external_cinema_id=show["cinema_id"],
+            external_hall_id=external_hall_id, source_url=show["source_url"],
+            latitude=show.get("latitude"), longitude=show.get("longitude"))
+        alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        room.seats = [Seat(row_label=alphabet[row], seat_number=number,
+            seat_type="premium" if row < 2 else "standard")
+            for row in range(rows) for number in range(1, per_row + 1)]
+        db.add(room)
+    else:
+        room.name = show["hall_name"]
+        room.cinema_name = show["cinema_name"]
+        room.address = show.get("address") or room.address
+        room.hall_type = show["hall_type"]
+        room.source_url = show["source_url"]
+        room.external_cinema_id = show["cinema_id"]
+        if show["format_type"] not in (room.formats or []):
+            room.formats = list(dict.fromkeys([*(room.formats or []), show["format_type"]]))
+        if show.get("latitude") is not None and show.get("longitude") is not None:
+            room.latitude, room.longitude = show["latitude"], show["longitude"]
+    room.last_synced_at = datetime.now(timezone.utc)
+    return room
+
+
 def sync_active_cinematica_halls(db: Session) -> dict:
     """Import the source hall directory from current public repertory.
 
@@ -309,6 +349,18 @@ def _showtime_is_available(db: Session, show: dict, now: datetime | None = None)
     return clash is None
 
 
+def _ticketon_showtime_is_available(db: Session, show: dict, now: datetime | None = None) -> bool:
+    """Avoid exposing a source time whose owned Parda seat map is already full."""
+    now = now or datetime.now(timezone.utc)
+    if _showtime_starts_at(show) <= now:
+        return False
+    linked = db.get(CatalogScreeningLink, show["id"])
+    if linked:
+        return (linked.screening.status == "scheduled" and linked.screening.starts_at > now
+                and _available_seats(db, linked.screening, now) > 0)
+    return True
+
+
 @router.get("/movies")
 def movies(category: str = Query(default="now_playing", pattern=r"^(now_playing|upcoming)$")):
     route = "movies/today" if category == "now_playing" else "movies/soon"
@@ -339,6 +391,18 @@ def movie_screenings(movie_id: int, db: Session = Depends(get_db)):
         parsed["format_type"] = fmt
         parsed["audio_language"] = source_movie["language"]
         parsed["source_url"] = source_movie["cinematica_url"]
+        if room:
+            parsed["address"] = room.address or None
+            parsed["latitude"] = room.latitude
+            parsed["longitude"] = room.longitude
+        result.append(parsed)
+    # Ticketon exposes a separate, public sale programme for specific movies.
+    # It is merged by the film title only after the adapter has verified the
+    # exact public event URL and an on-sale, future session.
+    for parsed in ticketon_shows_for_title(source_movie["title"]):
+        room = _ticketon_catalog_hall(db, parsed, create=True)
+        if not _ticketon_showtime_is_available(db, parsed, now):
+            continue
         if room:
             parsed["address"] = room.address or None
             parsed["latitude"] = room.latitude
@@ -410,6 +474,67 @@ def resolve_ticketing_screening(movie_id: int, repertory_id: int, db: Session = 
     except IntegrityError:
         db.rollback()
         resolved = db.get(CatalogScreeningLink, repertory_id)
+        if resolved:
+            return _ticketing_out(db, resolved.screening)
+        raise HTTPException(409, "This showtime is being prepared. Please try again")
+    db.refresh(screening)
+    return _ticketing_out(db, screening)
+
+
+@router.post("/movies/{movie_id}/ticketon/{session_id}/ticketing")
+def resolve_ticketon_ticketing_screening(movie_id: int, session_id: int, db: Session = Depends(get_db)):
+    """Create Parda's owned seat map for one currently on-sale Ticketon time.
+
+    The adapter re-reads the public source on every resolve. A client may not
+    choose a price, hall, venue, or time, and a negative source ID keeps its
+    link disjoint from the existing Cinematica repertory links.
+    """
+    if session_id <= 0:
+        raise HTTPException(422, "Invalid Ticketon session id")
+    source_movie = _source_movie(movie_id)
+    source_id = -session_id
+    show = ticketon_show_for_title(source_movie["title"], source_id)
+    if not show or not _ticketon_showtime_is_available(db, show):
+        raise HTTPException(410, "This showtime is no longer available")
+    existing = db.get(CatalogScreeningLink, source_id)
+    if existing:
+        return _ticketing_out(db, existing.screening)
+    try:
+        amount = Decimal(str(show["price"])).quantize(Decimal("0.01"))
+    except (InvalidOperation, TypeError, ValueError):
+        raise HTTPException(422, "This showtime does not have a valid ticket price")
+    movie = db.scalar(sa.select(Movie).where(Movie.title == source_movie["title"],
+        Movie.poster_url == (source_movie["poster_url"] or "")).limit(1))
+    if not movie:
+        movie = Movie(title=source_movie["title"], synopsis="Catalog showtime imported for Parda ticketing.",
+            duration_minutes=120, genre="Cinema", age_rating=source_movie["age_rating"],
+            language=source_movie["language"], poster_url=source_movie["poster_url"] or "",
+            release_date=datetime.fromisoformat(source_movie["release_date"]).date() if source_movie["release_date"] else None,
+            catalog_status=source_movie["catalog_status"], active=True)
+        db.add(movie)
+        db.flush()
+    auditorium = _ticketon_catalog_hall(db, show, create=True)
+    assert auditorium is not None
+    starts_at = _showtime_starts_at(show)
+    db.flush()
+    screening = Screening(movie_id=movie.id, auditorium_id=auditorium.id, starts_at=starts_at,
+        ends_at=starts_at + timedelta(minutes=movie.duration_minutes or 120), base_price=amount,
+        premium_surcharge=Decimal("0"), format_type=show["format_type"])
+    db.add(screening)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        resolved = db.get(CatalogScreeningLink, source_id)
+        if resolved and _available_seats(db, resolved.screening) > 0:
+            return _ticketing_out(db, resolved.screening)
+        raise HTTPException(409, "This showtime was just taken off sale. Please choose another time")
+    db.add(CatalogScreeningLink(source_repertory_id=source_id, screening_id=screening.id, source_name="ticketon"))
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        resolved = db.get(CatalogScreeningLink, source_id)
         if resolved:
             return _ticketing_out(db, resolved.screening)
         raise HTTPException(409, "This showtime is being prepared. Please try again")
