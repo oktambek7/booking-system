@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, ArrowRight, CalendarDays, ChevronLeft, ChevronRight, Film, Search } from 'lucide-react'
 import PardaBooking from './PardaBooking'
 
@@ -27,22 +27,39 @@ export default function CinemaCatalog({api,token,lang,onSignIn,onConfirmed}:{api
  const displayLanguage=(value:string)=>value==='Not listed'?t('notListed'):value
  const [category,setCategory]=useState<'now_playing'|'upcoming'>('now_playing')
  const [movies,setMovies]=useState<FilmItem[]>([]),[featured,setFeatured]=useState<FilmItem[]>([])
- const [query,setQuery]=useState(''),[page,setPage]=useState(1),[carousel,setCarousel]=useState(0)
+ const [query,setQuery]=useState(''),[page,setPage]=useState(1),[carousel,setCarousel]=useState(0),[carouselTransition,setCarouselTransition]=useState<{from:FilmItem;direction:'forward'|'backward'}|null>(null)
+ const carouselRef=useRef(0),carouselTransitionRef=useRef(false),carouselTimerRef=useRef<number|undefined>(undefined)
  const [movie,setMovie]=useState<FilmItem|null>(null),[shows,setShows]=useState<Show[]>([]),[day,setDay]=useState(''),[hall,setHall]=useState<'all'|'standard'|'vip'>('all'),[ticketShow,setTicketShow]=useState<Show|null>(null)
  const [loading,setLoading]=useState(true),[loadingShows,setLoadingShows]=useState(false),[error,setError]=useState(''),[reload,setReload]=useState(0)
  useEffect(()=>{let live=true;setLoading(true);setError('');loadJson<FilmItem[]>(`${api}/api/cinematica/movies?category=${category}`).then(items=>{if(!live)return;setMovies(items);if(category==='now_playing')setFeatured(items)}).catch(()=>live&&setError(t('error'))).finally(()=>live&&setLoading(false));return()=>{live=false}},[api,category,reload])
  useEffect(()=>{if(category!=='now_playing'||movie)return;const requested=Number(window.location.hash.replace('#movie-',''));const selected=movies.find(item=>item.id===requested);if(selected)setMovie(selected)},[category,movie,movies])
- useEffect(()=>{if(featured.length<2)return;const timer=setInterval(()=>setCarousel(index=>(index+1)%featured.length),11000);return()=>clearInterval(timer)},[featured.length])
  useEffect(()=>{if(!movie)return;let live=true;setLoadingShows(true);setShows([]);setDay('');setHall('all');loadJson<Show[]>(`${api}/api/cinematica/movies/${movie.id}/screenings`).then(items=>{if(!live)return;setShows(items);if(items.length)setDay(items[0].date)}).catch(()=>live&&setShows([])).finally(()=>live&&setLoadingShows(false));return()=>{live=false}},[api,movie?.id])
  const filtered=useMemo(()=>movies.filter(m=>m.title.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())),[movies,query])
  const pageSize=12,totalPages=Math.max(1,Math.ceil(filtered.length/pageSize)),visible=filtered.slice((page-1)*pageSize,page*pageSize)
  const activeFeature=featured.length?featured[carousel%featured.length]:null
+ const moveCarousel=(direction:'forward'|'backward')=>{
+  if(featured.length<2||carouselTransitionRef.current)return
+  const current=carouselRef.current%featured.length
+  const next=direction==='forward'?(current+1)%featured.length:(current-1+featured.length)%featured.length
+  carouselTransitionRef.current=true
+  setCarouselTransition({from:featured[current],direction})
+  carouselRef.current=next
+  setCarousel(next)
+  if(carouselTimerRef.current)window.clearTimeout(carouselTimerRef.current)
+  carouselTimerRef.current=window.setTimeout(()=>{carouselTransitionRef.current=false;setCarouselTransition(null)},820)
+ }
+ useEffect(()=>{if(featured.length<2)return;const timer=window.setInterval(()=>moveCarousel('forward'),10500);return()=>window.clearInterval(timer)},[featured])
+ useEffect(()=>()=>{if(carouselTimerRef.current)window.clearTimeout(carouselTimerRef.current)},[])
  const dates=[...new Set(shows.map(s=>s.date))],todayShows=shows.filter(s=>s.date===day&&(hall==='all'||s.hall_type===hall))
  function selectMovie(item:FilmItem){setMovie(item);setTicketShow(null);setError('');window.history.replaceState(null,'',`#movie-${item.id}`);document.getElementById('films')?.scrollIntoView({behavior:'smooth'})}
  function closeMovie(){setMovie(null);setTicketShow(null);setShows([]);window.history.replaceState(null,'','#films')}
  return <>
-  <section className="film-carousel" aria-label={t('playing')}>
-   {activeFeature?<><div key={`backdrop-${activeFeature.id}`} className="carousel-backdrop carousel-fade" style={{backgroundImage:`linear-gradient(90deg,var(--paper) 4%,color-mix(in srgb,var(--paper) 84%,transparent) 45%,transparent 100%),linear-gradient(0deg,var(--paper),transparent 48%),url("${activeFeature.poster_url}")`}}/><div key={`content-${activeFeature.id}`} className="carousel-content carousel-fade"><span className="carousel-kicker">PARDA CINEMA · {t('playing')}</span><h1>{activeFeature.title}</h1><div className="carousel-meta"><span className="age-badge">{activeFeature.age_rating}</span><span>{t('release')}: {activeFeature.release_date||'—'}</span><span>{displayLanguage(activeFeature.language)}</span></div><button className="carousel-cta" onClick={()=>selectMovie(activeFeature)}>{t('showtimes')} <ArrowRight size={16}/></button><div className="carousel-controls"><button aria-label={t('prev')} onClick={()=>setCarousel(i=>(i-1+featured.length)%featured.length)}><ChevronLeft/></button><span>{String(carousel+1).padStart(2,'0')} / {String(featured.length).padStart(2,'0')}</span><button aria-label={t('next')} onClick={()=>setCarousel(i=>(i+1)%featured.length)}><ChevronRight/></button></div></div><button key={`poster-${activeFeature.id}`} className="carousel-poster carousel-fade" onClick={()=>selectMovie(activeFeature)} aria-label={`${activeFeature.title} — ${t('showtimes')}`}><img src={activeFeature.poster_url} alt=""/></button></>:<div className="carousel-empty"><Film/><span>{loading?t('loading'):t('error')}</span></div>}
+  <section className={`film-carousel ${carouselTransition?`carousel-moving carousel-${carouselTransition.direction}`:''}`} aria-label={t('playing')}>
+   {activeFeature?<>
+    {carouselTransition&&<div className="carousel-visual carousel-outgoing" aria-hidden="true"><div className="carousel-backdrop" style={{backgroundImage:`linear-gradient(90deg,var(--paper) 4%,color-mix(in srgb,var(--paper) 84%,transparent) 45%,transparent 100%),linear-gradient(0deg,var(--paper),transparent 48%),url("${carouselTransition.from.poster_url}")`}}/><div className="carousel-poster"><img src={carouselTransition.from.poster_url} alt=""/></div></div>}
+    <div key={`visual-${activeFeature.id}`} className="carousel-visual carousel-active"><div className="carousel-backdrop" style={{backgroundImage:`linear-gradient(90deg,var(--paper) 4%,color-mix(in srgb,var(--paper) 84%,transparent) 45%,transparent 100%),linear-gradient(0deg,var(--paper),transparent 48%),url("${activeFeature.poster_url}")`}}/><button className="carousel-poster" onClick={()=>selectMovie(activeFeature)} aria-label={`${activeFeature.title} — ${t('showtimes')}`}><img src={activeFeature.poster_url} alt=""/></button></div>
+    <div key={`content-${activeFeature.id}`} className={`carousel-content ${carouselTransition?'carousel-content-enter':''}`}><span className="carousel-kicker">PARDA CINEMA · {t('playing')}</span><h1>{activeFeature.title}</h1><div className="carousel-meta"><span className="age-badge">{activeFeature.age_rating}</span><span>{t('release')}: {activeFeature.release_date||'—'}</span><span>{displayLanguage(activeFeature.language)}</span></div><button className="carousel-cta" onClick={()=>selectMovie(activeFeature)}>{t('showtimes')} <ArrowRight size={16}/></button><div className="carousel-controls"><button aria-label={t('prev')} disabled={Boolean(carouselTransition)} onClick={()=>moveCarousel('backward')}><ChevronLeft/></button><span>{String(carousel+1).padStart(2,'0')} / {String(featured.length).padStart(2,'0')}</span><button aria-label={t('next')} disabled={Boolean(carouselTransition)} onClick={()=>moveCarousel('forward')}><ChevronRight/></button></div></div>
+   </>:<div className="carousel-empty"><Film/><span>{loading?t('loading'):t('error')}</span></div>}
   </section>
   <section className="programme-section compact-programme" id="films">
    <div className="section-head"><div><h2>{category==='now_playing'?t('playing'):t('upcoming')}</h2><div className="catalog-switch"><button className={category==='now_playing'?'catalog-active':''} onClick={()=>{setCategory('now_playing');setPage(1)}}>{t('playing')}</button><button className={category==='upcoming'?'catalog-active':''} onClick={()=>{setCategory('upcoming');setPage(1)}}>{t('upcoming')}</button></div></div><label className="search-box"><Search size={16}/><input value={query} placeholder={t('search')} onChange={e=>{setQuery(e.target.value);setPage(1)}}/></label></div>
