@@ -327,10 +327,16 @@ def movie_screenings(movie_id: int, db: Session = Depends(get_db)):
     result = []
     for item in payload["list"]:
         parsed = _show_out(item)
-        if not parsed or not _showtime_is_available(db, parsed, now):
+        if not parsed:
             continue
-        room = _catalog_hall(db, parsed, create=False)
-        parsed["format_type"] = _format_type(item, source_movie["title"])
+        fmt = _format_type(item, source_movie["title"])
+        # Film detail is a natural refresh point: retain every source hall
+        # referenced by this movie, including halls whose last daily session
+        # has already started. Past sessions themselves are never returned.
+        room = _catalog_hall(db, parsed, source_url=source_movie["cinematica_url"], fmt=fmt, create=True)
+        if not _showtime_is_available(db, parsed, now):
+            continue
+        parsed["format_type"] = fmt
         parsed["audio_language"] = source_movie["language"]
         parsed["source_url"] = source_movie["cinematica_url"]
         if room:
@@ -338,6 +344,12 @@ def movie_screenings(movie_id: int, db: Session = Depends(get_db)):
             parsed["latitude"] = room.latitude
             parsed["longitude"] = room.longitude
         result.append(parsed)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        # Another request imported the same source hall. The response can
+        # still safely use the source showtimes; the next refresh enriches it.
     return sorted(result, key=lambda item: (item["date"], item["time"], item["cinema_name"]))
 
 
