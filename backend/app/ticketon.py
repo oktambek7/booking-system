@@ -131,10 +131,10 @@ def shows_for_title(title: str) -> list[dict]:
     """Return future, saleable sessions for a verified public title mapping."""
     event = _event_for_title(title)
     if not event:
-        logger.info("Ticketon title has no verified event mapping: %r", title)
+        logger.warning("Ticketon title has no verified event mapping: %r", title)
         return []
     event_id, slug = event
-    logger.info("Ticketon title mapped to public event %s: %r", event_id, title)
+    logger.warning("Ticketon title mapped to public event %s: %r", event_id, title)
     now = time.monotonic()
     stale: list[dict] | None = None
     with _LOCK:
@@ -146,6 +146,7 @@ def shows_for_title(title: str) -> list[dict]:
             if stale_until > now:
                 stale = payload
     sessions = _fetch_event(event_id, slug)
+    logger.warning("Ticketon public event %s returned %s future sessions", event_id, len(sessions))
     if not sessions and stale is not None:
         return stale
     with _LOCK:
