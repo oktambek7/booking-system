@@ -131,8 +131,10 @@ def shows_for_title(title: str) -> list[dict]:
     """Return future, saleable sessions for a verified public title mapping."""
     event = _event_for_title(title)
     if not event:
+        logger.info("Ticketon title has no verified event mapping: %r", title)
         return []
     event_id, slug = event
+    logger.info("Ticketon title mapped to public event %s: %r", event_id, title)
     now = time.monotonic()
     stale: list[dict] | None = None
     with _LOCK:
