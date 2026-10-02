@@ -219,14 +219,20 @@ def sync_active_cinematica_halls(db: Session) -> dict:
             continue
         for item in items:
             show = _show_out(item)
-            if not show or _showtime_starts_at(show) <= now:
+            if not show:
                 skipped += 1
                 continue
-            active_showtimes += 1
             room = _catalog_hall(db, show, source_url=movie["cinematica_url"],
                                  fmt=_format_type(item, movie["title"]), create=True)
             if room:
                 seen_halls.add(show["hall_id"])
+            # Keep verified source hall identity even after its last daily
+            # session starts. Only future sessions count as active and are
+            # exposed by the public showtime endpoint.
+            if _showtime_starts_at(show) <= now:
+                skipped += 1
+                continue
+            active_showtimes += 1
     db.commit()
     return {"cinemas": len({room.cinema_name for room in db.scalars(sa.select(Auditorium).where(
                 Auditorium.source_name == "cinematica", Auditorium.active.is_(True))).all()}),
