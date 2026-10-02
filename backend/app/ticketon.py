@@ -9,12 +9,15 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import html
+import logging
 import re
 import time
 from threading import Lock
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+
+logger = logging.getLogger(__name__)
 
 BASE = "https://ticketon.uz/en/cinema/event"
 FRESH_SECONDS = 5 * 60
@@ -149,7 +152,8 @@ def shows_for_title(title: str) -> list[dict]:
         })
         with urlopen(request, timeout=10.0) as response:
             sessions = _parse(slug, response.read().decode("utf-8"))
-    except (HTTPError, URLError, TimeoutError, UnicodeDecodeError):
+    except (HTTPError, URLError, TimeoutError, UnicodeDecodeError) as error:
+        logger.warning("Ticketon schedule fetch failed for %s: %s", slug, error)
         if stale is not None:
             return stale
         return []
