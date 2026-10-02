@@ -325,7 +325,9 @@ def screenings(day: date = Query(alias="date"), movie_id: int | None = None,
         tz=ZoneInfo(screening.auditorium.timezone)
         local=screening.starts_at.astimezone(tz)
         if local.date()==day and screening.starts_at>datetime.now(timezone.utc):
-            rows.append(_screening_out(db,screening))
+            item=_screening_out(db,screening)
+            if item.available_seats>0:
+                rows.append(item)
     db.commit()
     return rows
 

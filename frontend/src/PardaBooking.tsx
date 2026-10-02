@@ -1,6 +1,7 @@
 import { useEffect, useState, type CSSProperties, type FormEvent } from 'react'
 import { Check, CreditCard, LockKeyhole, Mail, X } from 'lucide-react'
 import { useResendCountdown } from './useResendCountdown'
+import { formatDateTime } from './dateFormat'
 
 type Lang = 'uz' | 'en' | 'ru'
 type Screening = {id:number; movie_title:string; starts_at:string; cinema_name:string; auditorium_name:string; available_seats:number; format_type:string; hall_type:'standard'|'vip'; base_price:number|string}
@@ -18,7 +19,7 @@ const paymentMethods = ['uzcard','humo','visa','mastercard'] as const
 type Method = typeof paymentMethods[number]
 const locale = (lang:Lang) => lang === 'uz' ? 'uz-UZ' : lang === 'ru' ? 'ru-RU' : 'en-US'
 const money = (value:number|string, lang:Lang) => `${new Intl.NumberFormat(locale(lang)).format(Number(value))} UZS`
-const stamp = (value:string, lang:Lang) => new Intl.DateTimeFormat(locale(lang),{timeZone:'Asia/Tashkent',weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(value))
+const stamp = (value:string, lang:Lang) => formatDateTime(value,lang)
 const headers = (token:string) => ({Authorization:`Bearer ${token}`,'Content-Type':'application/json'})
 const normalizeDigits = (value:string) => value.replace(/\D/g,'')
 const formatCard = (value:string) => normalizeDigits(value).slice(0,19).replace(/(.{4})/g,'$1 ').trim()

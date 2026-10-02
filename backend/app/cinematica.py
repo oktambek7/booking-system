@@ -28,6 +28,7 @@ _STALE_CACHE_SECONDS = 24 * 60 * 60
 _cache: dict[str, tuple[float, float, dict]] = {}
 _lock = Lock()
 logger = logging.getLogger(__name__)
+ACTIVE_BOOKING_STATUSES = (BookingStatus.CONFIRMED, BookingStatus.COMPLETED)
 
 
 def _get(path: str) -> dict:
@@ -148,11 +149,20 @@ def _source_show(movie_id: int, repertory_id: int) -> tuple[dict, dict]:
     raise HTTPException(404, "This showtime is no longer available")
 
 
-def _ticketing_out(db: Session, screening: Screening) -> dict:
+def _available_seats(db: Session, screening: Screening, now: datetime | None = None) -> int:
+    now = now or datetime.now(timezone.utc)
+    active_booking = sa.or_(
+        Booking.status.in_(ACTIVE_BOOKING_STATUSES),
+        sa.and_(Booking.status == BookingStatus.PENDING, Booking.hold_expires_at > now),
+    )
     taken = db.scalar(sa.select(sa.func.count(BookingSeat.id)).join(Booking).where(
         BookingSeat.screening_id == screening.id, BookingSeat.active.is_(True),
-        Booking.status.in_((BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.COMPLETED)))) or 0
+        active_booking)) or 0
     total = db.scalar(sa.select(sa.func.count(Seat.id)).where(Seat.auditorium_id == screening.auditorium_id)) or 0
+    return max(total - taken, 0)
+
+
+def _ticketing_out(db: Session, screening: Screening) -> dict:
     return {
         "id": screening.id, "movie_id": screening.movie_id, "auditorium_id": screening.auditorium_id,
         "starts_at": screening.starts_at, "ends_at": screening.ends_at, "base_price": screening.base_price,
@@ -160,8 +170,37 @@ def _ticketing_out(db: Session, screening: Screening) -> dict:
         "movie_title": screening.movie.title, "duration_minutes": screening.movie.duration_minutes,
         "cinema_name": screening.auditorium.cinema_name, "auditorium_name": screening.auditorium.name,
         "hall_type": screening.auditorium.hall_type, "city": screening.auditorium.city,
-        "timezone": screening.auditorium.timezone, "available_seats": max(total - taken, 0),
+        "timezone": screening.auditorium.timezone, "available_seats": _available_seats(db, screening),
     }
+
+
+def _showtime_starts_at(show: dict) -> datetime:
+    return datetime.fromisoformat(f"{show['date']}T{show['time']}:00+05:00").astimezone(timezone.utc)
+
+
+def _showtime_is_available(db: Session, show: dict, now: datetime | None = None) -> bool:
+    """Keep unavailable Parda inventory and conflicting legacy sessions out of the public programme."""
+    now = now or datetime.now(timezone.utc)
+    starts_at = _showtime_starts_at(show)
+    if starts_at <= now:
+        return False
+    linked = db.get(CatalogScreeningLink, show["id"])
+    if linked:
+        screening = linked.screening
+        return (screening.status == "scheduled" and screening.starts_at > now
+                and _available_seats(db, screening, now) > 0)
+    auditorium = db.scalar(sa.select(Auditorium).where(
+        Auditorium.cinema_name == show["cinema_name"], Auditorium.name == show["hall_name"],
+        Auditorium.hall_type == show["hall_type"]).limit(1))
+    if not auditorium:
+        return True
+    # A previous Parda screening in the same imported hall would violate the
+    # exclusion constraint. Do not present a slot that cannot be opened.
+    ends_at = starts_at + timedelta(minutes=120)
+    clash = db.scalar(sa.select(Screening.id).where(
+        Screening.auditorium_id == auditorium.id,
+        Screening.starts_at < ends_at, Screening.ends_at > starts_at).limit(1))
+    return clash is None
 
 
 @router.get("/movies")
@@ -173,11 +212,12 @@ def movies(category: str = Query(default="now_playing", pattern=r"^(now_playing|
 
 
 @router.get("/movies/{movie_id}/screenings")
-def movie_screenings(movie_id: int):
+def movie_screenings(movie_id: int, db: Session = Depends(get_db)):
     if movie_id <= 0:
         raise HTTPException(422, "Invalid movie id")
     payload = _get(f"repertory/movie/{movie_id}/grouped")
-    result = [parsed for item in payload["list"] if (parsed := _show_out(item))]
+    now = datetime.now(timezone.utc)
+    result = [parsed for item in payload["list"] if (parsed := _show_out(item)) and _showtime_is_available(db, parsed, now)]
     return sorted(result, key=lambda item: (item["date"], item["time"], item["cinema_name"]))
 
 
@@ -190,10 +230,9 @@ def resolve_ticketing_screening(movie_id: int, repertory_id: int, db: Session = 
     a showtime idempotent under concurrent clicks.
     """
     show, raw = _source_show(movie_id, repertory_id)
-    local_start = datetime.fromisoformat(f"{show['date']}T{show['time']}:00+05:00")
-    starts_at = local_start.astimezone(timezone.utc)
-    if starts_at <= datetime.now(timezone.utc):
-        raise HTTPException(410, "This showtime has already started")
+    starts_at = _showtime_starts_at(show)
+    if not _showtime_is_available(db, show):
+        raise HTTPException(410, "This showtime is no longer available")
     existing = db.get(CatalogScreeningLink, repertory_id)
     if existing:
         return _ticketing_out(db, existing.screening)
@@ -233,7 +272,10 @@ def resolve_ticketing_screening(movie_id: int, repertory_id: int, db: Session = 
         db.flush()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(409, "This cinema hall already has a screening at that time")
+        resolved = db.get(CatalogScreeningLink, repertory_id)
+        if resolved and _available_seats(db, resolved.screening) > 0:
+            return _ticketing_out(db, resolved.screening)
+        raise HTTPException(409, "This showtime was just taken off sale. Please choose another time")
     db.add(CatalogScreeningLink(source_repertory_id=repertory_id, screening_id=screening.id))
     try:
         db.commit()
