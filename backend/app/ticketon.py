@@ -1,48 +1,43 @@
-"""Small read-only adapter for Ticketon's public cinema pages.
-
-The pages are server-rendered and expose on-sale sessions in their public
-document.  Parda reads only the date, time, venue, hall, language, format and
-lowest published price.  This is intentionally a narrow allow-list: a cinema
-never appears simply because a name was guessed from a map result.
-"""
+"""Read-only adapter for Ticketon's official public cinema-session API."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
-import html
+from datetime import datetime, timedelta, timezone
+import json
 import logging
-import re
 import time
 from threading import Lock
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 
 logger = logging.getLogger(__name__)
-
-BASE = "https://ticketon.uz/en/cinema/event"
+EVENT_API = "https://api-gw.ticketon.uz/event/v1/events"
+EVENT_PAGE = "https://ticketon.uz/en/cinema/event"
+TASHKENT_CITY_ID = 103
 FRESH_SECONDS = 5 * 60
 STALE_SECONDS = 30 * 60
+LOOKAHEAD_DAYS = 7
 
-# These two current public event pages collectively include the named Tashkent
-# operators. Add a title only after verifying a live public event URL.
-TITLE_SLUGS = {
-    "digger": "tckt2-digger-uz",
-    "диггер": "tckt2-digger-uz",
-    "приключения мамонтенка. в поисках мамы": "tckt2-priklyucheniya-mamontenka-v-poiskah-mamy-uz",
-    "приключения мамонтёнка. в поисках мамы": "tckt2-priklyucheniya-mamontenka-v-poiskah-mamy-uz",
-    "the adventures of the mammoth cub. in search of mom": "tckt2-priklyucheniya-mamontenka-v-poiskah-mamy-uz",
-    "пункт назначения: мост №13": "tckt2-punkt-naznacheniya-most-13-uz",
-    "destination: bridge no. 13": "tckt2-punkt-naznacheniya-most-13-uz",
-    "сердце зверя": "tckt2-serdtse-zverya-uz",
-    "heart of the beast": "tckt2-serdtse-zverya-uz",
-    "на деревню к дедушке. супермиссия": "tckt2-na-derevnyu-k-dedushke-supermissiya-uz",
-    "мой пес гохан": "tckt2-moy-pes-gohan-uz",
-    "my dog gokhan": "tckt2-moy-pes-gohan-uz",
+# Each title below is paired with the public Ticketon event ID published on its
+# event page. IDs are used only with Ticketon's documented browser API.
+TITLE_EVENTS = {
+    "digger": (11549, "tckt2-digger-uz"),
+    "диггер": (11549, "tckt2-digger-uz"),
+    "приключения мамонтенка. в поисках мамы": (11554, "tckt2-priklyucheniya-mamontenka-v-poiskah-mamy-uz"),
+    "приключения мамонтёнка. в поисках мамы": (11554, "tckt2-priklyucheniya-mamontenka-v-poiskah-mamy-uz"),
+    "the adventures of the mammoth cub. in search of mom": (11554, "tckt2-priklyucheniya-mamontenka-v-poiskah-mamy-uz"),
+    "пункт назначения: мост №13": (11552, "tckt2-punkt-naznacheniya-most-13-uz"),
+    "destination: bridge no. 13": (11552, "tckt2-punkt-naznacheniya-most-13-uz"),
+    "сердце зверя": (11276, "tckt2-serdtse-zverya-uz"),
+    "heart of the beast": (11276, "tckt2-serdtse-zverya-uz"),
+    "на деревню к дедушке. супермиссия": (11553, "tckt2-na-derevnyu-k-dedushke-supermissiya-uz"),
+    "мой пес гохан": (11550, "tckt2-moy-pes-gohan-uz"),
+    "my dog gokhan": (11550, "tckt2-moy-pes-gohan-uz"),
 }
 
 # Coordinates are saved only where a public map listing identifies the venue.
-# Other live venues remain selectable but are deliberately excluded from a
-# distance claim until their operator/map coordinates are verified.
+# Other live venues remain selectable but are excluded from distance claims.
 VENUE_METADATA = {
     "Next Cinema": {"latitude": 41.297942, "longitude": 69.249454},
     "Magic Cinema": {"latitude": 41.304519, "longitude": 69.245098},
@@ -51,7 +46,6 @@ VENUE_METADATA = {
     "Parus Cinema": {"latitude": 41.292054, "longitude": 69.211087},
     "Uzbekistan National Cinema Art Palace": {"latitude": 41.319446, "longitude": 69.259611},
 }
-
 DISPLAY_NAMES = {
     "Premier Cinema": "Premier Cinema — Park in Mall",
     "Uzbekistan National Cinema Art Palace": "O‘zbekiston Milliy kino san’ati saroyi",
@@ -62,103 +56,98 @@ ALLOWED_VENUES = {
     "Uzbekistan National Cinema Art Palace",
 }
 
-_CACHE: dict[str, tuple[float, float, list[dict]]] = {}
+_CACHE: dict[int, tuple[float, float, list[dict]]] = {}
 _LOCK = Lock()
 
-# The state is compact JavaScript rather than JSON. It is part of Ticketon's
-# public server-rendered document. The expression stays restrictive so an
-# unrelated field cannot be mistaken for a saleable session.
-SESSION = re.compile(
-    r'time:"(?P<starts>[^"\\]+)",session_period:"(?P<period>[^"\\]+)",'
-    r'id:(?P<id>\d+),format:"(?P<format>[^"\\]+)",language:"(?P<language>[^"\\]+)",'
-    r'language_short:"(?P<language_short>[^"\\]+)",min_price:"(?P<price>\d+)"'
-    r'.{0,1200}?sales_status:"(?P<sales_status>[^"\\]+)"'
-    r'.{0,1200}?hall_id:(?P<hall_id>\d+),hall_name:"(?P<hall_name>(?:\\.|[^"\\])*)",'
-    r'venue_id:(?P<venue_id>\d+),venue_name:"(?P<venue_name>(?:\\.|[^"\\])*)"'
-    r'.{0,1800}?address:"(?P<address>(?:\\.|[^"\\])*)"',
-    re.DOTALL,
-)
+
+def _event_for_title(title: str) -> tuple[int, str] | None:
+    return TITLE_EVENTS.get(title.casefold().strip())
 
 
-def _clean(value: str) -> str:
-    return html.unescape(value.replace(r'\"', '"').replace(r'\\', '\\')).strip()
+def _session_out(raw: dict, slug: str, now: datetime) -> dict | None:
+    try:
+        starts_at = datetime.fromisoformat(str(raw["time"])).astimezone(timezone.utc)
+        raw_id = int(raw["id"])
+        hall_id = int(raw["hall_id"])
+        venue_id = int(raw["venue_id"])
+        price = int(raw["min_price"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    venue = str(raw.get("venue_name") or "").strip()
+    if (raw.get("sales_status") != "on_sale" or venue not in ALLOWED_VENUES
+            or starts_at <= now or not raw_id or not hall_id or not venue_id):
+        return None
+    hall = str(raw.get("hall_name") or "").strip()
+    metadata = VENUE_METADATA.get(venue, {})
+    return {
+        # Negative values keep Ticketon's source IDs disjoint from Cinematica
+        # repertory IDs already used in Parda's database.
+        "id": -raw_id,
+        "date": starts_at.astimezone(timezone(timedelta(hours=5))).date().isoformat(),
+        "time": starts_at.astimezone(timezone(timedelta(hours=5))).strftime("%H:%M"),
+        "cinema_name": DISPLAY_NAMES.get(venue, venue),
+        "source_cinema_name": venue,
+        "cinema_id": venue_id,
+        "hall_id": hall_id,
+        "hall_name": hall,
+        "hall_type": "vip" if "vip" in hall.casefold() else "standard",
+        "format_type": str(raw.get("format") or "2D").strip(),
+        "audio_language": str(raw.get("language") or raw.get("language_short") or "").strip(),
+        "price": price,
+        "address": str(raw.get("address") or "").strip() or None,
+        "latitude": metadata.get("latitude"),
+        "longitude": metadata.get("longitude"),
+        "source_name": "ticketon",
+        "source_url": f"{EVENT_PAGE}/{slug}",
+    }
 
 
-def _slug_for_title(title: str) -> str | None:
-    return TITLE_SLUGS.get(title.casefold().strip())
-
-
-def _parse(slug: str, body: str) -> list[dict]:
+def _fetch_event(event_id: int, slug: str) -> list[dict]:
+    """Fetch future on-sale sessions from Ticketon's public JSON endpoint."""
     now = datetime.now(timezone.utc)
+    tashkent_today = now.astimezone(timezone(timedelta(hours=5))).date()
     found: dict[int, dict] = {}
-    for match in SESSION.finditer(body):
+    for offset in range(LOOKAHEAD_DAYS):
+        query = urlencode({"id": event_id, "date_day": (tashkent_today + timedelta(days=offset)).isoformat(),
+                           "city_id": TASHKENT_CITY_ID})
+        request = Request(f"{EVENT_API}/{event_id}/sessions/movie?{query}", headers={
+            "Accept": "application/json", "Accept-Language": "en",
+            "User-Agent": "PardaCinema/1.0 (+https://parda.uz)",
+        })
         try:
-            starts_at = datetime.fromisoformat(match.group("starts")).astimezone(timezone.utc)
-            raw_id = int(match.group("id"))
-            hall_id = int(match.group("hall_id"))
-            venue_id = int(match.group("venue_id"))
-            price = int(match.group("price"))
-        except (TypeError, ValueError):
+            with urlopen(request, timeout=10.0) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except (HTTPError, URLError, TimeoutError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            logger.warning("Ticketon API fetch failed for event %s: %s", event_id, error)
             continue
-        venue = _clean(match.group("venue_name"))
-        if (match.group("sales_status") != "on_sale" or venue not in ALLOWED_VENUES
-                or starts_at <= now or not raw_id or not hall_id or not venue_id):
-            continue
-        hall = _clean(match.group("hall_name"))
-        metadata = VENUE_METADATA.get(venue, {})
-        found[raw_id] = {
-            # Negative values keep Ticketon's source IDs disjoint from the
-            # positive Cinematica repertory primary key already in the DB.
-            "id": -raw_id,
-            "date": starts_at.date().isoformat(),
-            "time": starts_at.strftime("%H:%M"),
-            "cinema_name": DISPLAY_NAMES.get(venue, venue),
-            "source_cinema_name": venue,
-            "cinema_id": venue_id,
-            "hall_id": hall_id,
-            "hall_name": hall,
-            "hall_type": "vip" if "vip" in hall.casefold() else "standard",
-            "format_type": _clean(match.group("format")) or "2D",
-            "audio_language": _clean(match.group("language")) or _clean(match.group("language_short")),
-            "price": price,
-            "address": _clean(match.group("address")) or None,
-            "latitude": metadata.get("latitude"),
-            "longitude": metadata.get("longitude"),
-            "source_name": "ticketon",
-            "source_url": f"{BASE}/{slug}",
-        }
+        for raw in payload.get("sessions") or []:
+            session = _session_out(raw, slug, now)
+            if session:
+                found[-int(raw["id"])] = session
     return sorted(found.values(), key=lambda item: (item["date"], item["time"], item["cinema_name"]))
 
 
 def shows_for_title(title: str) -> list[dict]:
-    """Return future, on-sale sessions for a verified public title mapping."""
-    slug = _slug_for_title(title)
-    if not slug:
+    """Return future, saleable sessions for a verified public title mapping."""
+    event = _event_for_title(title)
+    if not event:
         return []
+    event_id, slug = event
     now = time.monotonic()
     stale: list[dict] | None = None
     with _LOCK:
-        cached = _CACHE.get(slug)
+        cached = _CACHE.get(event_id)
         if cached:
             fresh_until, stale_until, payload = cached
             if fresh_until > now:
                 return payload
             if stale_until > now:
                 stale = payload
-    try:
-        request = Request(f"{BASE}/{slug}", headers={
-            "Accept": "text/html",
-            "User-Agent": "PardaCinema/1.0 (+https://parda.uz)",
-        })
-        with urlopen(request, timeout=10.0) as response:
-            sessions = _parse(slug, response.read().decode("utf-8"))
-    except (HTTPError, URLError, TimeoutError, UnicodeDecodeError) as error:
-        logger.warning("Ticketon schedule fetch failed for %s: %s", slug, error)
-        if stale is not None:
-            return stale
-        return []
+    sessions = _fetch_event(event_id, slug)
+    if not sessions and stale is not None:
+        return stale
     with _LOCK:
-        _CACHE[slug] = (now + FRESH_SECONDS, now + STALE_SECONDS, sessions)
+        _CACHE[event_id] = (now + FRESH_SECONDS, now + STALE_SECONDS, sessions)
     return sessions
 
 
