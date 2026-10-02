@@ -118,7 +118,11 @@ def _fetch_event(event_id: int, slug: str) -> list[dict]:
             with urlopen(request, timeout=10.0) as response:
                 payload = json.loads(response.read().decode("utf-8"))
         except (HTTPError, URLError, TimeoutError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            # Some providers reject unlicensed cloud-server traffic. Stop on a
+            # 403 instead of retrying every date and spamming application logs.
             logger.warning("Ticketon API fetch failed for event %s: %s", event_id, error)
+            if isinstance(error, HTTPError) and error.code == 403:
+                break
             continue
         for raw in payload.get("sessions") or []:
             session = _session_out(raw, slug, now)
@@ -131,10 +135,10 @@ def shows_for_title(title: str) -> list[dict]:
     """Return future, saleable sessions for a verified public title mapping."""
     event = _event_for_title(title)
     if not event:
-        logger.warning("Ticketon title has no verified event mapping: %r", title)
+        logger.info("Ticketon title has no verified event mapping: %r", title)
         return []
     event_id, slug = event
-    logger.warning("Ticketon title mapped to public event %s: %r", event_id, title)
+    logger.info("Ticketon title mapped to public event %s: %r", event_id, title)
     now = time.monotonic()
     stale: list[dict] | None = None
     with _LOCK:
@@ -146,7 +150,6 @@ def shows_for_title(title: str) -> list[dict]:
             if stale_until > now:
                 stale = payload
     sessions = _fetch_event(event_id, slug)
-    logger.warning("Ticketon public event %s returned %s future sessions", event_id, len(sessions))
     if not sessions and stale is not None:
         return stale
     with _LOCK:

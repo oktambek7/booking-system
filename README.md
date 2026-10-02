@@ -28,7 +28,7 @@ Parda is an Uzbek-first cinema discovery and seat-booking app. The React/Vite fr
 - [x] Self-contained card checkout flow for Uzcard, Humo, Visa, and Mastercard with email-code confirmation
 - [x] Customer cancellation, booking-history archival, expiring seat holds, and PostgreSQL protection against competing seat requests
 - [x] Cinematica hall-directory sync keyed by public cinema and hall IDs, with traceable source URL and sync time
-- [x] Verified Ticketon cinema feed for public, on-sale sessions where an exact live event page is configured
+- [ ] Ticketon live cinema feed requires provider-approved cloud access; Ticketon currently returns HTTP 403 to the deployed Render service
 - [x] Movie-detail cinema, format, language, Standard/VIP, and price filters
 - [x] User-triggered nearest-cinema sorting using verified hall coordinates only
 - [x] Protected catalog sync, sync-status, nearby-hall, and hall-coordinate API endpoints
@@ -145,16 +145,18 @@ flowchart LR
 
 The movie detail page derives cinema filter choices from only the source sessions
 returned for that film and date. This avoids a visitor selecting an operator
-that has no matching time. The Ticketon adapter has a deliberately narrow
-venue allow-list: CinemaPlex, Next Cinema, Compass Cinema, Riviera Cinema,
-Parus Cinema, Magic Cinema, Sergeli Cinema, Premier Cinema — Park in Mall,
-and O‘zbekiston Milliy kino san’ati saroyi. It reads only future sessions marked
-on sale on a mapped public Ticketon event page. `Tashkent City` continues to
-come from the existing Cinematica public feed.
+that has no matching time. `Tashkent City` comes from the existing Cinematica
+public feed.
 
-The source page is fetched again when a visitor selects a time. If it has been
-removed or is no longer on sale, Parda returns a clear unavailable response
-instead of constructing an internal booking from stale data.
+The code includes a narrow Ticketon adapter for CinemaPlex, Next Cinema,
+Compass Cinema, Riviera Cinema, Parus Cinema, Magic Cinema, Sergeli Cinema,
+Premier Cinema — Park in Mall, and O‘zbekiston Milliy kino san’ati saroyi. It
+uses Ticketon’s public session API and accepts only future `on_sale` responses.
+Ticketon currently returns HTTP 403 to the Render cloud service, so it does not
+show an incomplete or invented programme in production. Provider-approved API
+credentials or an allow-listed service IP are required before enabling that
+live source. When available, the source is revalidated when a visitor selects
+a time; a removed or off-sale time returns an unavailable response.
 
 ### Nearby cinemas and privacy
 
