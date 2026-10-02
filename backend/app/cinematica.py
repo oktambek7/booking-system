@@ -180,6 +180,10 @@ def _catalog_hall(db: Session, show: dict, *, source_url: str | None = None,
             seat_type="premium" if row < 2 else "standard")
             for row in range(rows) for number in range(1, per_row + 1)]
         db.add(room)
+        # Sessions use autoflush=False. Flush this new source identity now so
+        # later showtimes in the same import see it instead of inserting the
+        # same `(source_name, external_hall_id)` a second time.
+        db.flush()
     else:
         room.name = show["hall_name"]
         room.cinema_name = show["cinema_name"]
@@ -219,6 +223,10 @@ def _ticketon_catalog_hall(db: Session, show: dict, *, create: bool = False) -> 
             seat_type="premium" if row < 2 else "standard")
             for row in range(rows) for number in range(1, per_row + 1)]
         db.add(room)
+        # Sessions use autoflush=False. Flush this new source identity now so
+        # later showtimes in the same import see it instead of inserting the
+        # same `(source_name, external_hall_id)` a second time.
+        db.flush()
     else:
         room.name = show["hall_name"]
         room.cinema_name = show["cinema_name"]
