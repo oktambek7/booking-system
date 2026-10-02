@@ -12,8 +12,8 @@ import html
 import re
 import time
 from threading import Lock
-
-import httpx
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 
 BASE = "https://ticketon.uz/en/cinema/event"
@@ -143,12 +143,13 @@ def shows_for_title(title: str) -> list[dict]:
             if stale_until > now:
                 stale = payload
     try:
-        response = httpx.get(f"{BASE}/{slug}", timeout=10.0, headers={
-            "Accept": "text/html", "User-Agent": "PardaCinema/1.0 (+https://parda.uz)",
+        request = Request(f"{BASE}/{slug}", headers={
+            "Accept": "text/html",
+            "User-Agent": "PardaCinema/1.0 (+https://parda.uz)",
         })
-        response.raise_for_status()
-        sessions = _parse(slug, response.text)
-    except httpx.HTTPError:
+        with urlopen(request, timeout=10.0) as response:
+            sessions = _parse(slug, response.read().decode("utf-8"))
+    except (HTTPError, URLError, TimeoutError, UnicodeDecodeError):
         if stale is not None:
             return stale
         return []
