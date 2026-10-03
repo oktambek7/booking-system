@@ -204,3 +204,47 @@ input::placeholder { color:var(--muted)!important; opacity:1; }
 @keyframes carousel-backdrop-fade { from { opacity:0; transform:scale(1.025); } to { opacity:.96; transform:scale(1); } }
 @keyframes carousel-poster-fade { from { opacity:0; transform:translateY(-47%) translateX(20px) rotate(-1deg); } to { opacity:1; transform:translateY(-50%) translateX(0) rotate(2deg); } }
 @media (prefers-reduced-motion:reduce) { .carousel-fade,.carousel-backdrop.carousel-fade,.carousel-poster.carousel-fade { animation:none; } }
+
+/* Ticket controls remain a deliberate action group instead of adjacent inline buttons. */
+.history-card-actions {
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:9px;
+  margin-top:15px;
+}
+.history-card-actions .ticket-button,
+.history-card-actions .cancel-booking {
+  min-height:36px;
+  margin:0;
+  padding:0 13px;
+  border-radius:6px;
+  font-size:10px;
+  font-weight:750;
+  text-decoration:none;
+}
+.history-card-actions .ticket-button {
+  border-color:var(--action)!important;
+  background:var(--action)!important;
+  color:var(--on-action)!important;
+}
+.history-card-actions .ticket-button:hover { filter:brightness(.94); }
+.history-card-actions .cancel-booking {
+  border:1px solid color-mix(in srgb,#b65346 42%,var(--line))!important;
+  background:transparent!important;
+  color:#9f473b!important;
+}
+.history-card-actions .cancel-booking:hover:not(:disabled) {
+  border-color:#9f473b!important;
+  background:#9f473b12!important;
+}
+:root[data-theme="dark"] .history-card-actions .cancel-booking {
+  border-color:#d5847a!important;
+  background:#311e26!important;
+  color:#ffd4ce!important;
+}
+@media(max-width:420px) {
+  .history-card-actions { align-items:stretch; }
+  .history-card-actions .ticket-button,
+  .history-card-actions .cancel-booking { flex:1 1 132px; justify-content:center; }
+}
