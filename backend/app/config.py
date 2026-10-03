@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     admin_email: str = ""
     admin_password: str = ""
     admin_nickname: str = "admin"
+    # One-time, operator-controlled bootstrap for a pre-existing user. Keep
+    # this empty in normal operation and remove it after a successful grant.
+    operator_bootstrap_nickname: str = ""
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 settings = Settings()

@@ -108,6 +108,11 @@ Deploy from `render.yaml`, attach PostgreSQL, and set these private values in th
 
 Bootstrap the admin with `ADMIN_EMAIL` and a unique `ADMIN_PASSWORD` of at least 12 characters. Configure real, operator-provided cinema halls, seat plans, prices, and screening schedules through the admin tools.
 
+To grant the existing project owner a one-time operator role, set
+`OPERATOR_BOOTSTRAP_NICKNAME` to that user's exact nickname, deploy once, and
+then remove the variable. This bootstrap only promotes an existing account;
+public users cannot self-assign roles.
+
 ### Vercel frontend
 
 Set `VITE_API_URL` to the API origin and redeploy. Set the API `CORS_ORIGINS` to the exact Vercel site origin.

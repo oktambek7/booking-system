@@ -57,6 +57,7 @@ async def lifespan(app: FastAPI):
           WHERE (status = 'scheduled');
         EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;"""))
     _ensure_initial_admin()
+    _ensure_operator_bootstrap()
     created = ensure_current_demo_schedule()
     if created:
         logger.info("Created %s rolling Parda demo screenings", created)
@@ -115,6 +116,28 @@ def _ensure_initial_admin() -> None:
                     password_hash=hash_password(settings.admin_password), role=Role.ADMIN,
                     active=True, phone_verified=False, email_verified=True))
         db.commit()
+
+def _ensure_operator_bootstrap() -> None:
+    """Promote one existing account when explicitly configured by the owner.
+
+    This is deliberately configuration-only: public registration and regular
+    users cannot grant themselves elevated access. The deployment variable is
+    removed once the intended account has been promoted.
+    """
+    nickname = settings.operator_bootstrap_nickname.strip().lower()
+    if not nickname:
+        return
+    with SessionLocal() as db:
+        user = db.scalar(select(User).where(User.nickname == nickname))
+        if not user:
+            logger.warning("Configured operator bootstrap nickname was not found")
+            return
+        changed = user.role != Role.ADMIN or not user.email_verified
+        user.role = Role.ADMIN
+        user.email_verified = True
+        if changed:
+            db.commit()
+            logger.info("Configured operator account promoted")
 
 app = FastAPI(title="Booking System API", version="0.1.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=[x.strip() for x in settings.cors_origins.split(",") if x.strip()],
