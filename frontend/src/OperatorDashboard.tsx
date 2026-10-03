@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
-import { Armchair, CalendarDays, CheckCircle2, CircleDollarSign, Clapperboard, DoorOpen, Film, LayoutDashboard, LoaderCircle, Plus, RefreshCw, Ticket, Users, X } from 'lucide-react'
+import { Armchair, CalendarDays, CheckCircle2, CircleDollarSign, Clapperboard, DoorOpen, Film, LayoutDashboard, LoaderCircle, Plus, RefreshCw, ScanLine, Ticket, Users, X } from 'lucide-react'
 import { calendarDate, formatDateTime, isoDateInTashkent } from './dateFormat'
 
 type Movie = { id:number; title:string; active:boolean; catalog_status?:string; duration_minutes?:number|null; language:string; age_rating:string; poster_url:string }
 type Hall = { id:number; name:string; cinema_name:string; city:string; address:string; hall_type:'standard'|'vip'; formats:string[]; seat_count:number; active?:boolean; source_name?:string|null }
-type Booking = { id:number; status:'pending'|'confirmed'|'cancelled'|'completed'; seat_count:number; total_price:number|string; movie_title:string; starts_at:string; cinema_name:string; auditorium_name:string; seats:string[]; customer_nickname:string; customer_email:string }
+type Booking = { id:number; status:'pending'|'confirmed'|'cancelled'|'completed'; seat_count:number; total_price:number|string; ticket_code:string|null; checked_in_at:string|null; movie_title:string; starts_at:string; cinema_name:string; auditorium_name:string; seats:string[]; customer_nickname:string; customer_email:string }
 type Screening = { id:number; movie_id:number; auditorium_id:number; starts_at:string; ends_at:string; base_price:number|string; premium_surcharge:number|string; movie_title:string; cinema_name:string; auditorium_name:string; format_type:string; hall_type:'standard'|'vip'; available_seats:number; booking_count:number; seats_sold:number; confirmed_revenue:number|string }
 type Dashboard = { metrics:{date:string; screenings:number; upcoming_screenings:number; bookings:number; confirmed_bookings:number; pending_bookings:number; seats_sold:number; seats_available:number; confirmed_revenue:number|string}; screenings:Screening[]; bookings:Booking[] }
 
@@ -68,6 +68,19 @@ export default function OperatorDashboard({ api, token, onClose }: { api:string;
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Chipta holati yangilanmadi.') }
     finally { setBusy(false) }
   }
+  async function checkIn(event:FormEvent<HTMLFormElement>) {
+    event.preventDefault(); const form = event.currentTarget; const ticketCode = String(new FormData(form).get('ticket_code') || '').trim()
+    if (!ticketCode) return
+    setBusy(true); setError(''); setNotice('')
+    try {
+      const result = await fetch(`${api}/api/admin/tickets/check-in`, { method:'POST', headers:headers(token), body:JSON.stringify({ ticket_code:ticketCode }) })
+      const data = await result.json()
+      if (!result.ok) throw new Error(data.detail || 'Chipta tekshirilmadi.')
+      setNotice(`${data.booking.movie_title} · ${data.booking.seats.join(', ')} uchun kirish tasdiqlandi.`)
+      form.reset(); await load()
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Chipta tekshirilmadi.') }
+    finally { setBusy(false) }
+  }
   async function toggleHall(hall:Hall) {
     setBusy(true); setError(''); setNotice('')
     try {
@@ -112,7 +125,7 @@ export default function OperatorDashboard({ api, token, onClose }: { api:string;
             {tab === 'schedule' && <Schedule dashboard={dashboard} movies={visibleMovies} halls={activeHalls} day={day} busy={busy} onSubmit={submit}/>} 
             {tab === 'halls' && <Halls halls={halls} busy={busy} onSubmit={submit} onToggle={toggleHall}/>} 
             {tab === 'catalog' && <Catalog movies={movies} busy={busy} onSubmit={submit} onSync={syncCatalog}/>} 
-            {tab === 'tickets' && <Tickets bookings={dashboard?.bookings || []} busy={busy} onUpdate={updateBooking}/>} 
+            {tab === 'tickets' && <Tickets bookings={dashboard?.bookings || []} busy={busy} onUpdate={updateBooking} onCheckIn={checkIn}/>} 
           </>}
         </main>
       </div>
@@ -157,13 +170,13 @@ function Catalog({ movies, busy, onSubmit, onSync }: { movies:Movie[]; busy:bool
   return <div className="operator-two-column"><section className="operator-section"><div className="operator-section-head"><div><span>QO‘LDA QO‘SHISH</span><h2>Yangi film</h2></div></div><form className="operator-form" onSubmit={event => { const form = new FormData(event.currentTarget); return void onSubmit(event, '/api/movies', { title:form.get('title'), synopsis:form.get('synopsis'), duration_minutes:Number(form.get('duration')), genre:form.get('genre'), age_rating:form.get('age_rating'), language:form.get('language'), poster_url:form.get('poster_url') }, 'Film katalogga qo‘shildi.') }}><label>Original nomi<input name="title" maxLength={180} required/></label><label>Qisqa tavsif<textarea name="synopsis" maxLength={5000}/></label><div className="operator-field-row"><label>Davomiyligi (daq.)<input name="duration" type="number" min="1" max="360" defaultValue="120" required/></label><label>Yosh cheklovi<input name="age_rating" defaultValue="13+" required/></label></div><div className="operator-field-row"><label>Janr<input name="genre" defaultValue="Drama" required/></label><label>Namoyish tili<input name="language" defaultValue="O‘zbekcha" required/></label></div><label>Poster URL<input name="poster_url" type="url" placeholder="https://…"/></label><button className="operator-primary" disabled={busy}><Plus size={16}/>Film qo‘shish</button></form></section><section className="operator-section"><div className="operator-section-head"><div><span>TMDB</span><h2>Katalog sinxronizatsiyasi</h2></div></div><div className="operator-sync-card"><Film size={28}/><div><b>Film ma’lumotlarini yangilang</b><p>Poster, original nom, yosh cheklovi, aktyorlar va yangi premyeralar TMDB’dan olinadi.</p></div><button className="operator-primary" onClick={() => void onSync()} disabled={busy}><RefreshCw size={16}/>TMDB yangilash</button></div><div className="operator-movie-list">{movies.slice(0, 12).map(movie => <article key={movie.id}>{movie.poster_url ? <img src={movie.poster_url} alt=""/> : <span><Film size={18}/></span>}<div><b>{movie.title}</b><small>{movie.language} · {movie.age_rating} · {movie.duration_minutes || '—'} daq.</small></div></article>)}</div></section></div>
 }
 
-function Tickets({ bookings, busy, onUpdate }: { bookings:Booking[]; busy:boolean; onUpdate:(booking:Booking,status:'cancelled'|'completed')=>Promise<void> }) {
-  return <section className="operator-section"><div className="operator-section-head"><div><span>BUYURTMALAR</span><h2>Bugungi chiptalar</h2></div><b>{bookings.length} buyurtma</b></div>{bookings.length ? <div className="operator-ticket-table">{bookings.map(booking => <TicketRow key={booking.id} booking={booking} actions onUpdate={onUpdate} busy={busy}/>)}</div> : <Empty icon={<Ticket/>} title="Bugungi chipta yo‘q" text="Tanlangan kunga tegishli buyurtmalar shu yerda chiqadi."/>}</section>
+function Tickets({ bookings, busy, onUpdate, onCheckIn }: { bookings:Booking[]; busy:boolean; onUpdate:(booking:Booking,status:'cancelled'|'completed')=>Promise<void>; onCheckIn:(event:FormEvent<HTMLFormElement>)=>Promise<void> }) {
+  return <section className="operator-section"><div className="operator-section-head"><div><span>BUYURTMALAR</span><h2>Bugungi chiptalar</h2></div><b>{bookings.length} buyurtma</b></div><form className="operator-checkin" onSubmit={event=>void onCheckIn(event)}><ScanLine size={19}/><label>QR yoki chipta kodi<input name="ticket_code" required autoComplete="off" autoCapitalize="characters" maxLength={16} placeholder="PRD-XXXXXXXX"/></label><button className="operator-primary" disabled={busy}>Kirishni tasdiqlash</button><small>Faqat tasdiqlangan chipta bir marta, seansdan 2 soat oldin tekshiriladi.</small></form>{bookings.length ? <div className="operator-ticket-table">{bookings.map(booking => <TicketRow key={booking.id} booking={booking} actions onUpdate={onUpdate} busy={busy}/>)}</div> : <Empty icon={<Ticket/>} title="Bugungi chipta yo‘q" text="Tanlangan kunga tegishli buyurtmalar shu yerda chiqadi."/>}</section>
 }
 
 function TicketRow({ booking, actions, onUpdate, busy }: { booking:Booking; actions?:boolean; onUpdate?:(booking:Booking,status:'cancelled'|'completed')=>Promise<void>; busy?:boolean }) {
   const canComplete = booking.status === 'confirmed' && new Date(booking.starts_at) <= new Date()
-  return <article className="operator-ticket-row"><div className="operator-ticket-person"><span className={`operator-status status-${booking.status}`}/><div><b>{booking.customer_nickname}</b><small>{booking.customer_email}</small></div></div><div><b>{booking.movie_title}</b><small>{formatDateTime(booking.starts_at, 'uz')} · {booking.auditorium_name}</small></div><div><b>{booking.seats.join(', ')}</b><small>{money(booking.total_price)}</small></div><div className="operator-ticket-actions"><em>{booking.status}</em>{actions && <>{canComplete && <button onClick={() => void onUpdate?.(booking, 'completed')} disabled={busy}>Yakunlash</button>}{['pending','confirmed'].includes(booking.status) && <button className="operator-danger" onClick={() => void onUpdate?.(booking, 'cancelled')} disabled={busy}>Bekor qilish</button>}</>}</div></article>
+  return <article className="operator-ticket-row"><div className="operator-ticket-person"><span className={`operator-status status-${booking.status}`}/><div><b>{booking.customer_nickname}</b><small>{booking.customer_email}</small></div></div><div><b>{booking.movie_title}</b><small>{formatDateTime(booking.starts_at, 'uz')} · {booking.auditorium_name}</small></div><div><b>{booking.seats.join(', ')}</b><small>{booking.ticket_code || money(booking.total_price)}</small></div><div className="operator-ticket-actions"><em>{booking.checked_in_at?'kiritildi':booking.status}</em>{actions && <>{canComplete && <button onClick={() => void onUpdate?.(booking, 'completed')} disabled={busy}>Yakunlash</button>}{['pending','confirmed'].includes(booking.status) && <button className="operator-danger" onClick={() => void onUpdate?.(booking, 'cancelled')} disabled={busy}>Bekor qilish</button>}</>}</div></article>
 }
 
 function Empty({ icon, title, text }: { icon:ReactNode; title:string; text:string }) { return <div className="operator-empty">{icon}<b>{title}</b><p>{text}</p></div> }

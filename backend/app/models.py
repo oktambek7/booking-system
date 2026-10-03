@@ -123,6 +123,10 @@ class Booking(Base):
     hold_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     archived_by_customer: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Issued after a verified payment. The opaque value is encoded in the
+    # customer-facing QR ticket and never contains personal information.
+    ticket_code: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
+    checked_in_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     customer: Mapped[User] = relationship()
     screening: Mapped[Screening] = relationship()
     seat_assignments: Mapped[list["BookingSeat"]] = relationship(back_populates="booking", cascade="all, delete-orphan")

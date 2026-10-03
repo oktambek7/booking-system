@@ -154,6 +154,8 @@ class BookingOut(BaseModel):
     total_price: Decimal
     hold_expires_at: datetime | None
     created_at: datetime
+    ticket_code: str | None = None
+    checked_in_at: datetime | None = None
     movie_title: str
     starts_at: datetime
     cinema_name: str
@@ -162,6 +164,13 @@ class BookingOut(BaseModel):
 
 class BookingStatusIn(BaseModel):
     status: BookingStatus
+
+class TicketCheckInIn(BaseModel):
+    ticket_code: str = Field(min_length=6, max_length=16, pattern=r"^[A-Za-z0-9-]+$")
+
+class TicketCheckInOut(BaseModel):
+    booking: BookingOut
+    checked_in_at: datetime
 
 class OperatorMetricsOut(BaseModel):
     date: date

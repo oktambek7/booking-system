@@ -33,6 +33,7 @@ Parda is an Uzbek-first cinema discovery and seat-booking app. The React/Vite fr
 - [x] User-triggered nearest-cinema sorting using verified hall coordinates only
 - [x] Protected catalog sync, sync-status, nearby-hall, and hall-coordinate API endpoints
 - [x] Role-gated cinema operator dashboard for daily session capacity, ticket activity, confirmed revenue, hall inventory, schedule creation, and TMDB catalog refresh
+- [x] QR e-tickets with opaque server-issued codes and a one-time operator check-in flow
 
 ## Assignment requirement mapping
 
@@ -55,6 +56,7 @@ The original assignment describes appointments. Parda applies the same booking m
 - Two customers selecting the same seat are serialized by the database. One booking succeeds, and the other receives HTTP 409 with current availability on refresh.
 - A user cannot book a past screening, choose a seat outside that auditorium, submit duplicate or more than eight seats, or cancel after a screening begins.
 - A second payment verification attempt cannot confirm someone else’s booking. Codes are hashed, expire, limit attempts, and are rate limited for resend.
+- A paid ticket receives a non-personal, unique `PRD-` code. Check-in accepts it only once, only while the screening entry window is open, and never admits cancelled, pending, or already-used tickets.
 - External discovery data is never the seat source of truth. Cinematica’s read-only programme is cached fresh for five minutes and can serve a bounded stale result for up to 24 hours when its upstream service is temporarily unreachable.
 - New and returning unverified accounts resume the same verification flow without creating duplicate users; password resets are restricted to verified accounts.
 
@@ -179,6 +181,7 @@ The site asks for browser location only after the visitor presses **Find cinemas
 | `PATCH /api/cinemas/{id}` | Admin | Verify address, coordinates, formats, hall type, or disable a hall |
 | `GET /api/admin/dashboard?date=YYYY-MM-DD` | Admin | Date-scoped session occupancy, booking activity, and confirmed-revenue dashboard |
 | `GET /api/admin/cinemas` | Admin | Complete hall inventory, including disabled halls, for the operator workspace |
+| `POST /api/admin/tickets/check-in` | Admin | Validate a confirmed e-ticket code once during the screening entry window |
 | `POST /api/admin/catalog-sync` | Admin | Run the idempotent source hall-directory sync |
 | `GET /api/admin/catalog-sync/status` | Admin | Inspect imported hall count and most recent sync time |
 

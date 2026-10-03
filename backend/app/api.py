@@ -1,6 +1,6 @@
 from datetime import date, datetime, time, timedelta, timezone
 from math import asin, cos, radians, sin, sqrt
-from secrets import token_urlsafe
+from secrets import choice, token_urlsafe
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import sqlalchemy as sa
 from sqlalchemy import update
@@ -14,7 +14,8 @@ from .schemas import (AuditoriumIn, AuditoriumOut, AuditoriumUpdate, NearbyAudit
                       CatalogSyncOut, CinemaDirectorySyncOut, EmailChallengeOut, EmailCodeVerify, EmailResend, Login, MovieIn, MovieOut, OtpVerifyIn, PasswordResetConfirm, PasswordResetRequest, PaymentStartIn,
                       PaymentStartOut, PaymentVerifyOut, ScreeningIn, ScreeningOut,
                       ScreeningSeatsOut, SeatOut, Token, UserCreate, OperatorBookingOut,
-                      OperatorDashboardOut, OperatorMetricsOut, OperatorScreeningOut)
+                      OperatorDashboardOut, OperatorMetricsOut, OperatorScreeningOut,
+                      TicketCheckInIn, TicketCheckInOut)
 from .security import current_user, hash_password, make_token, require_roles, verify_password
 from .config import settings
 from .otp import code_hash, code_matches, new_code
@@ -90,6 +91,7 @@ def _booking_out(item: Booking) -> BookingOut:
     return BookingOut(id=item.id, customer_id=item.customer_id, screening_id=item.screening_id,
         status=item.status, seat_count=item.seat_count, total_price=item.total_price,
         hold_expires_at=item.hold_expires_at, created_at=item.created_at,
+        ticket_code=item.ticket_code, checked_in_at=item.checked_in_at,
         movie_title=item.screening.movie.title, starts_at=item.screening.starts_at,
         cinema_name=item.screening.auditorium.cinema_name,
         auditorium_name=item.screening.auditorium.name,
@@ -98,6 +100,16 @@ def _booking_out(item: Booking) -> BookingOut:
 def _operator_booking_out(item: Booking) -> OperatorBookingOut:
     return OperatorBookingOut(**_booking_out(item).model_dump(),
         customer_nickname=item.customer.nickname, customer_email=item.customer.email)
+
+def _new_ticket_code(db: Session) -> str:
+    """Generate a short, readable, collision-resistant code for an e-ticket."""
+    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    for _ in range(10):
+        candidate = f"PRD-{''.join(choice(alphabet) for _ in range(8))}"
+        exists = db.scalar(sa.select(sa.exists().where(Booking.ticket_code == candidate)))
+        if not exists:
+            return candidate
+    raise HTTPException(503, "Could not issue a ticket code. Please retry payment verification")
 
 @router.post("/auth/register", status_code=201)
 def register(data: UserCreate, db: Session = Depends(get_db)):
@@ -657,6 +669,7 @@ def verify_payment(payment_id:int,data:OtpVerifyIn,db:Session=Depends(get_db),us
     challenge.consumed_at=now
     payment.status="succeeded_demo"
     booking.status=BookingStatus.CONFIRMED;booking.hold_expires_at=None
+    booking.ticket_code = booking.ticket_code or _new_ticket_code(db)
     db.commit();db.refresh(booking)
     return PaymentVerifyOut(payment_id=payment.id,reference=payment.reference,status=payment.status,booking=_booking_out(booking))
 
@@ -681,6 +694,27 @@ def clear_booking_history(db:Session=Depends(get_db),user:User=Depends(current_u
     db.commit()
     return {"archived_count":len(items)}
 
+@router.post("/admin/tickets/check-in", response_model=TicketCheckInOut)
+def check_in_ticket(data: TicketCheckInIn, db: Session = Depends(get_db), _: User = admin):
+    """Admit one paid ticket once, within a bounded screening-entry window."""
+    ticket_code = data.ticket_code.strip().upper()
+    item = db.scalar(sa.select(Booking).where(Booking.ticket_code == ticket_code).with_for_update())
+    if not item:
+        raise HTTPException(404, "Ticket code was not found")
+    if item.status != BookingStatus.CONFIRMED:
+        raise HTTPException(409, "Only confirmed tickets can be checked in")
+    if item.checked_in_at:
+        raise HTTPException(409, "This ticket was already checked in")
+    now = datetime.now(timezone.utc)
+    if now < item.screening.starts_at - timedelta(hours=2):
+        raise HTTPException(422, "Entry opens two hours before the screening")
+    if now > item.screening.ends_at:
+        raise HTTPException(410, "This screening has already ended")
+    item.checked_in_at = now
+    db.commit()
+    db.refresh(item)
+    return TicketCheckInOut(booking=_booking_out(item), checked_in_at=item.checked_in_at)
+
 @router.patch("/bookings/{booking_id}/status",response_model=BookingOut)
 def update_booking_status(booking_id:int,data:BookingStatusIn,db:Session=Depends(get_db),user:User=Depends(current_user)):
     item=db.get(Booking,booking_id)
@@ -697,6 +731,7 @@ def update_booking_status(booking_id:int,data:BookingStatusIn,db:Session=Depends
         paid=db.scalar(sa.select(sa.exists().where(Payment.booking_id==item.id,
             Payment.status=="succeeded_demo")))
         if not paid: raise HTTPException(409,"Booking requires a verified demo payment before confirmation")
+        item.ticket_code = item.ticket_code or _new_ticket_code(db)
     if data.status==BookingStatus.COMPLETED and datetime.now(timezone.utc)<item.screening.ends_at:
         raise HTTPException(422,"A screening can only be marked completed after it ends")
     if data.status==BookingStatus.CANCELLED and user.role==Role.CUSTOMER and item.screening.starts_at<=datetime.now(timezone.utc):
