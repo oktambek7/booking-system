@@ -736,6 +736,8 @@ def update_booking_status(booking_id:int,data:BookingStatusIn,db:Session=Depends
         raise HTTPException(422,"A screening can only be marked completed after it ends")
     if data.status==BookingStatus.CANCELLED and user.role==Role.CUSTOMER and item.screening.starts_at<=datetime.now(timezone.utc):
         raise HTTPException(422,"Bookings can only be cancelled before the screening starts")
+    if data.status==BookingStatus.CANCELLED and item.checked_in_at:
+        raise HTTPException(409,"A checked-in ticket cannot be cancelled")
     item.status=data.status
     if data.status==BookingStatus.CANCELLED:
         for assignment in item.seat_assignments: assignment.active=False

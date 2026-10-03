@@ -121,7 +121,7 @@ export default function OperatorDashboard({ api, token, onClose }: { api:string;
           {notice && <p className="operator-alert operator-success"><CheckCircle2 size={16}/>{notice}</p>}
           {error && <p className="operator-alert operator-error">{error}</p>}
           {loading ? <div className="operator-loading"><LoaderCircle size={24}/><span>Operator ma’lumotlari yuklanmoqda…</span></div> : <>
-            {tab === 'overview' && <Overview dashboard={dashboard}/>} 
+            {tab === 'overview' && <Overview dashboard={dashboard} busy={busy} onUpdate={updateBooking}/>} 
             {tab === 'schedule' && <Schedule dashboard={dashboard} movies={visibleMovies} halls={activeHalls} day={day} busy={busy} onSubmit={submit}/>} 
             {tab === 'halls' && <Halls halls={halls} busy={busy} onSubmit={submit} onToggle={toggleHall}/>} 
             {tab === 'catalog' && <Catalog movies={movies} busy={busy} onSubmit={submit} onSync={syncCatalog}/>} 
@@ -133,7 +133,7 @@ export default function OperatorDashboard({ api, token, onClose }: { api:string;
   </div>
 }
 
-function Overview({ dashboard }: { dashboard:Dashboard|null }) {
+function Overview({ dashboard, busy, onUpdate }: { dashboard:Dashboard|null; busy:boolean; onUpdate:(booking:Booking,status:'cancelled'|'completed')=>Promise<void> }) {
   if (!dashboard) return null
   const { metrics, screenings, bookings } = dashboard
   const cards = [
@@ -145,7 +145,7 @@ function Overview({ dashboard }: { dashboard:Dashboard|null }) {
   return <>
     <section className="operator-metrics">{cards.map(([label,value,detail,Icon]) => <article key={label}><span><Icon size={18}/></span><p>{label}</p><strong>{value}</strong><small>{detail}</small></article>)}</section>
     <section className="operator-section"><div className="operator-section-head"><div><span>OPERATSIYA</span><h2>Bugungi seanslar</h2></div><b>{screenings.length} seans</b></div>{screenings.length ? <div className="operator-show-list">{screenings.map(item => <ScreeningRow key={item.id} item={item}/>)}</div> : <Empty icon={<CalendarDays/>} title="Bu sana uchun seans yo‘q" text="Seanslar bo‘limidan film, zal va vaqtni tanlab yangi seans yarating."/>}</section>
-    <section className="operator-section operator-recent"><div className="operator-section-head"><div><span>YANGI BUYURTMALAR</span><h2>Chipta harakati</h2></div><b>{bookings.length} buyurtma</b></div>{bookings.length ? <div className="operator-ticket-table">{bookings.slice(0, 6).map(item => <TicketRow key={item.id} booking={item}/>)}</div> : <Empty icon={<Ticket/>} title="Hali buyurtma yo‘q" text="Yangi xaridlar shu yerda ko‘rinadi."/>}</section>
+    <section className="operator-section operator-recent"><div className="operator-section-head"><div><span>YANGI BUYURTMALAR</span><h2>Chipta harakati</h2></div><b>{bookings.length} buyurtma</b></div>{bookings.length ? <div className="operator-ticket-table">{bookings.slice(0, 6).map(item => <TicketRow key={item.id} booking={item} actions onUpdate={onUpdate} busy={busy}/>)}</div> : <Empty icon={<Ticket/>} title="Hali buyurtma yo‘q" text="Yangi xaridlar shu yerda ko‘rinadi."/>}</section>
   </>
 }
 
@@ -176,7 +176,7 @@ function Tickets({ bookings, busy, onUpdate, onCheckIn }: { bookings:Booking[]; 
 
 function TicketRow({ booking, actions, onUpdate, busy }: { booking:Booking; actions?:boolean; onUpdate?:(booking:Booking,status:'cancelled'|'completed')=>Promise<void>; busy?:boolean }) {
   const canComplete = booking.status === 'confirmed' && new Date(booking.starts_at) <= new Date()
-  return <article className="operator-ticket-row"><div className="operator-ticket-person"><span className={`operator-status status-${booking.status}`}/><div><b>{booking.customer_nickname}</b><small>{booking.customer_email}</small></div></div><div><b>{booking.movie_title}</b><small>{formatDateTime(booking.starts_at, 'uz')} · {booking.auditorium_name}</small></div><div><b>{booking.seats.join(', ')}</b><small>{booking.ticket_code || money(booking.total_price)}</small></div><div className="operator-ticket-actions"><em>{booking.checked_in_at?'kiritildi':booking.status}</em>{actions && <>{canComplete && <button onClick={() => void onUpdate?.(booking, 'completed')} disabled={busy}>Yakunlash</button>}{['pending','confirmed'].includes(booking.status) && <button className="operator-danger" onClick={() => void onUpdate?.(booking, 'cancelled')} disabled={busy}>Bekor qilish</button>}</>}</div></article>
+  return <article className="operator-ticket-row"><div className="operator-ticket-person"><span className={`operator-status status-${booking.status}`}/><div><b>{booking.customer_nickname}</b><small>{booking.customer_email}</small></div></div><div><b>{booking.movie_title}</b><small>{formatDateTime(booking.starts_at, 'uz')} · {booking.auditorium_name}</small></div><div><b>{booking.seats.join(', ')}</b><small>{booking.ticket_code || money(booking.total_price)}</small></div><div className="operator-ticket-actions"><em>{booking.checked_in_at?'kiritildi':booking.status}</em>{actions && <>{canComplete && <button onClick={() => void onUpdate?.(booking, 'completed')} disabled={busy}>Yakunlash</button>}{['pending','confirmed'].includes(booking.status)&&!booking.checked_in_at && <button className="operator-danger" onClick={() => void onUpdate?.(booking, 'cancelled')} disabled={busy}>Joylarni bo‘shatish</button>}</>}</div></article>
 }
 
 function Empty({ icon, title, text }: { icon:ReactNode; title:string; text:string }) { return <div className="operator-empty">{icon}<b>{title}</b><p>{text}</p></div> }
