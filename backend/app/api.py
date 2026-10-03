@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from math import asin, cos, radians, sin, sqrt
 from secrets import token_urlsafe
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -13,7 +13,8 @@ from .models import (Auditorium, Booking, BookingSeat, BookingStatus, EmailOtpCh
 from .schemas import (AuditoriumIn, AuditoriumOut, AuditoriumUpdate, NearbyAuditoriumOut, BookingIn, BookingOut, BookingStatusIn,
                       CatalogSyncOut, CinemaDirectorySyncOut, EmailChallengeOut, EmailCodeVerify, EmailResend, Login, MovieIn, MovieOut, OtpVerifyIn, PasswordResetConfirm, PasswordResetRequest, PaymentStartIn,
                       PaymentStartOut, PaymentVerifyOut, ScreeningIn, ScreeningOut,
-                      ScreeningSeatsOut, SeatOut, Token, UserCreate)
+                      ScreeningSeatsOut, SeatOut, Token, UserCreate, OperatorBookingOut,
+                      OperatorDashboardOut, OperatorMetricsOut, OperatorScreeningOut)
 from .security import current_user, hash_password, make_token, require_roles, verify_password
 from .config import settings
 from .otp import code_hash, code_matches, new_code
@@ -71,6 +72,7 @@ def _auditorium_out(auditorium: Auditorium) -> AuditoriumOut:
     return AuditoriumOut(id=auditorium.id, name=auditorium.name, cinema_name=auditorium.cinema_name,
         city=auditorium.city, address=auditorium.address, timezone=auditorium.timezone,
         formats=auditorium.formats or ["2D"], hall_type=auditorium.hall_type,
+        active=auditorium.active,
         seat_count=len(auditorium.seats), source_name=auditorium.source_name,
         external_cinema_id=auditorium.external_cinema_id, external_hall_id=auditorium.external_hall_id,
         source_url=auditorium.source_url, latitude=auditorium.latitude, longitude=auditorium.longitude,
@@ -92,6 +94,10 @@ def _booking_out(item: Booking) -> BookingOut:
         cinema_name=item.screening.auditorium.cinema_name,
         auditorium_name=item.screening.auditorium.name,
         seats=[f"{x.seat.row_label}{x.seat.seat_number}" for x in item.seat_assignments])
+
+def _operator_booking_out(item: Booking) -> OperatorBookingOut:
+    return OperatorBookingOut(**_booking_out(item).model_dump(),
+        customer_nickname=item.customer.nickname, customer_email=item.customer.email)
 
 @router.post("/auth/register", status_code=201)
 def register(data: UserCreate, db: Session = Depends(get_db)):
@@ -288,6 +294,61 @@ def catalog_sync_status(db: Session = Depends(get_db), _: User = admin):
     latest = db.scalar(sa.select(sa.func.max(Auditorium.last_synced_at)).where(Auditorium.source_name == "cinematica"))
     halls = db.scalar(sa.select(sa.func.count(Auditorium.id)).where(Auditorium.source_name == "cinematica")) or 0
     return {"source": "cinematica", "halls": halls, "last_synced_at": latest}
+
+@router.get("/admin/cinemas", response_model=list[AuditoriumOut])
+def admin_cinemas(db: Session = Depends(get_db), _: User = admin):
+    """All halls, including disabled halls, for the operator workspace."""
+    rows = db.scalars(sa.select(Auditorium).order_by(Auditorium.cinema_name, Auditorium.name)).all()
+    return [_auditorium_out(row) for row in rows]
+
+@router.get("/admin/dashboard", response_model=OperatorDashboardOut)
+def operator_dashboard(day: date = Query(alias="date"), db: Session = Depends(get_db), _: User = admin):
+    """A date-scoped operator view. All metrics come from Parda's owned data."""
+    _expire_holds(db)
+    try:
+        business_zone = ZoneInfo(settings.business_timezone)
+    except ZoneInfoNotFoundError:
+        raise HTTPException(500, "Configured business timezone is invalid")
+    local_start = datetime.combine(day, time.min, tzinfo=business_zone)
+    utc_start = local_start.astimezone(timezone.utc)
+    utc_end = (local_start + timedelta(days=1)).astimezone(timezone.utc)
+    screening_rows = db.scalars(
+        sa.select(Screening).where(Screening.starts_at >= utc_start, Screening.starts_at < utc_end)
+        .order_by(Screening.starts_at)
+    ).all()
+    screening_ids = [row.id for row in screening_rows]
+    booking_rows = [] if not screening_ids else db.scalars(
+        sa.select(Booking).where(Booking.screening_id.in_(screening_ids))
+        .order_by(Booking.created_at.desc())
+    ).all()
+    by_screening: dict[int, list[Booking]] = {screening_id: [] for screening_id in screening_ids}
+    for booking in booking_rows:
+        by_screening.setdefault(booking.screening_id, []).append(booking)
+    now = datetime.now(timezone.utc)
+    dashboard_screenings: list[OperatorScreeningOut] = []
+    seats_sold = 0
+    seats_available = 0
+    confirmed_revenue = 0
+    for screening in screening_rows:
+        base = _screening_out(db, screening)
+        related = by_screening.get(screening.id, [])
+        sold = sum(item.seat_count for item in related if item.status in ACTIVE_STATUSES)
+        revenue = sum((item.total_price for item in related if item.status in (BookingStatus.CONFIRMED, BookingStatus.COMPLETED)), start=0)
+        seats_sold += sold
+        seats_available += base.available_seats
+        confirmed_revenue += revenue
+        dashboard_screenings.append(OperatorScreeningOut(**base.model_dump(), booking_count=len(related),
+            seats_sold=sold, confirmed_revenue=revenue))
+    metrics = OperatorMetricsOut(date=day, screenings=len(screening_rows),
+        upcoming_screenings=sum(1 for row in screening_rows if row.starts_at > now and row.status == "scheduled"),
+        bookings=len(booking_rows),
+        confirmed_bookings=sum(1 for row in booking_rows if row.status == BookingStatus.CONFIRMED),
+        pending_bookings=sum(1 for row in booking_rows if row.status == BookingStatus.PENDING),
+        seats_sold=seats_sold, seats_available=seats_available,
+        confirmed_revenue=confirmed_revenue)
+    db.commit()
+    return OperatorDashboardOut(metrics=metrics, screenings=dashboard_screenings,
+                                bookings=[_operator_booking_out(item) for item in booking_rows])
 
 @router.get("/movies/{movie_id}", response_model=MovieOut)
 def movie_details(movie_id: int, db: Session = Depends(get_db)):

@@ -32,6 +32,7 @@ Parda is an Uzbek-first cinema discovery and seat-booking app. The React/Vite fr
 - [x] Movie-detail cinema, format, language, Standard/VIP, and price filters
 - [x] User-triggered nearest-cinema sorting using verified hall coordinates only
 - [x] Protected catalog sync, sync-status, nearby-hall, and hall-coordinate API endpoints
+- [x] Role-gated cinema operator dashboard for daily session capacity, ticket activity, confirmed revenue, hall inventory, schedule creation, and TMDB catalog refresh
 
 ## Assignment requirement mapping
 
@@ -46,7 +47,7 @@ The original assignment describes appointments. Parda applies the same booking m
 | Pending, confirmed, cancelled, completed | `BookingStatus` supports all four states. A hold starts as pending; a verified demo payment confirms it; customers can cancel eligible tickets; admins complete finished screenings. |
 | No double booking | PostgreSQL row locks plus the partial unique active-seat index return a conflict to competing seat requests. |
 | Backend API, auth, validation, history | FastAPI endpoints are documented at `/docs`; JWT auth, Pydantic validation, email verification, booking history, soft history clearing, and role-gated administration are included. |
-| Timezone, email, dashboard, Docker, docs | `Asia/Tashkent` is stored with halls, Brevo sends OTP email, the admin dashboard manages films/halls/schedule/bookings, Docker Compose and API docs are supplied. |
+| Timezone, email, dashboard, Docker, docs | `Asia/Tashkent` is stored with halls, Brevo sends OTP email, the cinema operator dashboard manages films, halls, schedules, capacity and ticket states, Docker Compose and API docs are supplied. |
 
 ### Edge cases addressed
 
@@ -171,6 +172,8 @@ The site asks for browser location only after the visitor presses **Find cinemas
 | `GET /api/cinemas?city=Tashkent` | Public | Active Parda and imported halls |
 | `GET /api/cinemas/nearby?lat=&lng=` | Public | Halls with verified coordinates, ordered by distance |
 | `PATCH /api/cinemas/{id}` | Admin | Verify address, coordinates, formats, hall type, or disable a hall |
+| `GET /api/admin/dashboard?date=YYYY-MM-DD` | Admin | Date-scoped session occupancy, booking activity, and confirmed-revenue dashboard |
+| `GET /api/admin/cinemas` | Admin | Complete hall inventory, including disabled halls, for the operator workspace |
 | `POST /api/admin/catalog-sync` | Admin | Run the idempotent source hall-directory sync |
 | `GET /api/admin/catalog-sync/status` | Admin | Inspect imported hall count and most recent sync time |
 

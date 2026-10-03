@@ -89,6 +89,7 @@ class AuditoriumOut(BaseModel):
     timezone: str
     formats: list[str] = Field(default_factory=lambda: ["2D"])
     hall_type: Literal["standard", "vip"] = "standard"
+    active: bool = True
     seat_count: int
     source_name: str | None = None
     external_cinema_id: int | None = None
@@ -161,6 +162,31 @@ class BookingOut(BaseModel):
 
 class BookingStatusIn(BaseModel):
     status: BookingStatus
+
+class OperatorMetricsOut(BaseModel):
+    date: date
+    screenings: int
+    upcoming_screenings: int
+    bookings: int
+    confirmed_bookings: int
+    pending_bookings: int
+    seats_sold: int
+    seats_available: int
+    confirmed_revenue: Decimal
+
+class OperatorScreeningOut(ScreeningOut):
+    booking_count: int
+    seats_sold: int
+    confirmed_revenue: Decimal
+
+class OperatorBookingOut(BookingOut):
+    customer_nickname: str
+    customer_email: EmailStr
+
+class OperatorDashboardOut(BaseModel):
+    metrics: OperatorMetricsOut
+    screenings: list[OperatorScreeningOut]
+    bookings: list[OperatorBookingOut]
 
 class PaymentMethod(str, Enum):
     UZCARD = "uzcard"
