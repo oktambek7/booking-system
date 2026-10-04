@@ -34,6 +34,7 @@ Parda is an Uzbek-first cinema discovery and seat-booking app. The React/Vite fr
 - [x] Protected catalog sync, sync-status, nearby-hall, and hall-coordinate API endpoints
 - [x] Role-gated cinema operator dashboard for daily session capacity, ticket activity, confirmed revenue, hall inventory, schedule creation, and TMDB catalog refresh
 - [x] QR e-tickets with opaque server-issued codes and a one-time operator check-in flow
+- [x] Downloadable `.ics` calendar events from e-tickets, compatible with Google Calendar, Apple Calendar, and Outlook
 
 ## Assignment requirement mapping
 

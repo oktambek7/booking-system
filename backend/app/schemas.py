@@ -154,6 +154,7 @@ class BookingOut(BaseModel):
     total_price: Decimal
     hold_expires_at: datetime | None
     created_at: datetime
+    ends_at: datetime
     ticket_code: str | None = None
     checked_in_at: datetime | None = None
     movie_title: str

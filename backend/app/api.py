@@ -91,6 +91,7 @@ def _booking_out(item: Booking) -> BookingOut:
     return BookingOut(id=item.id, customer_id=item.customer_id, screening_id=item.screening_id,
         status=item.status, seat_count=item.seat_count, total_price=item.total_price,
         hold_expires_at=item.hold_expires_at, created_at=item.created_at,
+        ends_at=item.screening.ends_at,
         ticket_code=item.ticket_code, checked_in_at=item.checked_in_at,
         movie_title=item.screening.movie.title, starts_at=item.screening.starts_at,
         cinema_name=item.screening.auditorium.cinema_name,
