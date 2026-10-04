@@ -17,7 +17,7 @@ Parda is an Uzbek-first cinema discovery and seat-booking app. The React/Vite fr
 - [x] Film-first discovery: compact paginated posters, animated current-film carousel, and movie-specific dates/hall filters
 - [x] Background TMDB refresh every 24 hours when a server token is configured
 - [x] Explicit Standard/VIP auditorium types and schedule filtering
-- [x] Seat selection, ten-minute pending holds, booking history, cancellation, and status transitions
+- [x] Seat selection, ten-minute pending holds, booking history, status transitions, and a visible 30-minute customer cancellation policy
 - [x] Customer history clearing for cancelled/completed bookings (soft-archived; audit rows and active bookings are retained)
 - [x] In-app card-form checkout: Uzcard, Humo, Visa, and Mastercard choices, booking summary, email code verification, current expiry validation, resend limits, and no real charge
 - [x] Rolling Parda-owned demo sessions when the managed calendar has no future schedule
@@ -54,7 +54,7 @@ The original assignment describes appointments. Parda applies the same booking m
 
 - A seat hold expires after ten minutes; expiry releases its seat assignments while preserving the audit record.
 - Two customers selecting the same seat are serialized by the database. One booking succeeds, and the other receives HTTP 409 with current availability on refresh.
-- A user cannot book a past screening, choose a seat outside that auditorium, submit duplicate or more than eight seats, or cancel after a screening begins.
+- A user cannot book a past screening, choose a seat outside that auditorium, submit duplicate or more than eight seats, or cancel once the 30-minute pre-screening cutoff is reached. Admins can release an unused future booking while preserving its audit record.
 - A second payment verification attempt cannot confirm someone else’s booking. Codes are hashed, expire, limit attempts, and are rate limited for resend.
 - A paid ticket receives a non-personal, unique `PRD-` code. Check-in accepts it only once, only while the screening entry window is open, and never admits cancelled, pending, or already-used tickets.
 - External discovery data is never the seat source of truth. Cinematica’s read-only programme is cached fresh for five minutes and can serve a bounded stale result for up to 24 hours when its upstream service is temporarily unreachable.

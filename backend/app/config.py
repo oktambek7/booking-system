@@ -4,6 +4,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://booking:booking@localhost:5432/booking"
     jwt_secret: str = "change-me-before-deploying-this-app"
     jwt_expire_minutes: int = 1440
+    cancellation_cutoff_minutes: int = 30
     business_timezone: str = "Asia/Tashkent"
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     tmdb_read_token: str = ""
