@@ -238,12 +238,6 @@ input::placeholder { color:var(--muted)!important; opacity:1; }
   border-color:#9f473b!important;
   background:#9f473b12!important;
 }
-.cancellation-policy {
-  margin:11px 0 0;
-  color:var(--muted);
-  font-size:9px;
-  line-height:1.5;
-}
 :root[data-theme="dark"] .history-card-actions .cancel-booking {
   border-color:#d5847a!important;
   background:#311e26!important;

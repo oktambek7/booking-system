@@ -153,8 +153,6 @@ class BookingOut(BaseModel):
     seat_count: int
     total_price: Decimal
     hold_expires_at: datetime | None
-    cancellation_deadline_at: datetime
-    customer_can_cancel: bool
     created_at: datetime
     ticket_code: str | None = None
     checked_in_at: datetime | None = None

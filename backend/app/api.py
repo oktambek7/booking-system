@@ -33,7 +33,6 @@ PAYMENT_CODE_MAX_ATTEMPTS = 5
 PAYMENT_RESEND_LIMIT = 3
 EMAIL_RESEND_COOLDOWN_SECONDS = 120
 PASSWORD_RESET_CODE_MINUTES = 10
-CANCELLATION_CUTOFF_MINUTES = settings.cancellation_cutoff_minutes
 PASSWORD_RESET_MAX_ATTEMPTS = 5
 PASSWORD_RESET_REQUEST_LIMIT = 3
 def _resend_available_at(now: datetime | None = None) -> datetime:
@@ -89,14 +88,9 @@ def _distance_km(lat: float, lng: float, destination_lat: float, destination_lng
     return round(2 * radius * asin(sqrt(a)), 2)
 
 def _booking_out(item: Booking) -> BookingOut:
-    cancellation_deadline = item.screening.starts_at - timedelta(minutes=CANCELLATION_CUTOFF_MINUTES)
     return BookingOut(id=item.id, customer_id=item.customer_id, screening_id=item.screening_id,
         status=item.status, seat_count=item.seat_count, total_price=item.total_price,
-        hold_expires_at=item.hold_expires_at, cancellation_deadline_at=cancellation_deadline,
-        customer_can_cancel=(item.status in (BookingStatus.PENDING, BookingStatus.CONFIRMED)
-                             and not item.checked_in_at
-                             and datetime.now(timezone.utc) < cancellation_deadline),
-        created_at=item.created_at,
+        hold_expires_at=item.hold_expires_at, created_at=item.created_at,
         ticket_code=item.ticket_code, checked_in_at=item.checked_in_at,
         movie_title=item.screening.movie.title, starts_at=item.screening.starts_at,
         cinema_name=item.screening.auditorium.cinema_name,
@@ -740,15 +734,13 @@ def update_booking_status(booking_id:int,data:BookingStatusIn,db:Session=Depends
         item.ticket_code = item.ticket_code or _new_ticket_code(db)
     if data.status==BookingStatus.COMPLETED and datetime.now(timezone.utc)<item.screening.ends_at:
         raise HTTPException(422,"A screening can only be marked completed after it ends")
-    if data.status==BookingStatus.CANCELLED and user.role==Role.CUSTOMER:
-        deadline = item.screening.starts_at - timedelta(minutes=CANCELLATION_CUTOFF_MINUTES)
-        if datetime.now(timezone.utc) >= deadline:
-            raise HTTPException(422, f"Customer cancellation closes {CANCELLATION_CUTOFF_MINUTES} minutes before the screening")
     if data.status==BookingStatus.CANCELLED and item.checked_in_at:
         raise HTTPException(409,"A checked-in ticket cannot be cancelled")
     item.status=data.status
     if data.status==BookingStatus.CANCELLED:
         for assignment in item.seat_assignments: assignment.active=False
+        if user.role==Role.CUSTOMER and item.screening.ends_at <= datetime.now(timezone.utc):
+            item.archived_by_customer=True
     if data.status!=BookingStatus.PENDING: item.hold_expires_at=None
     db.commit();db.refresh(item)
     return _booking_out(item)
