@@ -156,3 +156,11 @@ def send_waitlist_available_email(address: str, *, movie: str, cinema: str, star
         f"Requested: {seat_count} {seats}\n\n"+
         "This availability alert is sent once for this waitlist request."
     ), tag="parda-waitlist-availability")
+
+
+def send_saved_movie_showtime_email(address: str, *, movie: str, cinema: str, starts_at: str) -> bool:
+    return _send_email(address, f"Showtimes available: {movie}", (
+        f"A Parda Cinema screening is now available for a movie you saved.\n\n"
+        f"Movie: {movie}\nCinema: {cinema}\nDate / time: {starts_at}\n\n"
+        "Open Parda to view seats and book your ticket. This message does not reserve a seat."
+    ), tag="parda-saved-movie-showtime")

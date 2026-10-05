@@ -26,6 +26,7 @@ Parda is an Uzbek-first cinema discovery and seat-booking app. The React/Vite fr
 - [x] Brevo transactional email delivery for signup verification, payment codes, and password resets
 - [x] Booking confirmation emails plus durable 24-hour and 2-hour screening reminders
 - [x] Full-screening waitlist with one-time email availability alerts and self-service withdrawal
+- [x] Persistent saved-film list with one-time first-showtime email alerts
 - [x] Live Cinematica programme discovery with five-minute refreshes and a bounded stale-cache fallback
 - [x] Self-contained card checkout flow for Uzcard, Humo, Visa, and Mastercard with email-code confirmation
 - [x] Customer cancellation, booking-history archival, expiring seat holds, and PostgreSQL protection against competing seat requests
@@ -57,6 +58,7 @@ The original assignment describes appointments. Parda applies the same booking m
 
 - A seat hold expires after ten minutes; expiry releases its seat assignments while preserving the audit record.
 - A visitor can join a full screening’s waitlist for one to eight seats. A later release creates a durable one-time email alert, but never reserves seats or bypasses the normal first-come booking transaction.
+- Saved films are scoped to the signed-in account. Parda queues one durable email when the film first receives a future Parda-managed screening; removing the saved film deletes any unsent alert.
 - Two customers selecting the same seat are serialized by the database. One booking succeeds, and the other receives HTTP 409 with current availability on refresh.
 - A user cannot book a past screening, choose a seat outside that auditorium, submit duplicate or more than eight seats. Customers can cancel any unused ticket; expired tickets are automatically hidden from their history on cancellation while the audit record remains. Admins can release an unused future booking while preserving its audit record.
 - A second payment verification attempt cannot confirm someone else’s booking. Codes are hashed, expire, limit attempts, and are rate limited for resend.
@@ -187,6 +189,7 @@ The site asks for browser location only after the visitor presses **Find cinemas
 | `GET /api/admin/cinemas` | Admin | Complete hall inventory, including disabled halls, for the operator workspace |
 | `POST /api/admin/tickets/check-in` | Admin | Validate a confirmed e-ticket code once during the screening entry window |
 | `POST /api/screenings/{id}/waitlist` | Signed-in customer | Request a one-time email when a full screening has enough seats again |
+| `GET`, `PUT`, `DELETE /api/watchlist` | Signed-in customer | Read, save, or remove personal movies and their showtime alerts |
 | `DELETE /api/screenings/{id}/waitlist` | Signed-in customer | Leave a screening waitlist request |
 | `POST /api/admin/catalog-sync` | Admin | Run the idempotent source hall-directory sync |
 | `GET /api/admin/catalog-sync/status` | Admin | Inspect imported hall count and most recent sync time |

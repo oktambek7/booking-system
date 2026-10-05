@@ -149,6 +149,33 @@ class BookingNotification(Base):
     booking: Mapped[Booking] = relationship()
     __table_args__ = (UniqueConstraint("booking_id", "event_type", name="uq_booking_notification_event"),)
 
+class MovieWatchlist(Base):
+    """A customer's saved movie and its one-time first-showtime email alert."""
+    __tablename__ = "movie_watchlists"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    movie_id: Mapped[int] = mapped_column(ForeignKey("movies.id", ondelete="CASCADE"), index=True)
+    alert_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    user: Mapped[User] = relationship()
+    movie: Mapped[Movie] = relationship()
+    __table_args__ = (UniqueConstraint("user_id", "movie_id", name="uq_movie_watchlist_user_movie"),)
+
+class MovieWatchlistNotification(Base):
+    """A durable first-available-showtime message for a saved movie."""
+    __tablename__ = "movie_watchlist_notifications"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    watchlist_id: Mapped[int] = mapped_column(ForeignKey("movie_watchlists.id", ondelete="CASCADE"), index=True)
+    screening_id: Mapped[int] = mapped_column(ForeignKey("screenings.id", ondelete="CASCADE"), index=True)
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    last_error: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    watchlist: Mapped[MovieWatchlist] = relationship()
+    screening: Mapped[Screening] = relationship()
+    __table_args__ = (UniqueConstraint("watchlist_id", name="uq_movie_watchlist_first_notice"),)
+
 class WaitlistEntry(Base):
     """A customer asks to be notified if a full screening regains enough seats."""
     __tablename__ = "screening_waitlist"

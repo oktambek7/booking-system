@@ -145,6 +145,16 @@ class BookingIn(BaseModel):
     screening_id: int
     seat_ids: list[int] = Field(min_length=1, max_length=8)
 
+class WatchlistMovieOut(BaseModel):
+    movie_id: int
+    title: str
+    poster_url: str
+    age_rating: str
+    catalog_status: str
+    release_date: date | None = None
+    alert_sent_at: datetime | None = None
+    created_at: datetime
+
 class WaitlistIn(BaseModel):
     seat_count: int = Field(default=1, ge=1, le=8)
 

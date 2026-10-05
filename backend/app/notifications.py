@@ -10,9 +10,9 @@ from sqlalchemy.exc import IntegrityError
 from .config import settings
 from .database import SessionLocal
 from .mail import (EmailDeliveryError, send_booking_confirmation_email, send_screening_reminder_email,
-                   send_waitlist_available_email)
+                   send_waitlist_available_email, send_saved_movie_showtime_email)
 from .models import (Booking, BookingNotification, BookingSeat, BookingStatus, Seat,
-                     WaitlistEntry, WaitlistNotification)
+                     WaitlistEntry, WaitlistNotification, MovieWatchlist, MovieWatchlistNotification, Screening)
 
 logger = logging.getLogger(__name__)
 
@@ -178,5 +178,72 @@ def deliver_due_waitlist_notifications(limit: int = 50) -> int:
                 notice.last_error = str(exc)[:300]
                 notice.due_at = now + timedelta(minutes=settings.notification_retry_minutes)
                 logger.warning("Parda waitlist notification retry scheduled: entry=%s", entry.id)
+        db.commit()
+    return delivered
+
+
+def queue_saved_movie_notifications() -> int:
+    """Queue an email for each saved movie's first future Parda screening."""
+    now = datetime.now(timezone.utc)
+    queued = 0
+    with SessionLocal() as db:
+        watchlists = db.scalars(sa.select(MovieWatchlist).where(
+            MovieWatchlist.alert_sent_at.is_(None)
+        )).all()
+        for watch in watchlists:
+            screening = db.scalar(sa.select(Screening).where(
+                Screening.movie_id == watch.movie_id,
+                Screening.status == "scheduled",
+                Screening.starts_at > now,
+            ).order_by(Screening.starts_at))
+            if not screening:
+                continue
+            existing = db.scalar(sa.select(MovieWatchlistNotification.id).where(
+                MovieWatchlistNotification.watchlist_id == watch.id))
+            if existing:
+                continue
+            db.add(MovieWatchlistNotification(watchlist_id=watch.id, screening_id=screening.id, due_at=now))
+            queued += 1
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+    return queued
+
+
+def deliver_due_saved_movie_notifications(limit: int = 50) -> int:
+    now = datetime.now(timezone.utc)
+    delivered = 0
+    with SessionLocal() as db:
+        ids = db.scalars(sa.select(MovieWatchlistNotification.id).where(
+            MovieWatchlistNotification.sent_at.is_(None), MovieWatchlistNotification.due_at <= now
+        ).order_by(MovieWatchlistNotification.due_at).limit(limit)).all()
+        for notice_id in ids:
+            notice = db.scalar(sa.select(MovieWatchlistNotification).where(
+                MovieWatchlistNotification.id == notice_id).with_for_update())
+            if not notice or notice.sent_at or notice.due_at > now:
+                continue
+            watch = db.scalar(sa.select(MovieWatchlist).where(
+                MovieWatchlist.id == notice.watchlist_id).with_for_update())
+            screening = db.get(Screening, notice.screening_id)
+            if not watch or not screening or screening.status != "scheduled" or screening.starts_at <= now:
+                notice.sent_at = now
+                notice.last_error = "Skipped because no future screening remains"
+                continue
+            try:
+                starts_at = screening.starts_at.astimezone(ZoneInfo(settings.business_timezone))
+                send_saved_movie_showtime_email(watch.user.email,
+                    movie=watch.movie.title,
+                    cinema=f"{screening.auditorium.cinema_name} · {screening.auditorium.name}",
+                    starts_at=starts_at.strftime("%d %b %Y, %H:%M"))
+                watch.alert_sent_at = now
+                notice.sent_at = now
+                notice.last_error = None
+                delivered += 1
+            except EmailDeliveryError as exc:
+                notice.attempts += 1
+                notice.last_error = str(exc)[:300]
+                notice.due_at = now + timedelta(minutes=settings.notification_retry_minutes)
+                logger.warning("Parda saved-movie notification retry scheduled: watchlist=%s", watch.id)
         db.commit()
     return delivered

@@ -9,13 +9,13 @@ from sqlalchemy.orm import Session
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from .database import get_db
 from .models import (Auditorium, Booking, BookingSeat, BookingStatus, EmailOtpChallenge, Movie,
-                     PasswordResetChallenge, Payment, PaymentEmailChallenge, Role, Screening, Seat, User, WaitlistEntry)
+                     PasswordResetChallenge, Payment, PaymentEmailChallenge, Role, Screening, Seat, User, WaitlistEntry, MovieWatchlist)
 from .schemas import (AuditoriumIn, AuditoriumOut, AuditoriumUpdate, NearbyAuditoriumOut, BookingIn, BookingOut, BookingStatusIn,
                       CatalogSyncOut, CinemaDirectorySyncOut, EmailChallengeOut, EmailCodeVerify, EmailResend, Login, MovieIn, MovieOut, OtpVerifyIn, PasswordResetConfirm, PasswordResetRequest, PaymentStartIn,
                       PaymentStartOut, PaymentVerifyOut, ScreeningIn, ScreeningOut,
                       ScreeningSeatsOut, SeatOut, Token, UserCreate, OperatorBookingOut,
                       OperatorDashboardOut, OperatorMetricsOut, OperatorScreeningOut,
-                      TicketCheckInIn, TicketCheckInOut, WaitlistIn, WaitlistOut)
+                      TicketCheckInIn, TicketCheckInOut, WaitlistIn, WaitlistOut, WatchlistMovieOut)
 from .security import current_user, hash_password, make_token, require_roles, verify_password
 from .config import settings
 from .otp import code_hash, code_matches, new_code
@@ -293,6 +293,47 @@ def movies(category: str | None = Query(default=None, pattern=r"^(now_playing|up
     q=sa.select(Movie).where(Movie.active.is_(True))
     if category: q=q.where(Movie.catalog_status==category)
     return db.scalars(q.order_by(Movie.release_date, Movie.title)).all()
+
+def _watchlist_out(item: MovieWatchlist) -> WatchlistMovieOut:
+    return WatchlistMovieOut(movie_id=item.movie_id, title=item.movie.title,
+        poster_url=item.movie.poster_url, age_rating=item.movie.age_rating,
+        catalog_status=item.movie.catalog_status, release_date=item.movie.release_date,
+        alert_sent_at=item.alert_sent_at, created_at=item.created_at)
+
+@router.get("/watchlist", response_model=list[WatchlistMovieOut])
+def movie_watchlist(db: Session = Depends(get_db), user: User = Depends(current_user)):
+    items = db.scalars(sa.select(MovieWatchlist).where(MovieWatchlist.user_id == user.id)
+        .order_by(MovieWatchlist.created_at.desc())).all()
+    return [_watchlist_out(item) for item in items]
+
+@router.put("/watchlist/{movie_id}", response_model=WatchlistMovieOut)
+def save_movie(movie_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    movie = db.get(Movie, movie_id)
+    if not movie or not movie.active:
+        raise HTTPException(404, "Movie not found")
+    item = db.scalar(sa.select(MovieWatchlist).where(MovieWatchlist.user_id == user.id,
+        MovieWatchlist.movie_id == movie_id).with_for_update())
+    if not item:
+        item = MovieWatchlist(user_id=user.id, movie_id=movie_id)
+        db.add(item)
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            item = db.scalar(sa.select(MovieWatchlist).where(MovieWatchlist.user_id == user.id,
+                MovieWatchlist.movie_id == movie_id))
+    db.refresh(item)
+    return _watchlist_out(item)
+
+@router.delete("/watchlist/{movie_id}")
+def remove_saved_movie(movie_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    item = db.scalar(sa.select(MovieWatchlist).where(MovieWatchlist.user_id == user.id,
+        MovieWatchlist.movie_id == movie_id).with_for_update())
+    if not item:
+        raise HTTPException(404, "Saved movie not found")
+    db.delete(item)
+    db.commit()
+    return {"removed": True}
 
 @router.post("/catalog/sync", response_model=CatalogSyncOut)
 def sync_movie_catalog(db: Session = Depends(get_db), _: User = admin):
