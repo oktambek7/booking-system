@@ -42,6 +42,7 @@ class Movie(Base):
     poster_url: Mapped[str] = mapped_column(String(800), default="")
     backdrop_url: Mapped[str] = mapped_column(String(800), default="")
     tmdb_id: Mapped[int | None] = mapped_column(Integer, unique=True, index=True)
+    cinematica_id: Mapped[int | None] = mapped_column(Integer, index=True)
     release_date: Mapped[date | None] = mapped_column(Date)
     vote_average: Mapped[Decimal | None] = mapped_column(Numeric(3, 1))
     cast_names: Mapped[list[str]] = mapped_column(JSON, default=list)

@@ -20,7 +20,7 @@ from .security import current_user, hash_password, make_token, require_roles, ve
 from .config import settings
 from .otp import code_hash, code_matches, new_code
 from .tmdb import TMDBUnavailable, sync_catalog
-from .cinematica import sync_active_cinematica_halls
+from .cinematica import _source_movie, sync_active_cinematica_halls
 from .mail import (EmailDeliveryError, email_code_hash, email_code_matches, send_email_code,
                    send_password_reset_email, send_payment_verification_email)
 from .notifications import (deliver_due_notifications, deliver_due_waitlist_notifications,
@@ -295,7 +295,7 @@ def movies(category: str | None = Query(default=None, pattern=r"^(now_playing|up
     return db.scalars(q.order_by(Movie.release_date, Movie.title)).all()
 
 def _watchlist_out(item: MovieWatchlist) -> WatchlistMovieOut:
-    return WatchlistMovieOut(movie_id=item.movie_id, title=item.movie.title,
+    return WatchlistMovieOut(movie_id=item.movie.cinematica_id or item.movie_id, title=item.movie.title,
         poster_url=item.movie.poster_url, age_rating=item.movie.age_rating,
         catalog_status=item.movie.catalog_status, release_date=item.movie.release_date,
         alert_sent_at=item.alert_sent_at, created_at=item.created_at)
@@ -306,29 +306,48 @@ def movie_watchlist(db: Session = Depends(get_db), user: User = Depends(current_
         .order_by(MovieWatchlist.created_at.desc())).all()
     return [_watchlist_out(item) for item in items]
 
+def _watchlist_catalog_movie(movie_id: int, db: Session) -> Movie:
+    """Resolve Cinematica's public ID to Parda's durable movie record."""
+    movie = db.scalar(sa.select(Movie).where(Movie.cinematica_id == movie_id))
+    if movie:
+        return movie
+    source = _source_movie(movie_id)
+    movie = Movie(cinematica_id=movie_id, title=source["title"],
+        synopsis="Saved from the live Cinematica catalogue.", duration_minutes=120,
+        genre="Cinema", age_rating=source["age_rating"], language=source["language"],
+        poster_url=source["poster_url"] or "", release_date=date.fromisoformat(source["release_date"])
+        if source["release_date"] else None, catalog_status=source["catalog_status"], active=True)
+    db.add(movie)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        movie = db.scalar(sa.select(Movie).where(Movie.cinematica_id == movie_id))
+        if not movie:
+            raise
+    return movie
+
 @router.put("/watchlist/{movie_id}", response_model=WatchlistMovieOut)
 def save_movie(movie_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
-    movie = db.get(Movie, movie_id)
-    if not movie or not movie.active:
-        raise HTTPException(404, "Movie not found")
+    movie = _watchlist_catalog_movie(movie_id, db)
     item = db.scalar(sa.select(MovieWatchlist).where(MovieWatchlist.user_id == user.id,
-        MovieWatchlist.movie_id == movie_id).with_for_update())
+        MovieWatchlist.movie_id == movie.id).with_for_update())
     if not item:
-        item = MovieWatchlist(user_id=user.id, movie_id=movie_id)
+        item = MovieWatchlist(user_id=user.id, movie_id=movie.id)
         db.add(item)
         try:
             db.commit()
         except IntegrityError:
             db.rollback()
             item = db.scalar(sa.select(MovieWatchlist).where(MovieWatchlist.user_id == user.id,
-                MovieWatchlist.movie_id == movie_id))
+                MovieWatchlist.movie_id == movie.id))
     db.refresh(item)
     return _watchlist_out(item)
 
 @router.delete("/watchlist/{movie_id}")
 def remove_saved_movie(movie_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
-    item = db.scalar(sa.select(MovieWatchlist).where(MovieWatchlist.user_id == user.id,
-        MovieWatchlist.movie_id == movie_id).with_for_update())
+    item = db.scalar(sa.select(MovieWatchlist).join(Movie).where(MovieWatchlist.user_id == user.id,
+        (Movie.cinematica_id == movie_id) | ((Movie.cinematica_id.is_(None)) & (Movie.id == movie_id))).with_for_update())
     if not item:
         raise HTTPException(404, "Saved movie not found")
     db.delete(item)
