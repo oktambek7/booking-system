@@ -145,3 +145,14 @@ def send_screening_reminder_email(address: str, *, movie: str, cinema: str, star
         f"Seats: {seats}\nTicket code: {ticket_code}\n\n"
         "Please arrive early and show your QR ticket or ticket code at entry."
     ), tag="parda-screening-reminder")
+
+
+def send_waitlist_available_email(address: str, *, movie: str, cinema: str, starts_at: str, seat_count: int) -> bool:
+    seats = "seat" if seat_count == 1 else "seats"
+    return _send_email(address, f"Seats may be available: {movie}", (
+        "A previously full Parda Cinema screening may have seats available again. "+
+        "Availability is live and is not reserved, so return to Parda to select your seats.\n\n"+
+        f"Movie: {movie}\nCinema: {cinema}\nDate / time: {starts_at}\n"+
+        f"Requested: {seat_count} {seats}\n\n"+
+        "This availability alert is sent once for this waitlist request."
+    ), tag="parda-waitlist-availability")

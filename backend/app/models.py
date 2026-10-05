@@ -149,6 +149,35 @@ class BookingNotification(Base):
     booking: Mapped[Booking] = relationship()
     __table_args__ = (UniqueConstraint("booking_id", "event_type", name="uq_booking_notification_event"),)
 
+class WaitlistEntry(Base):
+    """A customer asks to be notified if a full screening regains enough seats."""
+    __tablename__ = "screening_waitlist"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    screening_id: Mapped[int] = mapped_column(ForeignKey("screenings.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    seat_count: Mapped[int] = mapped_column(Integer, default=1)
+    status: Mapped[str] = mapped_column(String(20), default="waiting", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    user: Mapped[User] = relationship()
+    screening: Mapped[Screening] = relationship()
+    __table_args__ = (
+        UniqueConstraint("screening_id", "user_id", name="uq_waitlist_screening_user"),
+        CheckConstraint("seat_count BETWEEN 1 AND 8", name="ck_waitlist_seat_count"),
+    )
+
+class WaitlistNotification(Base):
+    """Durable one-time availability alert for a waitlist entry."""
+    __tablename__ = "waitlist_notifications"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    waitlist_entry_id: Mapped[int] = mapped_column(ForeignKey("screening_waitlist.id", ondelete="CASCADE"), index=True)
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    last_error: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    waitlist_entry: Mapped[WaitlistEntry] = relationship()
+    __table_args__ = (UniqueConstraint("waitlist_entry_id", name="uq_waitlist_availability_notice"),)
+
 class BookingSeat(Base):
     __tablename__ = "booking_seats"
     id: Mapped[int] = mapped_column(primary_key=True)

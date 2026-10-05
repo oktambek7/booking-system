@@ -9,13 +9,13 @@ from sqlalchemy.orm import Session
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from .database import get_db
 from .models import (Auditorium, Booking, BookingSeat, BookingStatus, EmailOtpChallenge, Movie,
-                     PasswordResetChallenge, Payment, PaymentEmailChallenge, Role, Screening, Seat, User)
+                     PasswordResetChallenge, Payment, PaymentEmailChallenge, Role, Screening, Seat, User, WaitlistEntry)
 from .schemas import (AuditoriumIn, AuditoriumOut, AuditoriumUpdate, NearbyAuditoriumOut, BookingIn, BookingOut, BookingStatusIn,
                       CatalogSyncOut, CinemaDirectorySyncOut, EmailChallengeOut, EmailCodeVerify, EmailResend, Login, MovieIn, MovieOut, OtpVerifyIn, PasswordResetConfirm, PasswordResetRequest, PaymentStartIn,
                       PaymentStartOut, PaymentVerifyOut, ScreeningIn, ScreeningOut,
                       ScreeningSeatsOut, SeatOut, Token, UserCreate, OperatorBookingOut,
                       OperatorDashboardOut, OperatorMetricsOut, OperatorScreeningOut,
-                      TicketCheckInIn, TicketCheckInOut)
+                      TicketCheckInIn, TicketCheckInOut, WaitlistIn, WaitlistOut)
 from .security import current_user, hash_password, make_token, require_roles, verify_password
 from .config import settings
 from .otp import code_hash, code_matches, new_code
@@ -23,7 +23,8 @@ from .tmdb import TMDBUnavailable, sync_catalog
 from .cinematica import sync_active_cinematica_halls
 from .mail import (EmailDeliveryError, email_code_hash, email_code_matches, send_email_code,
                    send_password_reset_email, send_payment_verification_email)
-from .notifications import deliver_due_notifications, schedule_booking_notifications
+from .notifications import (deliver_due_notifications, deliver_due_waitlist_notifications,
+                            queue_waitlist_notifications, schedule_booking_notifications)
 
 router = APIRouter(prefix="/api")
 admin = Depends(require_roles(Role.ADMIN))
@@ -500,6 +501,43 @@ def screening_seats(screening_id:int,db:Session=Depends(get_db)):
         price=screening.base_price+(screening.premium_surcharge if s.seat_type=="premium" else 0),
         available=s.id not in occupied) for s in seats])
 
+@router.post("/screenings/{screening_id}/waitlist", response_model=WaitlistOut)
+def join_waitlist(screening_id: int, data: WaitlistIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """Join one screening's waitlist only after it is full; entries are one per customer."""
+    _expire_holds(db)
+    screening = db.get(Screening, screening_id)
+    if not screening or screening.status != "scheduled":
+        raise HTTPException(404, "Screening not found")
+    if screening.starts_at <= datetime.now(timezone.utc):
+        raise HTTPException(410, "This screening has already started")
+    available = _screening_out(db, screening).available_seats
+    if available:
+        db.commit()
+        raise HTTPException(409, "Seats are available now. Choose seats directly instead")
+    entry = db.scalar(sa.select(WaitlistEntry).where(
+        WaitlistEntry.screening_id == screening.id, WaitlistEntry.user_id == user.id).with_for_update())
+    if entry:
+        entry.seat_count = data.seat_count
+    else:
+        entry = WaitlistEntry(screening_id=screening.id, user_id=user.id, seat_count=data.seat_count)
+        db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return WaitlistOut(screening_id=entry.screening_id, seat_count=entry.seat_count,
+                       status=entry.status, created_at=entry.created_at)
+
+
+@router.delete("/screenings/{screening_id}/waitlist")
+def leave_waitlist(screening_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    entry = db.scalar(sa.select(WaitlistEntry).where(
+        WaitlistEntry.screening_id == screening_id, WaitlistEntry.user_id == user.id).with_for_update())
+    if not entry:
+        raise HTTPException(404, "Waitlist entry not found")
+    db.delete(entry)
+    db.commit()
+    return {"removed": True}
+
+
 @router.post("/bookings",response_model=BookingOut,status_code=201)
 def create_booking(data:BookingIn,db:Session=Depends(get_db),user:User=Depends(current_user)):
     if len(data.seat_ids)!=len(set(data.seat_ids)):
@@ -517,6 +555,9 @@ def create_booking(data:BookingIn,db:Session=Depends(get_db),user:User=Depends(c
         BookingSeat.active.is_(True),Booking.status.in_(ACTIVE_STATUSES))).all())
     if taken:
         db.rollback(); raise HTTPException(409,"One or more selected seats were just taken. Please choose again")
+    # A user who obtains a seat should no longer receive a stale availability alert.
+    db.execute(sa.delete(WaitlistEntry).where(WaitlistEntry.screening_id == screening.id,
+                                               WaitlistEntry.user_id == user.id))
     booking=Booking(customer_id=user.id,screening_id=screening.id,status=BookingStatus.PENDING,
         seat_count=len(seats),total_price=sum((screening.base_price+(screening.premium_surcharge if s.seat_type=="premium" else 0) for s in seats)),
         hold_expires_at=datetime.now(timezone.utc)+timedelta(minutes=HOLD_MINUTES))
@@ -722,7 +763,7 @@ def check_in_ticket(data: TicketCheckInIn, db: Session = Depends(get_db), _: Use
     return TicketCheckInOut(booking=_booking_out(item), checked_in_at=item.checked_in_at)
 
 @router.patch("/bookings/{booking_id}/status",response_model=BookingOut)
-def update_booking_status(booking_id:int,data:BookingStatusIn,db:Session=Depends(get_db),user:User=Depends(current_user)):
+def update_booking_status(booking_id:int,data:BookingStatusIn,background_tasks:BackgroundTasks,db:Session=Depends(get_db),user:User=Depends(current_user)):
     item=db.get(Booking,booking_id)
     if not item: raise HTTPException(404,"Booking not found")
     if user.role==Role.CUSTOMER:
@@ -749,4 +790,7 @@ def update_booking_status(booking_id:int,data:BookingStatusIn,db:Session=Depends
             item.archived_by_customer=True
     if data.status!=BookingStatus.PENDING: item.hold_expires_at=None
     db.commit();db.refresh(item)
+    if data.status == BookingStatus.CANCELLED:
+        background_tasks.add_task(queue_waitlist_notifications)
+        background_tasks.add_task(deliver_due_waitlist_notifications)
     return _booking_out(item)

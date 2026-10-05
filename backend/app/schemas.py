@@ -145,6 +145,16 @@ class BookingIn(BaseModel):
     screening_id: int
     seat_ids: list[int] = Field(min_length=1, max_length=8)
 
+class WaitlistIn(BaseModel):
+    seat_count: int = Field(default=1, ge=1, le=8)
+
+class WaitlistOut(BaseModel):
+    screening_id: int
+    seat_count: int
+    status: Literal["waiting", "notified"]
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
 class BookingOut(BaseModel):
     id: int
     customer_id: int
