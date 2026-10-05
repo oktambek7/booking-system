@@ -7,7 +7,7 @@ type Lang = 'uz' | 'en' | 'ru'
 type Screening = {id:number; movie_title:string; starts_at:string; cinema_name:string; auditorium_name:string; available_seats:number; format_type:string; hall_type:'standard'|'vip'; base_price:number|string}
 type SourceShow = {id:number; date:string; time:string; cinema_name:string; hall_name:string; hall_type:'standard'|'vip'; format_type:string; price:string|number|null; source_name?:'cinematica'|'ticketon'}
 type Seat = {id:number; row_label:string; seat_number:number; seat_type:string; price:number|string; available:boolean}
-type Booking = {id:number; status:string; total_price:number|string; movie_title:string; starts_at:string; cinema_name:string; auditorium_name:string; seats:string[]; seat_count:number; hold_expires_at:string|null}
+type Booking = {id:number; status:string; total_price:number|string; movie_title:string; starts_at:string; cinema_name:string; auditorium_name:string; seats:string[]; seat_count:number; hold_expires_at:string|null; hold_seconds_remaining:number|null}
 type Payment = {payment_id:number; reference:string; method:string; card_last4:string; email_masked:string; amount:number|string; expires_at:string; resend_available_at?:string|null; demo_mode:boolean; status?:string}
 
 const text = {
@@ -32,11 +32,13 @@ const expiryIsCurrentOrFuture = (value:string) => {
 }
 const formatExpiry = (value:string) => {const d=normalizeDigits(value).slice(0,4);return d.length>2?`${d.slice(0,2)} / ${d.slice(2)}`:d}
 
-function useHoldCountdown(expiresAt:string|null){
+function useHoldCountdown(expiresAt:string|null,initialSeconds:number|null){
  const [now,setNow]=useState(Date.now())
- const expiry=expiresAt?Date.parse(expiresAt):NaN
- const secondsLeft=Number.isFinite(expiry)?Math.max(0,Math.ceil((expiry-now)/1000)):0
- useEffect(()=>{setNow(Date.now());if(!expiresAt)return;const timer=window.setInterval(()=>setNow(Date.now()),1000);return()=>window.clearInterval(timer)},[expiresAt])
+ const [start,setStart]=useState(now)
+ useEffect(()=>{const current=Date.now();setStart(current);setNow(current)},[expiresAt,initialSeconds])
+ const elapsed=Math.floor((now-start)/1000)
+ const secondsLeft=expiresAt?Math.max(0,(initialSeconds??0)-elapsed):0
+ useEffect(()=>{if(!expiresAt)return;const timer=window.setInterval(()=>setNow(Date.now()),1000);return()=>window.clearInterval(timer)},[expiresAt])
  return {expired:Boolean(expiresAt)&&secondsLeft===0,label:`${Math.floor(secondsLeft/60)}:${String(secondsLeft%60).padStart(2,'0')}`}
 }
 
@@ -48,7 +50,7 @@ export default function PardaBooking({api, token, lang, onSignIn, onConfirmed, o
  const [screening,setScreening]=useState<Screening|null>(null),[seats,setSeats]=useState<Seat[]>([]),[selected,setSelected]=useState<number[]>([])
  const [booking,setBooking]=useState<Booking|null>(null),[payment,setPayment]=useState<Payment|null>(null),[method,setMethod]=useState<Method>('uzcard'),[card,setCard]=useState(''),[holder,setHolder]=useState(''),[expiry,setExpiry]=useState(''),[cvv,setCvv]=useState(''),[code,setCode]=useState(''),[busy,setBusy]=useState(false)
  const paymentCooldown=useResendCountdown()
- const hold=useHoldCountdown(booking?.hold_expires_at||null)
+ const hold=useHoldCountdown(booking?.hold_expires_at||null,booking?.hold_seconds_remaining??null)
  useEffect(()=>{let active=true;setResolving(true);setError('');setScreening(null);setSeats([]);const sourcePath=sourceShow.source_name==='ticketon'?`ticketon/${Math.abs(sourceShow.id)}`:`screenings/${sourceShow.id}`;fetch(`${api}/api/cinematica/movies/${movieId}/${sourcePath}/ticketing`,{method:'POST'}).then(async response=>{const data=await response.json();if(!response.ok)throw Error(data.detail||t('error'));return data}).then(async(item:Screening)=>{const response=await fetch(`${api}/api/screenings/${item.id}/seats`);const data=await response.json();if(!response.ok)throw Error(data.detail||t('error'));if(active){setScreening(item);setSeats(data.seats)}}).catch(err=>active&&setError(err instanceof Error?err.message:t('error'))).finally(()=>active&&setResolving(false));return()=>{active=false}},[api,movieId,sourceShow.id,sourceShow.source_name,lang])
  const chosenSeats=seats.filter(seat=>selected.includes(seat.id))
  const chosenTotal=chosenSeats.reduce((total,seat)=>total+Number(seat.price),0)

@@ -153,6 +153,7 @@ class BookingOut(BaseModel):
     seat_count: int
     total_price: Decimal
     hold_expires_at: datetime | None
+    hold_seconds_remaining: int | None
     created_at: datetime
     ends_at: datetime
     ticket_code: str | None = None

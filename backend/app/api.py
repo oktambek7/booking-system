@@ -1,5 +1,5 @@
 from datetime import date, datetime, time, timedelta, timezone
-from math import asin, cos, radians, sin, sqrt
+from math import asin, ceil, cos, radians, sin, sqrt
 from secrets import choice, token_urlsafe
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import sqlalchemy as sa
@@ -88,9 +88,11 @@ def _distance_km(lat: float, lng: float, destination_lat: float, destination_lng
     return round(2 * radius * asin(sqrt(a)), 2)
 
 def _booking_out(item: Booking) -> BookingOut:
+    now = datetime.now(timezone.utc)
+    hold_seconds_remaining = None if not item.hold_expires_at else max(0, ceil((item.hold_expires_at - now).total_seconds()))
     return BookingOut(id=item.id, customer_id=item.customer_id, screening_id=item.screening_id,
         status=item.status, seat_count=item.seat_count, total_price=item.total_price,
-        hold_expires_at=item.hold_expires_at, created_at=item.created_at,
+        hold_expires_at=item.hold_expires_at, hold_seconds_remaining=hold_seconds_remaining, created_at=item.created_at,
         ends_at=item.screening.ends_at,
         ticket_code=item.ticket_code, checked_in_at=item.checked_in_at,
         movie_title=item.screening.movie.title, starts_at=item.screening.starts_at,
