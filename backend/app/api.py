@@ -6,7 +6,7 @@ import sqlalchemy as sa
 from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from .database import get_db
 from .models import (Auditorium, Booking, BookingSeat, BookingStatus, EmailOtpChallenge, Movie,
                      PasswordResetChallenge, Payment, PaymentEmailChallenge, Role, Screening, Seat, User)
@@ -23,6 +23,7 @@ from .tmdb import TMDBUnavailable, sync_catalog
 from .cinematica import sync_active_cinematica_halls
 from .mail import (EmailDeliveryError, email_code_hash, email_code_matches, send_email_code,
                    send_password_reset_email, send_payment_verification_email)
+from .notifications import deliver_due_notifications, schedule_booking_notifications
 
 router = APIRouter(prefix="/api")
 admin = Depends(require_roles(Role.ADMIN))
@@ -651,7 +652,7 @@ def resend_payment_code(payment_id: int, db: Session = Depends(get_db), user: Us
     return _send_payment_code(payment, booking, user, db)
 
 @router.post("/payments/{payment_id}/verify",response_model=PaymentVerifyOut)
-def verify_payment(payment_id:int,data:OtpVerifyIn,db:Session=Depends(get_db),user:User=Depends(current_user)):
+def verify_payment(payment_id:int,data:OtpVerifyIn,background_tasks:BackgroundTasks,db:Session=Depends(get_db),user:User=Depends(current_user)):
     payment=db.scalar(sa.select(Payment).where(Payment.id==payment_id).with_for_update())
     if not payment: raise HTTPException(404,"Payment attempt not found")
     booking=_owned_pending_booking(payment.booking_id,db,user,lock=True)
@@ -673,7 +674,9 @@ def verify_payment(payment_id:int,data:OtpVerifyIn,db:Session=Depends(get_db),us
     payment.status="succeeded_demo"
     booking.status=BookingStatus.CONFIRMED;booking.hold_expires_at=None
     booking.ticket_code = booking.ticket_code or _new_ticket_code(db)
+    schedule_booking_notifications(db, booking, now=now)
     db.commit();db.refresh(booking)
+    background_tasks.add_task(deliver_due_notifications)
     return PaymentVerifyOut(payment_id=payment.id,reference=payment.reference,status=payment.status,booking=_booking_out(booking))
 
 @router.get("/bookings",response_model=list[BookingOut])

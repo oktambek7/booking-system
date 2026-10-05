@@ -98,6 +98,13 @@
 .carousel-content{position:absolute;z-index:3;top:0;bottom:0;left:clamp(28px,7vw,104px);width:min(58%,650px);max-width:none;padding:56px 0 44px;display:flex;flex-direction:column;align-items:flex-start}
 .carousel-content h1{height:2.94em;min-height:2.94em;max-height:2.94em;margin:18px 0;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3}
 .carousel-meta{min-height:24px}.carousel-controls{margin-top:auto}.carousel-controls button:disabled{cursor:default;opacity:.56}
+.carousel-controls{display:grid;grid-template-columns:42px auto 42px;gap:10px;align-items:center;min-height:44px;padding:4px 0;color:var(--muted);font-size:11px;font-weight:720;letter-spacing:.06em}
+.carousel-controls button{display:grid;width:42px;height:42px;place-items:center;margin:0;padding:0;border:1px solid color-mix(in srgb,var(--line) 86%,transparent);border-radius:50%;background:color-mix(in srgb,var(--white) 92%,transparent);color:var(--ink);box-shadow:0 2px 8px color-mix(in srgb,var(--ink) 8%,transparent);transition:transform .18s ease,background .18s ease,border-color .18s ease,color .18s ease,box-shadow .18s ease}
+.carousel-controls button svg{width:19px;height:19px;stroke-width:2.25}
+.carousel-controls button:hover:not(:disabled){transform:translateY(-1px);border-color:var(--accent);background:var(--accent-soft);color:var(--accent-strong);box-shadow:0 8px 16px color-mix(in srgb,var(--ink) 13%,transparent)}
+.carousel-controls button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.carousel-controls span{min-width:48px;text-align:center;line-height:1}
+@media(max-width:480px){.carousel-controls{grid-template-columns:38px auto 38px;gap:8px;min-height:40px}.carousel-controls button{width:38px;height:38px}.carousel-controls button svg{width:18px;height:18px}}
 .carousel-moving.carousel-forward .carousel-active .carousel-backdrop{animation:carousel-backdrop-in-forward 820ms cubic-bezier(.22,.72,.2,1) both}
 .carousel-moving.carousel-backward .carousel-active .carousel-backdrop{animation:carousel-backdrop-in-backward 820ms cubic-bezier(.22,.72,.2,1) both}
 .carousel-moving.carousel-forward .carousel-active .carousel-poster{animation:carousel-poster-in-forward 820ms cubic-bezier(.18,.78,.2,1) both}

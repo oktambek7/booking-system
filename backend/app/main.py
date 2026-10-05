@@ -11,6 +11,7 @@ from .cinematica import router as cinematica_router, sync_active_cinematica_hall
 from .config import settings
 from .database import Base, SessionLocal, engine
 from .models import Role, User
+from .notifications import deliver_due_notifications, schedule_missing_reminders
 from .security import hash_password
 from .seed_demo import ensure_current_demo_schedule
 from .tmdb import TMDBUnavailable, sync_catalog
@@ -37,6 +38,17 @@ async def _tmdb_refresh_loop() -> None:
             logger.exception("Unexpected TMDB catalog refresh error")
         await asyncio.sleep(max(1, settings.tmdb_sync_interval_hours) * 60 * 60)
 
+async def _booking_notification_loop() -> None:
+    while True:
+        try:
+            await asyncio.to_thread(schedule_missing_reminders)
+            delivered = await asyncio.to_thread(deliver_due_notifications)
+            if delivered:
+                logger.info("Delivered %s customer booking notifications", delivered)
+        except Exception:
+            logger.exception("Booking notification delivery failed")
+        await asyncio.sleep(max(30, settings.notification_poll_seconds))
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
@@ -45,7 +57,7 @@ async def lifespan(app: FastAPI):
         # Apply only additive schema migrations here. 001_cinema_constraints.sql
         # contains a PL/pgSQL DO block and must not be split on semicolons; the
         # exclusion constraint is installed idempotently just below.
-        for migration_name in ("002_persistent_product_data.sql", "003_email_verification_and_hall_type.sql", "004_booking_history_archive.sql", "005_demo_card_payments.sql", "006_catalog_screening_links.sql", "007_password_reset.sql", "008_cinematica_hall_directory.sql", "009_ticket_checkin.sql"):
+        for migration_name in ("002_persistent_product_data.sql", "003_email_verification_and_hall_type.sql", "004_booking_history_archive.sql", "005_demo_card_payments.sql", "006_catalog_screening_links.sql", "007_password_reset.sql", "008_cinematica_hall_directory.sql", "009_ticket_checkin.sql", "010_booking_notifications.sql"):
             migration = migrations / migration_name
             for statement in migration.read_text(encoding="utf-8").split(";"):
                 if statement.strip():
@@ -70,6 +82,7 @@ async def lifespan(app: FastAPI):
             logger.exception("Cinematica hall directory refresh failed")
     directory_task = asyncio.create_task(refresh_cinematica_once())
     refresh_task = None
+    notification_task = asyncio.create_task(_booking_notification_loop())
     if settings.tmdb_read_token:
         refresh_task = asyncio.create_task(_tmdb_refresh_loop())
     try:
@@ -86,6 +99,11 @@ async def lifespan(app: FastAPI):
                 await refresh_task
             except asyncio.CancelledError:
                 pass
+        notification_task.cancel()
+        try:
+            await notification_task
+        except asyncio.CancelledError:
+            pass
 
 def _ensure_initial_admin() -> None:
     if not settings.admin_email and not settings.admin_password:

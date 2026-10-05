@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     tmdb_region: str = "UZ"
     tmdb_max_pages: int = 5
     tmdb_sync_interval_hours: int = 24
+    notification_poll_seconds: int = 60
+    notification_retry_minutes: int = 10
     sms_mode: str = "mock"
     sms_api_url: str = "https://notify.eskiz.uz/api"
     sms_email: str = ""

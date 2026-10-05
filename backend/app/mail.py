@@ -47,7 +47,7 @@ def _email_html(content: str) -> str:
         '</main></body></html>'
     )
 
-def _send_email(address: str, subject: str, content: str) -> bool:
+def _send_email(address: str, subject: str, content: str, *, tag: str = "parda-transactional") -> bool:
     """Return True only for a local-development mock delivery."""
     email_mode = settings.email_mode.strip().lower()
     if email_mode == "mock" and settings.app_environment.lower() != "production":
@@ -79,7 +79,7 @@ def _send_email(address: str, subject: str, content: str) -> bool:
                     "to": [{"email": address}],
                     "subject": subject,
                     "htmlContent": _email_html(content),
-                    "tags": ["parda-verification"],
+                    "tags": [tag],
                 },
                 timeout=15.0,
             )
@@ -127,3 +127,21 @@ def send_password_reset_email(address: str, code: str) -> bool:
         f"Your password reset code is: {code}\n\n"
         "It expires in 10 minutes. If you did not request a password reset, you can ignore this email."
     ))
+
+def send_booking_confirmation_email(address: str, *, movie: str, cinema: str, starts_at: str,
+                                    seats: str, ticket_code: str, amount: str) -> bool:
+    return _send_email(address, "Your Parda Cinema ticket is confirmed", (
+        "Your ticket is confirmed. Keep this email and present the QR ticket or ticket code at entry.\n\n"
+        f"Movie: {movie}\nCinema: {cinema}\nDate / time: {starts_at}\n"
+        f"Seats: {seats}\nTicket code: {ticket_code}\nAmount: {amount}\n\n"
+        "We will send reminders before the screening."
+    ), tag="parda-booking-confirmation")
+
+def send_screening_reminder_email(address: str, *, movie: str, cinema: str, starts_at: str,
+                                  seats: str, ticket_code: str, when: str) -> bool:
+    return _send_email(address, f"Reminder: {movie} starts {when}", (
+        f"Your Parda Cinema screening starts {when}.\n\n"
+        f"Movie: {movie}\nCinema: {cinema}\nDate / time: {starts_at}\n"
+        f"Seats: {seats}\nTicket code: {ticket_code}\n\n"
+        "Please arrive early and show your QR ticket or ticket code at entry."
+    ), tag="parda-screening-reminder")
