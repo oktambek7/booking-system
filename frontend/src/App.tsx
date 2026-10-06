@@ -49,6 +49,7 @@ export default function App(){
  const emailCooldown=useResendCountdown()
  useEffect(()=>{document.documentElement.dataset.theme=theme;localStorage.setItem('parda_theme',theme)},[theme])
  useEffect(()=>{localStorage.setItem('parda_lang',lang)},[lang])
+ useEffect(()=>{const onKeyDown=(event:KeyboardEvent)=>{if(event.key!=='Escape')return;if(ticket){setTicket(null);return}if(showAdmin){setShowAdmin(false);return}if(showNotifications){setShowNotifications(false);return}if(showHistory){setShowHistory(false);return}if(showPasswordReset){setShowPasswordReset(false);return}if(showAuth){setShowAuth(false)}};window.addEventListener('keydown',onKeyDown);return()=>window.removeEventListener('keydown',onKeyDown)},[ticket,showAdmin,showNotifications,showHistory,showPasswordReset,showAuth])
  const headers=useMemo(()=>authHeaders(token),[token])
  async function loadHistory(t=token){if(!t)return;const r=await fetch(`${API}/api/bookings`,{headers:authHeaders(t)});if(r.ok)setBookings(await r.json())}
  async function loadSavedMovies(t=token){if(!t){setSavedMovies([]);return}setSavedLoading(true);try{const r=await fetch(`${API}/api/watchlist`,{headers:authHeaders(t)});if(r.ok)setSavedMovies(await r.json())}finally{setSavedLoading(false)}}

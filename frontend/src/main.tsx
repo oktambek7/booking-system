@@ -7,7 +7,6 @@ import './cinema.css'
 import './cinema-redesign.css'
 import './payment.css'
 import './operator.css'
-import './theme.css'
 import './cinema-final.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
