@@ -51,7 +51,7 @@ export default function CinemaCatalog({api,token,lang,onSignIn,onConfirmed}:{api
   if(carouselTimerRef.current)window.clearTimeout(carouselTimerRef.current)
   carouselTimerRef.current=window.setTimeout(()=>{carouselTransitionRef.current=false;setCarouselTransition(null)},820)
  }
- useEffect(()=>{if(featured.length<2)return;const timer=window.setInterval(()=>moveCarousel('forward'),10500);return()=>window.clearInterval(timer)},[featured])
+ useEffect(()=>{if(featured.length<2)return;const timer=window.setInterval(()=>moveCarousel('forward'),14000);return()=>window.clearInterval(timer)},[featured])
  useEffect(()=>{if(!saveToast)return;const timer=window.setTimeout(()=>setSaveToast(''),3200);return()=>window.clearTimeout(timer)},[saveToast])
  useEffect(()=>()=>{if(carouselTimerRef.current)window.clearTimeout(carouselTimerRef.current)},[])
  const dates=[...new Set(shows.map(s=>s.date))],cinemas=[...new Set(shows.map(s=>s.cinema_name))].sort((a,b)=>a.localeCompare(b)),audioLanguages=[...new Set(shows.map(s=>s.audio_language).filter(Boolean) as string[])].sort((a,b)=>a.localeCompare(b))
