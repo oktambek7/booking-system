@@ -91,7 +91,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   color: var(--ink) !important;
   box-shadow: none !important;
 }
-.language-trigger { min-width: 82px !important; gap: 8px !important; padding: 0 14px !important; font-size: 11px !important; }
+.language-trigger { display: inline-flex !important; align-items: center !important; justify-content: center !important; min-width: 82px !important; gap: 8px !important; padding: 0 14px !important; font-size: 11px !important; }
+.language-trigger svg { flex: 0 0 auto !important; }
 .language-trigger:hover, .theme-toggle:hover, .notification-button:hover { border-color: var(--line-strong) !important; background: var(--surface-tint) !important; transform: none !important; box-shadow: none !important; }
 .language-menu { top: calc(100% + 9px) !important; min-width: 148px !important; padding: 6px !important; border: 1px solid var(--line) !important; border-radius: 10px !important; background: var(--surface-raised) !important; box-shadow: var(--shadow-lg) !important; }
 .language-menu button { min-height: 38px !important; border-radius: 7px !important; color: var(--ink) !important; }
@@ -406,6 +407,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .detail-dates button { min-width: 94px !important; }
   .live-showtime { align-items: flex-start !important; flex-direction: column !important; gap: 11px !important; }
   .live-showtime-buy { width: 100% !important; justify-content: space-between !important; }
+}
+
+@media (min-width: 531px) and (max-width: 650px) {
+  .carousel-save { width: auto !important; padding: 0 16px !important; }
 }
 
 /* Overlay architecture: drawers reserve the right edge; focused tasks use a
