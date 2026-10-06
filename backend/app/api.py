@@ -9,13 +9,13 @@ from sqlalchemy.orm import Session
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from .database import get_db
 from .models import (Auditorium, Booking, BookingSeat, BookingStatus, EmailOtpChallenge, Movie,
-                     PasswordResetChallenge, Payment, PaymentEmailChallenge, Role, Screening, Seat, User, WaitlistEntry, MovieWatchlist)
+                     PasswordResetChallenge, Payment, PaymentEmailChallenge, Role, Screening, Seat, User, WaitlistEntry, MovieWatchlist, BookingNotification, WaitlistNotification, MovieWatchlistNotification)
 from .schemas import (AuditoriumIn, AuditoriumOut, AuditoriumUpdate, NearbyAuditoriumOut, BookingIn, BookingOut, BookingStatusIn,
                       CatalogSyncOut, CinemaDirectorySyncOut, EmailChallengeOut, EmailCodeVerify, EmailResend, Login, MovieIn, MovieOut, OtpVerifyIn, PasswordResetConfirm, PasswordResetRequest, PaymentStartIn,
                       PaymentStartOut, PaymentVerifyOut, ScreeningIn, ScreeningOut,
                       ScreeningSeatsOut, SeatOut, Token, UserCreate, OperatorBookingOut,
                       OperatorDashboardOut, OperatorMetricsOut, OperatorScreeningOut,
-                      TicketCheckInIn, TicketCheckInOut, WaitlistIn, WaitlistOut, WatchlistMovieOut)
+                      TicketCheckInIn, TicketCheckInOut, WaitlistIn, WaitlistOut, WatchlistMovieOut, CustomerNotificationOut)
 from .security import current_user, hash_password, make_token, require_roles, verify_password
 from .config import settings
 from .otp import code_hash, code_matches, new_code
@@ -353,6 +353,45 @@ def remove_saved_movie(movie_id: int, db: Session = Depends(get_db), user: User 
     db.delete(item)
     db.commit()
     return {"removed": True}
+
+@router.get("/notifications", response_model=list[CustomerNotificationOut])
+def customer_notifications(db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """Return durable customer-facing delivery events without exposing email data."""
+    items: list[CustomerNotificationOut] = []
+    booking_rows = db.execute(sa.select(BookingNotification, Booking, Screening, Movie, Auditorium)
+        .join(Booking, BookingNotification.booking_id == Booking.id)
+        .join(Screening, Booking.screening_id == Screening.id)
+        .join(Movie, Screening.movie_id == Movie.id)
+        .join(Auditorium, Screening.auditorium_id == Auditorium.id)
+        .where(Booking.customer_id == user.id)).all()
+    for notice, _, screening, movie, auditorium in booking_rows:
+        items.append(CustomerNotificationOut(id=f"booking-{notice.id}", kind=notice.event_type,
+            state="sent" if notice.sent_at else "retrying" if notice.attempts else "scheduled",
+            movie_title=movie.title, cinema_name=f"{auditorium.cinema_name} · {auditorium.name}",
+            starts_at=screening.starts_at, due_at=notice.due_at, created_at=notice.created_at))
+    waitlist_rows = db.execute(sa.select(WaitlistNotification, WaitlistEntry, Screening, Movie, Auditorium)
+        .join(WaitlistEntry, WaitlistNotification.waitlist_entry_id == WaitlistEntry.id)
+        .join(Screening, WaitlistEntry.screening_id == Screening.id)
+        .join(Movie, Screening.movie_id == Movie.id)
+        .join(Auditorium, Screening.auditorium_id == Auditorium.id)
+        .where(WaitlistEntry.user_id == user.id)).all()
+    for notice, _, screening, movie, auditorium in waitlist_rows:
+        items.append(CustomerNotificationOut(id=f"waitlist-{notice.id}", kind="waitlist_available",
+            state="sent" if notice.sent_at else "retrying" if notice.attempts else "scheduled",
+            movie_title=movie.title, cinema_name=f"{auditorium.cinema_name} · {auditorium.name}",
+            starts_at=screening.starts_at, due_at=notice.due_at, created_at=notice.created_at))
+    saved_rows = db.execute(sa.select(MovieWatchlistNotification, MovieWatchlist, Screening, Movie, Auditorium)
+        .join(MovieWatchlist, MovieWatchlistNotification.watchlist_id == MovieWatchlist.id)
+        .join(Screening, MovieWatchlistNotification.screening_id == Screening.id)
+        .join(Movie, MovieWatchlist.movie_id == Movie.id)
+        .join(Auditorium, Screening.auditorium_id == Auditorium.id)
+        .where(MovieWatchlist.user_id == user.id)).all()
+    for notice, _, screening, movie, auditorium in saved_rows:
+        items.append(CustomerNotificationOut(id=f"saved-film-{notice.id}", kind="saved_movie_showtime",
+            state="sent" if notice.sent_at else "retrying" if notice.attempts else "scheduled",
+            movie_title=movie.title, cinema_name=f"{auditorium.cinema_name} · {auditorium.name}",
+            starts_at=screening.starts_at, due_at=notice.due_at, created_at=notice.created_at))
+    return sorted(items, key=lambda item: (item.created_at, item.due_at), reverse=True)[:50]
 
 @router.post("/catalog/sync", response_model=CatalogSyncOut)
 def sync_movie_catalog(db: Session = Depends(get_db), _: User = admin):

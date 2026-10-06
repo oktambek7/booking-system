@@ -155,6 +155,16 @@ class WatchlistMovieOut(BaseModel):
     alert_sent_at: datetime | None = None
     created_at: datetime
 
+class CustomerNotificationOut(BaseModel):
+    id: str
+    kind: str
+    state: str
+    movie_title: str
+    cinema_name: str
+    starts_at: datetime | None = None
+    due_at: datetime
+    created_at: datetime
+
 class WaitlistIn(BaseModel):
     seat_count: int = Field(default=1, ge=1, le=8)
 
