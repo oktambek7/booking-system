@@ -28,6 +28,10 @@ class User(Base):
     phone: Mapped[str | None] = mapped_column(String(20))
     phone_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Parda Pass is an internal rewards balance.  Points are never derived
+    # from card details and are only changed inside the payment transaction.
+    parda_points: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    reserved_points: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 class Movie(Base):
@@ -121,6 +125,12 @@ class Booking(Base):
     status: Mapped[BookingStatus] = mapped_column(Enum(BookingStatus), default=BookingStatus.PENDING, index=True)
     seat_count: Mapped[int] = mapped_column(Integer)
     total_price: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    subtotal_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    promotion_code: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    promotion_discount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    points_redeemed: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    points_discount_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    points_earned: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     hold_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     archived_by_customer: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -237,6 +247,34 @@ class Payment(Base):
     booking: Mapped[Booking] = relationship()
     __table_args__ = (Index("uq_open_payment_per_booking", "booking_id", unique=True,
                             postgresql_where=text("status = 'awaiting_verification'")),)
+
+class Promotion(Base):
+    __tablename__ = "promotions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(40), unique=True, index=True)
+    label: Mapped[str] = mapped_column(String(120))
+    percent_off: Mapped[int] = mapped_column(Integer)
+    min_order_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    max_discount_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    usage_limit: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    usage_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    __table_args__ = (
+        CheckConstraint("percent_off BETWEEN 1 AND 100", name="ck_promotions_percent_off"),
+        CheckConstraint("usage_limit IS NULL OR usage_limit > 0", name="ck_promotions_usage_limit"),
+    )
+
+class PromotionRedemption(Base):
+    __tablename__ = "promotion_redemptions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    promotion_id: Mapped[int] = mapped_column(ForeignKey("promotions.id", ondelete="RESTRICT"), index=True)
+    booking_id: Mapped[int] = mapped_column(ForeignKey("bookings.id", ondelete="CASCADE"), unique=True, index=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    discount_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    redeemed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 class OtpChallenge(Base):
     __tablename__ = "otp_challenges"

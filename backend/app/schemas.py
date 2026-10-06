@@ -145,6 +145,41 @@ class BookingIn(BaseModel):
     screening_id: int
     seat_ids: list[int] = Field(min_length=1, max_length=8)
 
+class BookingPriceIn(BaseModel):
+    promo_code: str | None = Field(default=None, max_length=40)
+    points_to_redeem: int = Field(default=0, ge=0, le=100000)
+
+class LoyaltyOut(BaseModel):
+    points: int
+    reserved_points: int
+    available_points: int
+    point_value_uzs: int
+    earn_rate_uzs: int
+
+class PromotionIn(BaseModel):
+    code: str = Field(min_length=3, max_length=40, pattern=r"^[A-Za-z0-9_-]+$")
+    label: str = Field(min_length=2, max_length=120)
+    percent_off: int = Field(ge=1, le=100)
+    min_order_amount: Decimal = Field(default=0, ge=0)
+    max_discount_amount: Decimal | None = Field(default=None, ge=0)
+    usage_limit: int | None = Field(default=None, ge=1)
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+
+class PromotionOut(BaseModel):
+    id: int
+    code: str
+    label: str
+    percent_off: int
+    min_order_amount: Decimal
+    max_discount_amount: Decimal | None = None
+    usage_limit: int | None = None
+    usage_count: int
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    active: bool
+    model_config = ConfigDict(from_attributes=True)
+
 class WatchlistMovieOut(BaseModel):
     movie_id: int
     title: str
@@ -182,6 +217,12 @@ class BookingOut(BaseModel):
     status: BookingStatus
     seat_count: int
     total_price: Decimal
+    subtotal_price: Decimal = 0
+    promotion_code: str | None = None
+    promotion_discount: Decimal = 0
+    points_redeemed: int = 0
+    points_discount_amount: Decimal = 0
+    points_earned: int = 0
     hold_expires_at: datetime | None
     hold_seconds_remaining: int | None
     created_at: datetime

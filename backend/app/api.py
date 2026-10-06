@@ -1,6 +1,7 @@
 from datetime import date, datetime, time, timedelta, timezone
 from math import asin, ceil, cos, radians, sin, sqrt
 from secrets import choice, token_urlsafe
+from decimal import Decimal, ROUND_DOWN
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import sqlalchemy as sa
 from sqlalchemy import update
@@ -9,13 +10,14 @@ from sqlalchemy.orm import Session
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from .database import get_db
 from .models import (Auditorium, Booking, BookingSeat, BookingStatus, EmailOtpChallenge, Movie,
-                     PasswordResetChallenge, Payment, PaymentEmailChallenge, Role, Screening, Seat, User, WaitlistEntry, MovieWatchlist, BookingNotification, WaitlistNotification, MovieWatchlistNotification)
+                     PasswordResetChallenge, Payment, PaymentEmailChallenge, Promotion, PromotionRedemption, Role, Screening, Seat, User, WaitlistEntry, MovieWatchlist, BookingNotification, WaitlistNotification, MovieWatchlistNotification)
 from .schemas import (AuditoriumIn, AuditoriumOut, AuditoriumUpdate, NearbyAuditoriumOut, BookingIn, BookingOut, BookingStatusIn,
                       CatalogSyncOut, CinemaDirectorySyncOut, EmailChallengeOut, EmailCodeVerify, EmailResend, Login, MovieIn, MovieOut, OtpVerifyIn, PasswordResetConfirm, PasswordResetRequest, PaymentStartIn,
                       PaymentStartOut, PaymentVerifyOut, ScreeningIn, ScreeningOut,
                       ScreeningSeatsOut, SeatOut, Token, UserCreate, OperatorBookingOut,
                       OperatorDashboardOut, OperatorMetricsOut, OperatorScreeningOut,
-                      TicketCheckInIn, TicketCheckInOut, WaitlistIn, WaitlistOut, WatchlistMovieOut, CustomerNotificationOut)
+                      TicketCheckInIn, TicketCheckInOut, WaitlistIn, WaitlistOut, WatchlistMovieOut, CustomerNotificationOut,
+                      BookingPriceIn, LoyaltyOut, PromotionIn, PromotionOut)
 from .security import current_user, hash_password, make_token, require_roles, verify_password
 from .config import settings
 from .otp import code_hash, code_matches, new_code
@@ -37,6 +39,8 @@ EMAIL_RESEND_COOLDOWN_SECONDS = 120
 PASSWORD_RESET_CODE_MINUTES = 10
 PASSWORD_RESET_MAX_ATTEMPTS = 5
 PASSWORD_RESET_REQUEST_LIMIT = 3
+POINT_VALUE_UZS = 100
+POINT_EARN_RATE_UZS = 1000
 def _resend_available_at(now: datetime | None = None) -> datetime:
     return (now or datetime.now(timezone.utc)) + timedelta(seconds=EMAIL_RESEND_COOLDOWN_SECONDS)
 
@@ -48,12 +52,22 @@ def _enforce_resend_cooldown(created_at: datetime | None, label: str) -> None:
     if remaining:
         raise HTTPException(429, f"Wait {remaining} seconds before requesting another {label} code")
 
+def _release_pending_points(db: Session, booking: Booking) -> None:
+    if not booking.points_redeemed:
+        return
+    customer = db.scalar(sa.select(User).where(User.id == booking.customer_id).with_for_update())
+    if customer:
+        customer.reserved_points = max(0, customer.reserved_points - booking.points_redeemed)
+
 def _expire_holds(db: Session):
     now = datetime.now(timezone.utc)
-    db.execute(update(Booking).where(Booking.status == BookingStatus.PENDING,
-                                    Booking.hold_expires_at <= now).values(status=BookingStatus.CANCELLED))
-    db.execute(update(BookingSeat).where(BookingSeat.active.is_(True), BookingSeat.booking_id.in_(
-        sa.select(Booking.id).where(Booking.status == BookingStatus.CANCELLED))).values(active=False))
+    expired = db.scalars(sa.select(Booking).where(Booking.status == BookingStatus.PENDING,
+        Booking.hold_expires_at <= now).with_for_update()).all()
+    for booking in expired:
+        _release_pending_points(db, booking)
+        booking.status = BookingStatus.CANCELLED
+        for assignment in booking.seat_assignments:
+            assignment.active = False
 
 def _screening_out(db: Session, screening: Screening) -> ScreeningOut:
     _expire_holds(db)
@@ -94,6 +108,9 @@ def _booking_out(item: Booking) -> BookingOut:
     hold_seconds_remaining = None if not item.hold_expires_at else max(0, ceil((item.hold_expires_at - now).total_seconds()))
     return BookingOut(id=item.id, customer_id=item.customer_id, screening_id=item.screening_id,
         status=item.status, seat_count=item.seat_count, total_price=item.total_price,
+        subtotal_price=item.subtotal_price, promotion_code=item.promotion_code,
+        promotion_discount=item.promotion_discount, points_redeemed=item.points_redeemed,
+        points_discount_amount=item.points_discount_amount, points_earned=item.points_earned,
         hold_expires_at=item.hold_expires_at, hold_seconds_remaining=hold_seconds_remaining, created_at=item.created_at,
         ends_at=item.screening.ends_at,
         ticket_code=item.ticket_code, checked_in_at=item.checked_in_at,
@@ -115,6 +132,75 @@ def _new_ticket_code(db: Session) -> str:
         if not exists:
             return candidate
     raise HTTPException(503, "Could not issue a ticket code. Please retry payment verification")
+
+def _promotion_discount(db: Session, code: str, subtotal: Decimal, *, lock: bool = False) -> tuple[Promotion, Decimal]:
+    normalized = code.strip().upper()
+    query = sa.select(Promotion).where(Promotion.code == normalized)
+    if lock:
+        query = query.with_for_update()
+    promotion = db.scalar(query)
+    now = datetime.now(timezone.utc)
+    if not promotion or not promotion.active:
+        raise HTTPException(422, "This promo code is not available")
+    if promotion.starts_at and promotion.starts_at > now:
+        raise HTTPException(422, "This promo code has not started yet")
+    if promotion.ends_at and promotion.ends_at <= now:
+        raise HTTPException(422, "This promo code has expired")
+    if promotion.usage_limit is not None and promotion.usage_count >= promotion.usage_limit:
+        raise HTTPException(422, "This promo code has reached its usage limit")
+    if subtotal < promotion.min_order_amount:
+        raise HTTPException(422, f"This promo code requires an order of at least {promotion.min_order_amount:,.0f} UZS")
+    discount = (subtotal * Decimal(promotion.percent_off) / Decimal(100)).quantize(Decimal("1"), rounding=ROUND_DOWN)
+    if promotion.max_discount_amount is not None:
+        discount = min(discount, promotion.max_discount_amount)
+    return promotion, discount
+
+def _quote_booking(db: Session, booking: Booking, customer: User, promo_code: str | None, points_to_redeem: int) -> None:
+    """Persist a pending quote while reserving, never spending, loyalty points."""
+    subtotal = booking.subtotal_price or booking.total_price
+    normalized = (promo_code or "").strip().upper() or None
+    promotion_discount = Decimal(0)
+    if normalized:
+        _, promotion_discount = _promotion_discount(db, normalized, subtotal, lock=True)
+    available_points = customer.parda_points - customer.reserved_points + booking.points_redeemed
+    max_points = int(((subtotal - promotion_discount) / Decimal(2 * POINT_VALUE_UZS)).to_integral_value(rounding=ROUND_DOWN))
+    if points_to_redeem > max_points:
+        raise HTTPException(422, f"You can use up to {max_points} Parda Points on this booking")
+    if points_to_redeem > available_points:
+        raise HTTPException(422, "You do not have enough available Parda Points")
+    customer.reserved_points = max(0, customer.reserved_points - booking.points_redeemed) + points_to_redeem
+    booking.subtotal_price = subtotal
+    booking.promotion_code = normalized
+    booking.promotion_discount = promotion_discount
+    booking.points_redeemed = points_to_redeem
+    booking.points_discount_amount = Decimal(points_to_redeem * POINT_VALUE_UZS)
+    booking.total_price = max(Decimal(0), subtotal - promotion_discount - booking.points_discount_amount)
+
+@router.get("/loyalty", response_model=LoyaltyOut)
+def loyalty_balance(user: User = Depends(current_user)):
+    return LoyaltyOut(points=user.parda_points, reserved_points=user.reserved_points,
+        available_points=max(0, user.parda_points - user.reserved_points),
+        point_value_uzs=POINT_VALUE_UZS, earn_rate_uzs=POINT_EARN_RATE_UZS)
+
+@router.get("/admin/promotions", response_model=list[PromotionOut])
+def list_promotions(db: Session = Depends(get_db), _: User = admin):
+    return db.scalars(sa.select(Promotion).order_by(Promotion.created_at.desc())).all()
+
+@router.post("/admin/promotions", response_model=PromotionOut, status_code=201)
+def create_promotion(data: PromotionIn, db: Session = Depends(get_db), _: User = admin):
+    if data.ends_at and data.starts_at and data.ends_at <= data.starts_at:
+        raise HTTPException(422, "Promotion end time must be after its start time")
+    item = Promotion(code=data.code.strip().upper(), label=data.label.strip(), percent_off=data.percent_off,
+        min_order_amount=data.min_order_amount, max_discount_amount=data.max_discount_amount,
+        usage_limit=data.usage_limit, starts_at=data.starts_at, ends_at=data.ends_at)
+    db.add(item)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "A promotion with this code already exists")
+    db.refresh(item)
+    return item
 
 @router.post("/auth/register", status_code=201)
 def register(data: UserCreate, db: Session = Depends(get_db)):
@@ -657,14 +743,28 @@ def create_booking(data:BookingIn,db:Session=Depends(get_db),user:User=Depends(c
     # A user who obtains a seat should no longer receive a stale availability alert.
     db.execute(sa.delete(WaitlistEntry).where(WaitlistEntry.screening_id == screening.id,
                                                WaitlistEntry.user_id == user.id))
+    subtotal=sum((screening.base_price+(screening.premium_surcharge if s.seat_type=="premium" else 0) for s in seats))
     booking=Booking(customer_id=user.id,screening_id=screening.id,status=BookingStatus.PENDING,
-        seat_count=len(seats),total_price=sum((screening.base_price+(screening.premium_surcharge if s.seat_type=="premium" else 0) for s in seats)),
+        seat_count=len(seats),total_price=subtotal,subtotal_price=subtotal,
         hold_expires_at=datetime.now(timezone.utc)+timedelta(minutes=HOLD_MINUTES))
     booking.seat_assignments=[BookingSeat(screening_id=screening.id,seat_id=s.id,active=True) for s in seats]
     db.add(booking)
     try: db.commit()
     except IntegrityError:
         db.rollback(); raise HTTPException(409,"A seat was booked at the same time. Please choose again")
+    db.refresh(booking)
+    return _booking_out(booking)
+
+@router.post("/bookings/{booking_id}/pricing", response_model=BookingOut)
+def price_booking(booking_id: int, data: BookingPriceIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    booking = _owned_pending_booking(booking_id, db, user, lock=True)
+    open_payment = db.scalar(sa.select(Payment.id).where(Payment.booking_id == booking.id,
+        Payment.status == "awaiting_verification"))
+    if open_payment:
+        raise HTTPException(409, "A payment verification is already in progress for this booking")
+    customer = db.scalar(sa.select(User).where(User.id == user.id).with_for_update())
+    _quote_booking(db, booking, customer, data.promo_code, data.points_to_redeem)
+    db.commit()
     db.refresh(booking)
     return _booking_out(booking)
 
@@ -680,6 +780,7 @@ def _owned_pending_booking(booking_id: int, db: Session, user: User, lock: bool 
     if item.customer_id!=user.id: raise HTTPException(403,"This booking belongs to another customer")
     if item.status!=BookingStatus.PENDING: raise HTTPException(409,"This seat hold is no longer pending")
     if not item.hold_expires_at or item.hold_expires_at<=datetime.now(timezone.utc):
+        _release_pending_points(db, item)
         item.status=BookingStatus.CANCELLED
         for seat in item.seat_assignments: seat.active=False
         db.commit()
@@ -748,6 +849,14 @@ def start_payment(data: PaymentStartIn, db: Session = Depends(get_db), user: Use
     item = _owned_pending_booking(data.booking_id, db, user, lock=True)
     if not user.email_verified:
         raise HTTPException(403, "Verify your account email before paying")
+    if item.promotion_code:
+        promotion, discount = _promotion_discount(db, item.promotion_code, item.subtotal_price, lock=True)
+        if discount != item.promotion_discount:
+            raise HTTPException(409, "The promotion changed. Reapply it before paying")
+    if item.points_redeemed:
+        wallet = db.scalar(sa.select(User).where(User.id == user.id).with_for_update())
+        if wallet.reserved_points < item.points_redeemed or wallet.parda_points < item.points_redeemed:
+            raise HTTPException(409, "Your Parda Pass balance changed. Reapply your points")
     completed = db.scalar(sa.select(sa.exists().where(Payment.booking_id == item.id,
         Payment.status == "succeeded_demo")))
     if completed:
@@ -811,6 +920,30 @@ def verify_payment(payment_id:int,data:OtpVerifyIn,background_tasks:BackgroundTa
             raise HTTPException(429,"Too many incorrect codes. Start a new verification attempt")
         raise HTTPException(422,"Incorrect code. Check the 4 digits and try again")
     challenge.consumed_at=now
+    wallet = db.scalar(sa.select(User).where(User.id == user.id).with_for_update())
+    if booking.promotion_code:
+        try:
+            promotion, discount = _promotion_discount(db, booking.promotion_code, booking.subtotal_price, lock=True)
+        except HTTPException as exc:
+            payment.status = "promotion_unavailable"
+            db.commit()
+            raise HTTPException(409, "The promotion is no longer available. Reapply checkout pricing") from exc
+        if discount != booking.promotion_discount:
+            payment.status = "promotion_unavailable"
+            db.commit()
+            raise HTTPException(409, "The promotion changed. Reapply checkout pricing")
+        promotion.usage_count += 1
+        db.add(PromotionRedemption(promotion_id=promotion.id, booking_id=booking.id,
+            customer_id=user.id, discount_amount=booking.promotion_discount))
+    if booking.points_redeemed:
+        if wallet.reserved_points < booking.points_redeemed or wallet.parda_points < booking.points_redeemed:
+            payment.status = "loyalty_unavailable"
+            db.commit()
+            raise HTTPException(409, "Your Parda Pass balance changed. Reapply checkout pricing")
+        wallet.reserved_points -= booking.points_redeemed
+        wallet.parda_points -= booking.points_redeemed
+    booking.points_earned = int((booking.total_price / Decimal(POINT_EARN_RATE_UZS)).to_integral_value(rounding=ROUND_DOWN))
+    wallet.parda_points += booking.points_earned
     payment.status="succeeded_demo"
     booking.status=BookingStatus.CONFIRMED;booking.hold_expires_at=None
     booking.ticket_code = booking.ticket_code or _new_ticket_code(db)
@@ -884,6 +1017,8 @@ def update_booking_status(booking_id:int,data:BookingStatusIn,background_tasks:B
         raise HTTPException(409,"A checked-in ticket cannot be cancelled")
     item.status=data.status
     if data.status==BookingStatus.CANCELLED:
+        if item.status == BookingStatus.PENDING:
+            _release_pending_points(db, item)
         for assignment in item.seat_assignments: assignment.active=False
         if user.role==Role.CUSTOMER and item.screening.ends_at <= datetime.now(timezone.utc):
             item.archived_by_customer=True

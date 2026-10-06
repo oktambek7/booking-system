@@ -28,6 +28,8 @@ Parda is an Uzbek-first cinema discovery and seat-booking app. The React/Vite fr
 - [x] Full-screening waitlist with one-time email availability alerts and self-service withdrawal
 - [x] Persistent saved-film list with one-time first-showtime email alerts
 - [x] In-app notification center for ticket confirmation, reminder, waitlist, and saved-film delivery state
+- [x] Operator-managed promo campaigns with expiry, spend rules, usage limits, and checkout revalidation
+- [x] Parda Pass points: balance, reservation during checkout, redemption, and confirmed-ticket rewards
 - [x] Live Cinematica programme discovery with five-minute refreshes and a bounded stale-cache fallback
 - [x] Self-contained card checkout flow for Uzcard, Humo, Visa, and Mastercard with email-code confirmation
 - [x] Customer cancellation, booking-history archival, expiring seat holds, and PostgreSQL protection against competing seat requests
