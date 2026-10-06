@@ -91,7 +91,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   color: var(--ink) !important;
   box-shadow: none !important;
 }
-.language-trigger { min-width: 82px !important; padding: 0 14px !important; font-size: 11px !important; }
+.language-trigger { min-width: 82px !important; gap: 8px !important; padding: 0 14px !important; font-size: 11px !important; }
 .language-trigger:hover, .theme-toggle:hover, .notification-button:hover { border-color: var(--line-strong) !important; background: var(--surface-tint) !important; transform: none !important; box-shadow: none !important; }
 .language-menu { top: calc(100% + 9px) !important; min-width: 148px !important; padding: 6px !important; border: 1px solid var(--line) !important; border-radius: 10px !important; background: var(--surface-raised) !important; box-shadow: var(--shadow-lg) !important; }
 .language-menu button { min-height: 38px !important; border-radius: 7px !important; color: var(--ink) !important; }
@@ -130,6 +130,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .carousel-meta { gap: 14px !important; color: #c6d0d6 !important; font-size: 12px !important; }
 .carousel-meta .age-badge { border-color: #5a7383 !important; color: #e4edf0 !important; }
 .carousel-actions { gap: 10px !important; margin-top: 20px !important; }
+.carousel-save span { display: inline !important; }
 .carousel-cta, .button-primary {
   min-height: 48px !important;
   padding: 0 19px !important;
