@@ -1,0 +1,104 @@
+/* Production visual system. Loaded after every legacy stylesheet. */
+:root {
+  --parda-orange: #e36f4d;
+  --parda-orange-strong: #f18a67;
+  --parda-orange-ink: #241109;
+  --action: var(--parda-orange) !important;
+  --action-hover: var(--parda-orange-strong) !important;
+  --accent: var(--parda-orange) !important;
+  --accent-strong: #9e3d27 !important;
+  --accent-soft: #f9e1d8 !important;
+  --sage: #ad482f !important;
+  --sage-light: #f7ded5 !important;
+}
+
+:root[data-theme='dark'] {
+  --parda-orange: #e36f4d;
+  --parda-orange-strong: #f18a67;
+  --parda-orange-ink: #241109;
+  --action: var(--parda-orange) !important;
+  --action-hover: var(--parda-orange-strong) !important;
+  --accent: var(--parda-orange) !important;
+  --accent-strong: #ffd6c7 !important;
+  --accent-soft: #3b2118 !important;
+  --sage: #f0a088 !important;
+  --sage-light: #38221a !important;
+}
+
+/* One clear action color, including dialogs, booking, filters, and admin tools. */
+.button-primary, .carousel-cta, .catalog-switch .catalog-active,
+.detail-halls .detail-hall-active, .hall-filter .hall-active,
+.ticket-done, .ticket-actions .ticket-done, .payment-submit,
+.parda-pass-fields button, .payment-methods button.active,
+.operator-refresh, .operator-nav-active, .admin-form .button-primary,
+.confirm-primary, .confirm-dialog .button-primary {
+  background: var(--parda-orange) !important;
+  border-color: var(--parda-orange) !important;
+  color: var(--parda-orange-ink) !important;
+  box-shadow: none !important;
+}
+
+.catalog-switch button, .detail-halls button, .hall-filter button,
+.payment-methods button, .ticket-button, .ticket-calendar,
+.operator-close, .history-clear button, .parda-days button,
+.detail-dates button, .release-link {
+  border-color: color-mix(in srgb, var(--parda-orange) 62%, var(--line)) !important;
+  background: color-mix(in srgb, var(--parda-orange) 13%, var(--surface)) !important;
+  color: var(--ink) !important;
+}
+
+.catalog-switch button:hover, .detail-halls button:hover, .hall-filter button:hover,
+.payment-methods button:hover, .ticket-button:hover, .ticket-calendar:hover,
+.operator-close:hover, .history-clear button:hover, .parda-days button:hover,
+.detail-dates button:hover, .release-link:hover {
+  border-color: var(--parda-orange) !important;
+  background: color-mix(in srgb, var(--parda-orange) 23%, var(--surface)) !important;
+  color: var(--ink) !important;
+}
+
+.detail-dates .detail-date-active, .parda-days button.is-active {
+  border-color: var(--parda-orange) !important;
+  background: color-mix(in srgb, var(--parda-orange) 19%, var(--surface)) !important;
+  box-shadow: inset 0 -3px 0 var(--parda-orange) !important;
+}
+
+.icon-button.auth-close, .icon-button.ticket-close, .history-drawer .icon-button,
+.notification-drawer .icon-button, .seat-dialog .icon-button, .payment-dialog .icon-button {
+  border-color: color-mix(in srgb, var(--parda-orange) 58%, var(--line)) !important;
+  background: color-mix(in srgb, var(--parda-orange) 12%, var(--surface)) !important;
+  color: var(--parda-orange) !important;
+}
+
+/* Direct logo image treatment for header, footer, auth, and operator surfaces. */
+.brand-mark { display: grid !important; width: 52px !important; height: 52px !important; place-items: center !important; overflow: hidden !important; padding: 3px !important; border: 1px solid color-mix(in srgb, var(--parda-orange) 65%, var(--line)) !important; border-radius: 12px !important; background: #111827 !important; }
+.brand-mark > img { display: block !important; width: 100% !important; height: 100% !important; object-fit: cover !important; border-radius: 8px !important; }
+.brand-mark > svg { display: none !important; }
+.topbar .brand { gap: 12px !important; font-size: 16px !important; }
+.footer .brand-mark, .auth-mark { position: relative !important; background: #fff7f2 url('/parda-logo-mark.jpg') center/cover no-repeat !important; border-color: #d77b5f !important; }
+.footer .brand-mark::after { content: '' !important; position: absolute !important; inset: 0 !important; border: 1px solid rgba(255,255,255,.66) !important; border-radius: inherit !important; pointer-events: none !important; }
+.auth-mark { margin: 0 auto 16px !important; }
+
+/* Admin keeps an administrator badge; PARDA cinema branding stays on brand surfaces. */
+.operator-launch { display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 8px !important; min-height: 40px !important; padding: 0 14px !important; border-color: var(--parda-orange) !important; background: color-mix(in srgb, var(--parda-orange) 15%, var(--surface)) !important; color: var(--ink) !important; }
+.operator-launch::before, .operator-launch-mark { display: none !important; }
+.operator-launch .operator-launch-admin-icon { display: block !important; color: var(--parda-orange) !important; }
+.operator-title-mark, .operator-brand > img { border-color: color-mix(in srgb, var(--parda-orange) 65%, var(--line)) !important; }
+
+/* Compact dropdown, never a horizontal tray of language chips. */
+.language-picker { position: relative !important; height: 40px !important; border: 0 !important; background: transparent !important; }
+.language-trigger { min-width: 82px !important; height: 40px !important; border-color: var(--line) !important; background: var(--surface) !important; }
+.language-trigger[aria-expanded='true'] { border-color: var(--parda-orange) !important; background: color-mix(in srgb, var(--parda-orange) 10%, var(--surface)) !important; }
+.language-menu { position: absolute !important; z-index: 90 !important; top: calc(100% + 8px) !important; right: 0 !important; display: grid !important; min-width: 112px !important; padding: 5px !important; border: 1px solid var(--line-strong) !important; border-radius: 9px !important; background: var(--surface-raised) !important; box-shadow: 0 14px 34px rgba(0,0,0,.24) !important; }
+.language-menu button { display: flex !important; align-items: center !important; width: 100% !important; min-height: 33px !important; padding: 0 10px !important; border: 0 !important; border-radius: 6px !important; background: transparent !important; color: var(--muted) !important; font-size: 11px !important; font-weight: 750 !important; letter-spacing: .08em !important; text-align: left !important; }
+.language-menu button:hover, .language-menu .language-active { background: color-mix(in srgb, var(--parda-orange) 16%, var(--surface)) !important; color: var(--ink) !important; box-shadow: inset 2px 0 0 var(--parda-orange) !important; }
+
+/* The detail return control remains visible after navigation and works with browser Back. */
+.movie-detail-panel .detail-back { display: inline-flex !important; align-items: center !important; gap: 8px !important; min-height: 40px !important; margin-bottom: 18px !important; padding: 0 14px !important; border: 1px solid color-mix(in srgb, var(--parda-orange) 58%, var(--line)) !important; border-radius: 7px !important; background: color-mix(in srgb, var(--parda-orange) 12%, var(--surface)) !important; color: var(--ink) !important; font-weight: 750 !important; }
+.movie-detail-panel .detail-back:hover { border-color: var(--parda-orange) !important; background: color-mix(in srgb, var(--parda-orange) 22%, var(--surface)) !important; }
+
+@media (max-width: 530px) {
+  .brand-mark { width: 43px !important; height: 43px !important; }
+  .topbar .brand { gap: 9px !important; font-size: 14px !important; }
+  .operator-launch { width: 40px !important; min-width: 40px !important; padding: 0 !important; }
+  .operator-launch span { display: none !important; }
+}
