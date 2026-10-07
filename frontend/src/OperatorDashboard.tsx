@@ -115,7 +115,7 @@ export default function OperatorDashboard({ api, token, onClose }: { api:string;
   return <div className="operator-scrim" role="presentation">
     <section className="operator-shell" aria-label="Parda cinema operator dashboard">
       <header className="operator-header">
-        <div><span className="operator-eyebrow">PARDA · OPERATOR</span><h1>{selected}</h1></div>
+        <div className="operator-title"><span className="operator-title-mark"><Clapperboard size={19}/></span><div><span className="operator-eyebrow">PARDA · OPERATOR</span><h1>{selected}</h1></div></div>
         <div className="operator-header-actions"><button className="operator-refresh" onClick={() => void load()} disabled={loading || busy}><RefreshCw size={16}/>Yangilash</button><button className="operator-close" onClick={onClose} aria-label="Boshqaruvni yopish"><X size={19}/></button></div>
       </header>
       <div className="operator-layout">
