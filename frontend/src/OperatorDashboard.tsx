@@ -115,11 +115,11 @@ export default function OperatorDashboard({ api, token, onClose }: { api:string;
   return <div className="operator-scrim" role="presentation">
     <section className="operator-shell" aria-label="Parda cinema operator dashboard">
       <header className="operator-header">
-        <div className="operator-title"><span className="operator-title-mark"><Clapperboard size={19}/></span><div><span className="operator-eyebrow">PARDA · OPERATOR</span><h1>{selected}</h1></div></div>
+        <div className="operator-title"><span className="operator-title-mark"><img src="/parda-logo-mark.jpg" alt=""/></span><div><span className="operator-eyebrow">PARDA · OPERATOR</span><h1>{selected}</h1></div></div>
         <div className="operator-header-actions"><button className="operator-refresh" onClick={() => void load()} disabled={loading || busy}><RefreshCw size={16}/>Yangilash</button><button className="operator-close" onClick={onClose} aria-label="Boshqaruvni yopish"><X size={19}/></button></div>
       </header>
       <div className="operator-layout">
-        <aside className="operator-sidebar"><div className="operator-brand"><Clapperboard size={19}/><span>PARDA</span></div><nav>{nav.map(([key,label,Icon]) => <button key={key} className={tab === key ? 'operator-nav-active' : ''} onClick={() => setTab(key)}><Icon size={17}/><span>{label}</span></button>)}</nav><small>Asia/Tashkent<br/>Operator workspace</small></aside>
+        <aside className="operator-sidebar"><div className="operator-brand"><img src="/parda-logo-mark.jpg" alt=""/><span>PARDA</span></div><nav>{nav.map(([key,label,Icon]) => <button key={key} className={tab === key ? 'operator-nav-active' : ''} onClick={() => setTab(key)}><Icon size={17}/><span>{label}</span></button>)}</nav><small>Asia/Tashkent<br/>Operator workspace</small></aside>
         <main className="operator-content">
           <div className="operator-toolbar"><label>Sana<input type="date" value={day} min={dateKey()} onChange={event => setDay(event.target.value)}/></label><span>{calendarDate(day, 'uz')}</span></div>
           {notice && <p className="operator-alert operator-success"><CheckCircle2 size={16}/>{notice}</p>}
