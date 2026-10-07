@@ -569,3 +569,162 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
+
+/* Production cohesion pass: one warm cinema system for every customer and operator surface. */
+:root {
+  --ink: #211e1c;
+  --ink-soft: #403a36;
+  --muted: #716a64;
+  --paper: #f7f4f0;
+  --surface: #fffdfa;
+  --surface-raised: #fdfaf6;
+  --surface-tint: #f1ece6;
+  --line: #ded6ce;
+  --line-strong: #c1b5aa;
+  --brand: #a94631;
+  --brand-hover: #8f3928;
+  --brand-ink: #fffaf6;
+  --coral: #b75037;
+  --coral-soft: #fae9e3;
+  --gold: #af7b35;
+  --success: #3f785a;
+  --danger: #ad4d43;
+  --shadow-sm: 0 10px 28px rgba(37, 28, 22, .08);
+  --shadow-lg: 0 28px 80px rgba(24, 18, 14, .24);
+}
+
+:root[data-theme='dark'] {
+  --ink: #f1ede7;
+  --ink-soft: #ded8d1;
+  --muted: #aaa39d;
+  --paper: #0f0f0f;
+  --surface: #181818;
+  --surface-raised: #202020;
+  --surface-tint: #282828;
+  --line: #323232;
+  --line-strong: #52504e;
+  --brand: #d96d4d;
+  --brand-hover: #ec8464;
+  --brand-ink: #170d09;
+  --coral: #df795a;
+  --coral-soft: #34231e;
+  --gold: #c58f42;
+  --success: #72ad83;
+  --danger: #e0998d;
+  --shadow-sm: 0 10px 28px rgba(0, 0, 0, .35);
+  --shadow-lg: 0 30px 90px rgba(0, 0, 0, .62);
+}
+
+body, .app-shell, .programme-section, .footer, .operator-shell { background: var(--paper) !important; }
+:root[data-theme='dark'] .topbar { background: rgba(15, 15, 15, .94) !important; }
+
+/* Brand system */
+.brand-mark, .operator-title-mark {
+  display: grid !important;
+  place-items: center !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  background-color: transparent !important;
+  background-image: url('./parda-mark-light.svg') !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-size: contain !important;
+  box-shadow: none !important;
+}
+:root[data-theme='dark'] .brand-mark, :root[data-theme='dark'] .operator-title-mark { background-image: url('./parda-mark-dark.svg') !important; }
+.brand-mark { width: 38px !important; height: 38px !important; border-radius: 0 !important; }
+.brand-mark svg, .operator-title-mark svg { display: none !important; }
+.brand { gap: 11px !important; font-size: 14px !important; letter-spacing: .16em !important; }
+.brand-period { color: var(--brand) !important; }
+.auth-mark { display: block !important; width: 44px !important; height: 44px !important; margin: 0 auto 16px !important; background-image: url('./parda-mark-light.svg') !important; }
+:root[data-theme='dark'] .auth-mark { background-image: url('./parda-mark-dark.svg') !important; }
+
+/* Header controls */
+.topbar { min-height: 74px !important; border-color: var(--line) !important; }
+.main-nav { gap: 30px !important; }
+.main-nav a, .location-label { color: var(--muted) !important; font-size: 12px !important; font-weight: 720 !important; }
+.location-label svg { color: var(--brand) !important; }
+.language-picker { height: 38px !important; }
+.language-trigger, .theme-toggle, .notification-button { height: 38px !important; min-width: 38px !important; border-color: var(--line) !important; background: var(--surface) !important; }
+.language-trigger { min-width: 78px !important; padding: 0 11px !important; gap: 7px !important; font-size: 11px !important; letter-spacing: .04em !important; }
+.language-menu { top: calc(100% + 8px) !important; min-width: 108px !important; padding: 5px !important; border-radius: 8px !important; background: var(--surface-raised) !important; box-shadow: var(--shadow-lg) !important; }
+.language-menu button { min-height: 32px !important; padding: 0 10px !important; border-radius: 5px !important; color: var(--muted) !important; font-size: 10px !important; font-weight: 800 !important; letter-spacing: .08em !important; text-align: left !important; }
+.language-menu button:hover, .language-menu .language-active { background: var(--surface-tint) !important; color: var(--ink) !important; }
+.language-menu .language-active { box-shadow: inset 2px 0 0 var(--brand) !important; }
+.account-button { min-height: 38px !important; padding: 4px 13px 4px 5px !important; border-color: var(--line) !important; background: var(--surface) !important; color: var(--ink) !important; }
+.account-avatar { width: 28px !important; height: 28px !important; background: var(--coral-soft) !important; color: var(--brand) !important; }
+.account-name { line-height: 1 !important; }
+.operator-launch { display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 8px !important; min-width: 108px !important; min-height: 38px !important; padding: 0 12px !important; border-color: color-mix(in srgb, var(--brand) 62%, var(--line)) !important; background: color-mix(in srgb, var(--brand) 11%, var(--surface)) !important; color: var(--ink) !important; }
+.operator-launch svg { display: none !important; }
+.operator-launch::before { content: '' !important; width: 21px !important; height: 21px !important; background: url('./parda-mark-light.svg') center/contain no-repeat !important; }
+:root[data-theme='dark'] .operator-launch::before { background-image: url('./parda-mark-dark.svg') !important; }
+.operator-launch:hover { border-color: var(--brand) !important; background: color-mix(in srgb, var(--brand) 18%, var(--surface)) !important; }
+
+/* The hero is an anchored stage, not a floating rounded panel. */
+.film-carousel { height: clamp(438px, 47vw, 520px) !important; margin: 0 !important; border: 0 !important; border-bottom: 1px solid var(--line) !important; border-radius: 0 !important; background: var(--surface) !important; }
+.carousel-backdrop { opacity: .56 !important; filter: saturate(.76) contrast(.94) !important; }
+:root[data-theme='dark'] .carousel-backdrop { opacity: .68 !important; }
+:root[data-theme='dark'] .carousel-backdrop::after { background: linear-gradient(90deg, rgba(15, 15, 15, .96) 0%, rgba(15, 15, 15, .79) 40%, rgba(15, 15, 15, .18) 73%, rgba(15, 15, 15, .56) 100%) !important; }
+.carousel-content { left: clamp(26px, 8vw, 124px) !important; padding: clamp(38px, 4.7vw, 62px) 0 84px !important; }
+.carousel-content h1 { font-size: clamp(34px, 4vw, 56px) !important; letter-spacing: -.048em !important; }
+.carousel-kicker { color: var(--brand) !important; }
+.carousel-meta { color: var(--muted) !important; }
+.carousel-poster { border-color: color-mix(in srgb, var(--ink) 34%, transparent) !important; border-radius: 4px !important; box-shadow: 0 25px 65px rgba(0, 0, 0, .34) !important; }
+.carousel-controls { left: clamp(26px, 8vw, 124px) !important; color: var(--muted) !important; }
+.carousel-controls button { border-color: var(--line-strong) !important; background: color-mix(in srgb, var(--paper) 72%, transparent) !important; color: var(--ink) !important; }
+.carousel-controls button:hover:not(:disabled) { border-color: var(--brand) !important; background: color-mix(in srgb, var(--brand) 12%, var(--paper)) !important; }
+.save-film-button, .carousel-save { border-color: color-mix(in srgb, var(--ink) 32%, transparent) !important; background: color-mix(in srgb, var(--paper) 65%, transparent) !important; color: var(--ink) !important; }
+.save-film-button:hover, .carousel-save:hover, .save-film-button.is-saved { border-color: var(--brand) !important; background: color-mix(in srgb, var(--brand) 13%, var(--paper)) !important; color: var(--ink) !important; }
+
+/* Cinema filters and seat selection use neutral surfaces with one warm action color. */
+.showtime-filter-block, .seat-map, .seat-legend, .payment-summary { background: var(--surface) !important; border-color: var(--line) !important; }
+.detail-halls .detail-hall-active, .hall-filter .hall-active, .catalog-switch .catalog-active { border-color: var(--brand) !important; background: var(--brand) !important; color: var(--brand-ink) !important; box-shadow: none !important; }
+.detail-dates .detail-date-active, .parda-days button.is-active { border-color: var(--brand) !important; background: color-mix(in srgb, var(--brand) 13%, var(--surface)) !important; box-shadow: inset 0 -2px 0 var(--brand) !important; }
+.seat-dot.seat-picked, .seat.seat-selected { background: var(--brand) !important; border-color: var(--brand) !important; color: var(--brand-ink) !important; box-shadow: none !important; }
+.seat.seat-open { border-color: #4e9271 !important; background: color-mix(in srgb, #4e9271 14%, var(--surface)) !important; }
+.seat.seat-taken { border-color: #6b6966 !important; background: #5a5856 !important; color: #f0ece7 !important; }
+.modal-scrim, .operator-scrim { background: rgba(0, 0, 0, .74) !important; }
+
+/* E-ticket: structured card, restrained borders, no detached controls. */
+.ticket-dialog { width: min(580px, calc(100vw - 32px)) !important; padding: 26px 28px !important; border-radius: 12px !important; overflow: hidden !important; }
+.ticket-heading { min-height: 34px !important; align-items: center !important; }
+.ticket-kicker { color: var(--muted) !important; }
+.ticket-live-mark { background: color-mix(in srgb, var(--success) 13%, var(--surface)) !important; }
+.ticket-dialog h2 { margin: 17px 42px 5px 0 !important; font-size: clamp(25px, 4.5vw, 33px) !important; }
+.ticket-code-box { grid-template-columns: 150px minmax(0, 1fr) !important; gap: 20px !important; margin: 20px 0 18px !important; padding: 15px !important; border-color: var(--line) !important; border-radius: 9px !important; background: var(--surface) !important; }
+.ticket-qr-wrap { width: 150px !important; height: 150px !important; background: #fff !important; }
+.ticket-code-info strong { font-size: 18px !important; }
+.ticket-details { margin-bottom: 17px !important; }
+.ticket-actions { justify-content: space-between !important; padding-top: 1px !important; }
+.ticket-calendar, .ticket-done { min-height: 42px !important; border-radius: 7px !important; }
+.ticket-actions .ticket-done { background: var(--brand) !important; border-color: var(--brand) !important; color: var(--brand-ink) !important; }
+
+/* Operator dashboard brand and neutral surfaces. */
+.operator-header { background: var(--surface-raised) !important; border-color: var(--line) !important; }
+.operator-title { gap: 12px !important; }
+.operator-title-mark { width: 40px !important; height: 40px !important; flex-basis: 40px !important; border-radius: 0 !important; }
+.operator-title .operator-eyebrow { color: var(--brand) !important; }
+:root[data-theme='dark'] .operator-sidebar, :root[data-theme='dark'] .operator-header, :root[data-theme='dark'] .operator-section, :root[data-theme='dark'] .operator-metrics article { background: var(--surface-raised) !important; border-color: var(--line) !important; }
+
+@media (max-width: 820px) {
+  .film-carousel { height: 460px !important; margin: 0 !important; }
+  .carousel-content { left: 24px !important; padding-bottom: 84px !important; }
+  .carousel-controls { left: 24px !important; }
+}
+
+@media (max-width: 530px) {
+  .brand-mark { width: 34px !important; height: 34px !important; }
+  .language-trigger { min-width: 68px !important; padding: 0 8px !important; }
+  .language-trigger span { display: inline !important; }
+  .language-trigger svg:last-child { display: block !important; }
+  .operator-launch { width: 38px !important; min-width: 38px !important; padding: 0 !important; }
+  .operator-launch span { display: none !important; }
+  .film-carousel { height: 446px !important; }
+  .carousel-content { width: calc(100% - 42px) !important; }
+  .carousel-poster { opacity: .72 !important; }
+  .ticket-dialog { padding: 22px 18px !important; }
+  .ticket-code-box { grid-template-columns: 1fr !important; justify-items: center !important; padding: 14px !important; }
+  .ticket-qr-wrap { width: 148px !important; height: 148px !important; }
+  .ticket-code-info { text-align: center !important; }
+  .ticket-actions { gap: 9px !important; }
+}
