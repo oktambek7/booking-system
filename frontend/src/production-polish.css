@@ -102,3 +102,29 @@
   .operator-launch { width: 40px !important; min-width: 40px !important; padding: 0 !important; }
   .operator-launch span { display: none !important; }
 }
+
+/* Legacy dark-theme rules used background-color with higher specificity. */
+:root[data-theme='dark'] .catalog-switch .catalog-active,
+:root[data-theme='dark'] .detail-halls .detail-hall-active,
+:root[data-theme='dark'] .hall-filter .hall-active,
+:root[data-theme='dark'] .button-primary,
+:root[data-theme='dark'] .carousel-cta,
+:root[data-theme='dark'] .ticket-done,
+:root[data-theme='dark'] .ticket-actions .ticket-done,
+:root[data-theme='dark'] .payment-submit,
+:root[data-theme='dark'] .operator-refresh,
+:root[data-theme='dark'] .operator-nav-active {
+  background-color: var(--parda-orange) !important;
+  color: var(--parda-orange-ink) !important;
+}
+
+:root[data-theme='dark'] .catalog-switch button:not(.catalog-active),
+:root[data-theme='dark'] .detail-halls button:not(.detail-hall-active),
+:root[data-theme='dark'] .hall-filter button:not(.hall-active),
+:root[data-theme='dark'] .ticket-calendar,
+:root[data-theme='dark'] .ticket-button,
+:root[data-theme='dark'] .operator-close {
+  background-color: color-mix(in srgb, var(--parda-orange) 13%, var(--surface)) !important;
+  border-color: color-mix(in srgb, var(--parda-orange) 62%, var(--line)) !important;
+  color: var(--ink) !important;
+}
