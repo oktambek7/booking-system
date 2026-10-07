@@ -199,3 +199,65 @@
   .film-carousel { border-radius: 16px !important; }
   .carousel-content { top: 24px !important; right: 18px !important; bottom: 72px !important; left: 18px !important; padding: 24px !important; border-radius: 14px !important; }
 }
+
+/* Restore the original centred cinema stage in place of the glass treatment. */
+.film-carousel {
+  width: min(1600px, calc(100% - 64px)) !important;
+  height: 530px !important;
+  margin: 24px auto 0 !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 12px !important;
+  background: var(--surface) !important;
+  isolation: auto !important;
+}
+.film-carousel::before { content: none !important; }
+.carousel-content {
+  top: 0 !important;
+  bottom: 0 !important;
+  left: clamp(46px, 6vw, 108px) !important;
+  width: min(50%, 610px) !important;
+  display: block !important;
+  padding: clamp(38px, 4.7vw, 62px) 0 84px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+.carousel-controls { left: clamp(46px, 6vw, 108px) !important; }
+.carousel-poster {
+  right: clamp(90px, 10vw, 155px) !important;
+  width: clamp(192px, 17vw, 250px) !important;
+}
+
+@media (max-width: 820px) {
+  .film-carousel {
+    width: 100% !important;
+    height: 460px !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-bottom: 1px solid var(--line) !important;
+    border-radius: 0 !important;
+  }
+  .carousel-content {
+    top: 0 !important;
+    right: 24px !important;
+    bottom: 0 !important;
+    left: 24px !important;
+    width: min(67%, 510px) !important;
+    padding: 43px 0 90px !important;
+  }
+  .carousel-controls { right: 24px !important; bottom: 20px !important; left: auto !important; }
+}
+
+@media (max-width: 530px) {
+  .film-carousel { height: 446px !important; }
+  .carousel-content {
+    top: 0 !important;
+    right: 18px !important;
+    bottom: 0 !important;
+    left: 18px !important;
+    width: calc(100% - 36px) !important;
+    padding: 31px 0 82px !important;
+  }
+}
