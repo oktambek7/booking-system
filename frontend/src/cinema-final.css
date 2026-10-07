@@ -30,6 +30,72 @@
   font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif;
 }
 
+/* Final production alignment: black cinema canvas, one shared action colour, and clear seating geometry. */
+:root, :root[data-theme='dark'] {
+  --brand: #e36f4d !important;
+  --brand-hover: #f18866 !important;
+  --brand-ink: #1b100c !important;
+}
+
+.button-primary, .carousel-cta, .detail-halls .detail-hall-active, .hall-filter .hall-active,
+.catalog-switch .catalog-active, .selection-action .button-primary, .payment-submit {
+  background: var(--brand) !important;
+  border-color: var(--brand) !important;
+  color: var(--brand-ink) !important;
+}
+
+/* Keep the feature stage optically centred on wide screens. */
+@media (min-width: 821px) {
+  .carousel-content { left: max(38px, calc(50% - 710px)) !important; }
+  .carousel-controls { left: max(38px, calc(50% - 710px)) !important; }
+  .carousel-poster { right: max(76px, calc(50% - 600px)) !important; }
+}
+
+/* Use the supplied PARDA mark consistently in navigation and operator controls. */
+.brand-mark, .operator-title-mark, .auth-mark {
+  background-image: url('/parda-logo-mark.jpg') !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-size: cover !important;
+}
+.brand-mark { width: 44px !important; height: 44px !important; border-radius: 11px !important; border-color: color-mix(in srgb, var(--brand) 42%, var(--line)) !important; }
+.operator-launch { gap: 9px !important; min-width: 120px !important; padding: 0 15px 0 9px !important; }
+.operator-launch::before { width: 25px !important; height: 25px !important; border-radius: 7px !important; background: url('/parda-logo-mark.jpg') center/cover no-repeat !important; }
+.operator-launch span { line-height: 1 !important; }
+
+/* Centre the signed-in account content instead of pinning the name to the edge. */
+.account-button { display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 8px !important; min-width: 112px !important; padding: 4px 14px 4px 6px !important; }
+.account-avatar { flex: 0 0 28px !important; }
+.account-name { display: block !important; min-width: 0 !important; text-align: center !important; font-weight: 750 !important; }
+
+/* Seat picker: use neutral surfaces and reserve colour for booking meaning. */
+.parda-seat-dialog { background: var(--surface) !important; }
+.parda-seat-dialog .dialog-header, .parda-seat-dialog .seat-dialog-bottom { background: var(--surface) !important; border-color: var(--line) !important; }
+.seat-legend { background: var(--surface) !important; border-color: var(--line) !important; }
+.seat-map { padding: 22px 26px 18px !important; background: var(--surface) !important; border-color: var(--line) !important; }
+.seat-map::before { content: none !important; }
+.seat-grid { display: grid !important; gap: 8px !important; }
+.seat-row { gap: 7px !important; }
+.seat { min-width: 34px !important; width: 34px !important; height: 30px !important; padding: 0 !important; border: 1px solid var(--line-strong) !important; border-radius: 5px 5px 2px 2px !important; background: var(--surface-raised) !important; color: transparent !important; font-size: 0 !important; }
+.seat.seat-premium { border-color: #b88a45 !important; background: color-mix(in srgb, #b88a45 14%, var(--surface)) !important; }
+.seat.seat-selected { border-color: var(--brand) !important; background: var(--brand) !important; color: transparent !important; }
+.seat.seat-taken { border-color: #686561 !important; background: #686561 !important; color: transparent !important; opacity: .78 !important; }
+.seat-dot.seat-open { border: 1px solid var(--line-strong) !important; background: var(--surface-raised) !important; }
+.seat-dot.seat-picked { background: var(--brand) !important; }
+.seat-dot.seat-busy { background: #686561 !important; }
+.seat-dot.seat-vip { background: #b88a45 !important; }
+.screen-label { position: relative !important; display: grid !important; place-items: center !important; width: min(88%, 610px) !important; min-height: 38px !important; margin: 30px auto 0 !important; border: 1px solid color-mix(in srgb, var(--ink) 26%, var(--line)) !important; border-bottom-width: 5px !important; border-radius: 50% 50% 5px 5px / 85% 85% 5px 5px !important; background: linear-gradient(180deg, color-mix(in srgb, var(--ink) 12%, var(--surface)), transparent) !important; color: var(--muted) !important; font-size: 10px !important; font-weight: 800 !important; letter-spacing: .18em !important; box-shadow: 0 14px 26px color-mix(in srgb, var(--ink) 10%, transparent) !important; }
+:root[data-theme='dark'] .parda-seat-dialog .dialog-header, :root[data-theme='dark'] .parda-seat-dialog .seat-dialog-bottom, :root[data-theme='dark'] .seat-legend, :root[data-theme='dark'] .seat-map { background: #0f0f0f !important; }
+
+@media (max-width: 530px) {
+  .brand-mark { width: 39px !important; height: 39px !important; }
+  .account-button { min-width: 42px !important; }
+  .account-name { display: none !important; }
+  .seat-map { padding: 16px 10px 14px !important; }
+  .seat { min-width: 24px !important; width: 24px !important; height: 24px !important; }
+  .seat-row { gap: 4px !important; }
+}
+
 :root[data-theme='dark'] {
   color-scheme: dark;
   --ink: #f1f1f1;
@@ -728,3 +794,22 @@ body, .app-shell, .programme-section, .footer, .operator-shell { background: var
   .ticket-code-info { text-align: center !important; }
   .ticket-actions { gap: 9px !important; }
 }
+
+/* Final overrides load last so both themes use the same production system. */
+:root, :root[data-theme='dark'] { --brand: #e36f4d !important; --brand-hover: #f18866 !important; --brand-ink: #1b100c !important; }
+.button-primary, .carousel-cta, .detail-halls .detail-hall-active, .hall-filter .hall-active, .catalog-switch .catalog-active, .selection-action .button-primary, .payment-submit { background: var(--brand) !important; border-color: var(--brand) !important; color: var(--brand-ink) !important; }
+@media (min-width: 821px) { .carousel-content { left: max(38px, calc(50% - 710px)) !important; } .carousel-controls { left: max(38px, calc(50% - 710px)) !important; } .carousel-poster { right: max(76px, calc(50% - 600px)) !important; } }
+.brand-mark, .operator-title-mark, .auth-mark { background-image: url('/parda-logo-mark.jpg') !important; background-position: center !important; background-repeat: no-repeat !important; background-size: cover !important; }
+.brand-mark { width: 44px !important; height: 44px !important; border-radius: 11px !important; border-color: color-mix(in srgb, var(--brand) 42%, var(--line)) !important; }
+.operator-launch { gap: 9px !important; min-width: 120px !important; padding: 0 15px 0 9px !important; }
+.operator-launch::before { width: 25px !important; height: 25px !important; border-radius: 7px !important; background: url('/parda-logo-mark.jpg') center/cover no-repeat !important; }
+.operator-launch span { line-height: 1 !important; }
+.account-button { display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 8px !important; min-width: 112px !important; padding: 4px 14px 4px 6px !important; }
+.account-avatar { flex: 0 0 28px !important; }.account-name { display: block !important; min-width: 0 !important; text-align: center !important; font-weight: 750 !important; }
+.parda-seat-dialog, .parda-seat-dialog .dialog-header, .parda-seat-dialog .seat-dialog-bottom, .seat-legend, .seat-map { background: var(--surface) !important; border-color: var(--line) !important; }
+.seat-map { padding: 22px 26px 18px !important; }.seat-map::before { content: none !important; }.seat-grid { display: grid !important; gap: 8px !important; }.seat-row { gap: 7px !important; }
+.seat { min-width: 34px !important; width: 34px !important; height: 30px !important; padding: 0 !important; border: 1px solid var(--line-strong) !important; border-radius: 5px 5px 2px 2px !important; background: var(--surface-raised) !important; color: transparent !important; font-size: 0 !important; }.seat.seat-premium { border-color: #b88a45 !important; background: color-mix(in srgb, #b88a45 14%, var(--surface)) !important; }.seat.seat-selected { border-color: var(--brand) !important; background: var(--brand) !important; color: transparent !important; }.seat.seat-taken { border-color: #686561 !important; background: #686561 !important; color: transparent !important; opacity: .78 !important; }
+.seat-dot.seat-open { border: 1px solid var(--line-strong) !important; background: var(--surface-raised) !important; }.seat-dot.seat-picked { background: var(--brand) !important; }.seat-dot.seat-busy { background: #686561 !important; }.seat-dot.seat-vip { background: #b88a45 !important; }
+.screen-label { position: relative !important; display: grid !important; place-items: center !important; width: min(88%, 610px) !important; min-height: 38px !important; margin: 30px auto 0 !important; border: 1px solid color-mix(in srgb, var(--ink) 26%, var(--line)) !important; border-bottom-width: 5px !important; border-radius: 50% 50% 5px 5px / 85% 85% 5px 5px !important; background: linear-gradient(180deg, color-mix(in srgb, var(--ink) 12%, var(--surface)), transparent) !important; color: var(--muted) !important; font-size: 10px !important; font-weight: 800 !important; letter-spacing: .18em !important; box-shadow: 0 14px 26px color-mix(in srgb, var(--ink) 10%, transparent) !important; }
+:root[data-theme='dark'] .parda-seat-dialog, :root[data-theme='dark'] .parda-seat-dialog .dialog-header, :root[data-theme='dark'] .parda-seat-dialog .seat-dialog-bottom, :root[data-theme='dark'] .seat-legend, :root[data-theme='dark'] .seat-map { background: #0f0f0f !important; }
+@media (max-width: 530px) { .brand-mark { width: 39px !important; height: 39px !important; }.account-button { min-width: 42px !important; }.account-name { display: none !important; }.seat-map { padding: 16px 10px 14px !important; }.seat { min-width: 24px !important; width: 24px !important; height: 24px !important; }.seat-row { gap: 4px !important; } }
