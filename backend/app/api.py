@@ -1,5 +1,8 @@
 from datetime import date, datetime, time, timedelta, timezone
+from base64 import b64decode
+from binascii import Error as BinasciiError
 from math import asin, ceil, cos, radians, sin, sqrt
+import re
 from secrets import choice, token_urlsafe
 from decimal import Decimal, ROUND_DOWN
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -13,7 +16,7 @@ from .models import (Auditorium, Booking, BookingSeat, BookingStatus, EmailOtpCh
                      PasswordResetChallenge, Payment, PaymentEmailChallenge, Promotion, PromotionRedemption, Role, Screening, Seat, User, WaitlistEntry, MovieWatchlist, BookingNotification, WaitlistNotification, MovieWatchlistNotification)
 from .schemas import (AuditoriumIn, AuditoriumOut, AuditoriumUpdate, NearbyAuditoriumOut, BookingIn, BookingOut, BookingStatusIn,
                       CatalogSyncOut, CinemaDirectorySyncOut, EmailChallengeOut, EmailCodeVerify, EmailResend, Login, MovieIn, MovieOut, OtpVerifyIn, PasswordResetConfirm, PasswordResetRequest, PaymentStartIn,
-                      PaymentStartOut, PaymentVerifyOut, ScreeningIn, ScreeningOut,
+                      PaymentStartOut, PaymentVerifyOut, ProfileUpdate, ScreeningIn, ScreeningOut,
                       ScreeningSeatsOut, SeatOut, Token, UserCreate, OperatorBookingOut,
                       OperatorDashboardOut, OperatorMetricsOut, OperatorScreeningOut,
                       TicketCheckInIn, TicketCheckInOut, WaitlistIn, WaitlistOut, WatchlistMovieOut, CustomerNotificationOut,
@@ -41,6 +44,27 @@ PASSWORD_RESET_MAX_ATTEMPTS = 5
 PASSWORD_RESET_REQUEST_LIMIT = 3
 POINT_VALUE_UZS = 100
 POINT_EARN_RATE_UZS = 1000
+_AVATAR_DATA_URL = re.compile(r"^data:image/(?:jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$")
+_MAX_AVATAR_BYTES = 300 * 1024
+
+def _user_payload(user: User) -> dict:
+    return {"id": user.id, "name": user.nickname, "nickname": user.nickname,
+            "email": user.email, "role": user.role.value, "created_at": user.created_at,
+            "avatar_data": user.avatar_data}
+
+def _validated_avatar(value: str | None) -> str | None:
+    if value is None:
+        return None
+    match = _AVATAR_DATA_URL.fullmatch(value)
+    if not match:
+        raise HTTPException(422, "Profile photo must be a PNG, JPEG, or WebP image")
+    try:
+        image = b64decode(match.group(1), validate=True)
+    except (ValueError, BinasciiError) as exc:
+        raise HTTPException(422, "Profile photo is not valid") from exc
+    if not image or len(image) > _MAX_AVATAR_BYTES:
+        raise HTTPException(422, "Profile photo must be smaller than 300 KB")
+    return value
 def _resend_available_at(now: datetime | None = None) -> datetime:
     return (now or datetime.now(timezone.utc)) + timedelta(seconds=EMAIL_RESEND_COOLDOWN_SECONDS)
 
@@ -298,9 +322,7 @@ def verify_email(data: EmailCodeVerify, db: Session = Depends(get_db)):
     challenge.consumed_at = now
     user.email_verified = True
     db.commit()
-    return {"access_token": make_token(user), "token_type": "bearer",
-        "user": {"id": user.id, "name": user.nickname, "nickname": user.nickname,
-                 "email": user.email, "role": user.role.value}}
+    return {"access_token": make_token(user), "token_type": "bearer", "user": _user_payload(user)}
 
 @router.post("/auth/login", response_model=Token)
 def login(data: Login, db: Session = Depends(get_db)):
@@ -370,8 +392,25 @@ def confirm_password_reset(data: PasswordResetConfirm, db: Session = Depends(get
 
 @router.get("/auth/me")
 def me(user: User = Depends(current_user)):
-    return {"id": user.id, "name": user.nickname, "nickname": user.nickname,
-            "email": user.email, "role": user.role.value}
+    return _user_payload(user)
+
+@router.patch("/auth/profile")
+def update_profile(data: ProfileUpdate, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    nickname = data.nickname.strip().lower()
+    if nickname != user.nickname:
+        existing = db.scalar(sa.select(User).where(sa.func.lower(User.nickname) == nickname, User.id != user.id))
+        if existing:
+            raise HTTPException(409, "This username is already in use")
+        user.nickname = nickname
+        user.name = nickname
+    user.avatar_data = _validated_avatar(data.avatar_data)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(409, "This username is already in use") from exc
+    db.refresh(user)
+    return _user_payload(user)
 
 @router.get("/movies", response_model=list[MovieOut])
 def movies(category: str | None = Query(default=None, pattern=r"^(now_playing|upcoming)$"),

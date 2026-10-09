@@ -36,6 +36,10 @@ class Login(BaseModel):
     email: EmailStr
     password: str
 
+class ProfileUpdate(BaseModel):
+    nickname: str = Field(min_length=2, max_length=40, pattern=r"^[\w.-]+$")
+    avatar_data: str | None = Field(default=None, max_length=500000)
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"

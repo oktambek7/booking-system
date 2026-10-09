@@ -28,6 +28,9 @@ class User(Base):
     phone: Mapped[str | None] = mapped_column(String(20))
     phone_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    # A compact, client-resized data URL. This avoids exposing a filesystem
+    # path while allowing an account picture without a separate media service.
+    avatar_data: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Parda Pass is an internal rewards balance.  Points are never derived
     # from card details and are only changed inside the payment transaction.
     parda_points: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
