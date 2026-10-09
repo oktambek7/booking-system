@@ -518,6 +518,32 @@ def customer_notifications(db: Session = Depends(get_db), user: User = Depends(c
             starts_at=screening.starts_at, due_at=notice.due_at, created_at=notice.created_at))
     return sorted(items, key=lambda item: (item.created_at, item.due_at), reverse=True)[:50]
 
+@router.delete("/notifications")
+def clear_customer_notifications(db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """Remove delivered notices while retaining future reminders and watchlist alerts."""
+    booking_ids = sa.select(Booking.id).where(Booking.customer_id == user.id)
+    waitlist_ids = sa.select(WaitlistEntry.id).where(WaitlistEntry.user_id == user.id)
+    watchlist_ids = sa.select(MovieWatchlist.id).where(MovieWatchlist.user_id == user.id)
+    removed = 0
+    for statement in (
+        sa.delete(BookingNotification).where(
+            BookingNotification.booking_id.in_(booking_ids),
+            BookingNotification.sent_at.is_not(None),
+        ),
+        sa.delete(WaitlistNotification).where(
+            WaitlistNotification.waitlist_entry_id.in_(waitlist_ids),
+            WaitlistNotification.sent_at.is_not(None),
+        ),
+        sa.delete(MovieWatchlistNotification).where(
+            MovieWatchlistNotification.watchlist_id.in_(watchlist_ids),
+            MovieWatchlistNotification.sent_at.is_not(None),
+        ),
+    ):
+        result = db.execute(statement)
+        removed += result.rowcount or 0
+    db.commit()
+    return {"cleared_count": removed}
+
 @router.post("/catalog/sync", response_model=CatalogSyncOut)
 def sync_movie_catalog(db: Session = Depends(get_db), _: User = admin):
     try:

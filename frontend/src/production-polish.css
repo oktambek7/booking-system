@@ -440,11 +440,12 @@
 .account-avatar { display: grid; overflow: hidden !important; place-items: center; border: 1px solid color-mix(in srgb, var(--parda-orange-ink) 25%, transparent); border-radius: 50%; background: color-mix(in srgb, var(--parda-orange-ink) 10%, var(--parda-orange)); }
 .account-avatar > img { width: 100%; height: 100%; padding: 0; border-radius: inherit; object-fit: cover; object-position: center; }
 
-/* A single warm overlay keeps the carousel luminous without a visible split. */
-.carousel-backdrop { opacity: .62 !important; filter: saturate(.78) brightness(1.03) !important; }
-.carousel-backdrop::after { content: '' !important; position: absolute !important; inset: 0 !important; background: rgba(248, 236, 225, .32) !important; }
-:root[data-theme='dark'] .carousel-backdrop { opacity: .73 !important; filter: saturate(.82) brightness(1.17) contrast(.92) !important; }
-:root[data-theme='dark'] .carousel-backdrop::after { background: rgba(105, 78, 61, .24) !important; }
+/* One continuous cinematic shade preserves contrast without splitting the slide in half. */
+.carousel-backdrop { opacity: .82 !important; filter: saturate(.8) contrast(.94) !important; }
+.carousel-backdrop::after { content: none !important; }
+.carousel-visual::after { content: '' !important; position: absolute !important; inset: 0 !important; z-index: 1 !important; pointer-events: none !important; background: rgba(9, 11, 14, .42) !important; }
+:root[data-theme='dark'] .carousel-backdrop { opacity: .86 !important; filter: saturate(.76) brightness(.9) contrast(.98) !important; }
+:root[data-theme='dark'] .carousel-visual::after { background: rgba(4, 6, 9, .56) !important; }
 :root[data-theme='dark'] .carousel-content { background: transparent !important; }
 .bookings-button {
   display: inline-flex;
@@ -524,4 +525,68 @@
   .topbar { padding: 0 10px !important; }
   .topbar .brand > span:last-child { display: none; }
   .top-actions { gap: 3px !important; }
+}
+
+/* Customer-facing mobile layout pass. */
+.notification-drawer-tools { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.notification-drawer-tools > p { margin: 0; }
+.notification-drawer-tools > button { flex: 0 0 auto; min-height: 34px; padding: 0 11px; border: 1px solid color-mix(in srgb, var(--parda-orange) 65%, var(--line)); border-radius: 7px; background: color-mix(in srgb, var(--parda-orange) 12%, var(--surface)); color: var(--ink); font: inherit; font-size: 10px; font-weight: 800; cursor: pointer; }
+.notification-drawer-tools > button:hover, .notification-drawer-tools > button:focus-visible { background: var(--parda-orange); color: var(--parda-orange-ink); }
+.notification-drawer-tools > button:disabled { opacity: .55; cursor: wait; }
+
+@media (max-width: 640px) {
+  html, body, #root { max-width: 100%; overflow-x: hidden; }
+  .topbar { display: grid !important; grid-template-columns: minmax(0, 1fr) auto !important; min-height: 60px !important; padding: 0 10px !important; gap: 8px !important; }
+  .topbar .brand { gap: 7px !important; min-width: 0 !important; }
+  .topbar .brand-mark { width: 34px !important; height: 34px !important; flex: 0 0 34px !important; }
+  .top-actions { display: flex !important; justify-content: flex-end !important; min-width: 0 !important; gap: 4px !important; }
+  .language-trigger, .theme-toggle, .notification-button, .account-button, .bookings-button, .signin-button { width: 36px !important; min-width: 36px !important; min-height: 36px !important; height: 36px !important; padding: 0 !important; }
+  .account-button { gap: 0 !important; }
+  .account-button .account-name { display: none !important; }
+  .carousel-visual { min-height: 490px !important; }
+  .carousel-content { left: 18px !important; right: 18px !important; width: auto !important; max-width: none !important; padding: 34px 0 78px !important; }
+  .carousel-content h1 { max-width: 72% !important; font-size: clamp(30px, 9vw, 40px) !important; line-height: .98 !important; }
+  .carousel-meta { max-width: 72% !important; }
+  .carousel-actions { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 8px !important; width: min(100%, 306px) !important; }
+  .carousel-actions button { min-height: 42px !important; padding: 0 9px !important; font-size: 11px !important; white-space: nowrap !important; }
+  .carousel-poster { right: 20px !important; width: 118px !important; }
+  .carousel-pager { left: 18px !important; bottom: 18px !important; }
+  .programme-section { padding: 36px 14px 52px !important; }
+  .section-head { display: grid !important; gap: 16px !important; }
+  .search-box, .catalog-switch { width: 100% !important; }
+  .catalog-switch { display: grid !important; grid-template-columns: 1fr 1fr !important; }
+  .catalog-switch button { width: 100% !important; min-width: 0 !important; padding-inline: 7px !important; font-size: 11px !important; }
+  .film-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 16px 10px !important; }
+  .movie-detail-panel, .showtimes-panel { overflow: hidden; }
+  .detail-heading { grid-template-columns: 82px minmax(0, 1fr) !important; gap: 14px !important; }
+  .detail-heading > img { width: 82px !important; }
+  .detail-title-row { flex-direction: column !important; align-items: flex-start !important; }
+  .detail-halls { overflow-x: auto !important; flex-wrap: nowrap !important; padding-bottom: 5px !important; }
+  .detail-halls > * { flex: 0 0 auto !important; }
+  .live-showtime { display: grid !important; grid-template-columns: minmax(0, 1fr) auto !important; gap: 10px !important; }
+  .live-showtime-buy { align-items: flex-end !important; }
+  .live-showtime-buy b { font-size: 10px !important; white-space: nowrap !important; }
+  .modal-scrim { padding: 0 !important; }
+  .seat-dialog, .payment-dialog, .ticket-dialog, .auth-dialog, .confirm-dialog { width: 100% !important; max-width: none !important; max-height: 100dvh !important; border-radius: 0 !important; }
+  .parda-seat-dialog { height: 100dvh !important; }
+  .seat-dialog .dialog-header { padding: 18px 16px 12px !important; }
+  .seat-dialog .dialog-header h2 { font-size: clamp(21px, 7vw, 30px) !important; }
+  .seat-map { overflow: auto !important; padding-inline: 10px !important; }
+  .seat-row { width: max-content !important; }
+  .seat-dialog-bottom { padding: 12px 16px calc(16px + env(safe-area-inset-bottom)) !important; }
+  .selection-action { gap: 10px !important; }
+  .selection-action .button-primary { padding-inline: 11px !important; font-size: 11px !important; }
+  .payment-dialog { padding: 20px 16px calc(20px + env(safe-area-inset-bottom)) !important; overflow: auto !important; }
+  .payment-methods { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .payment-row { grid-template-columns: 1fr !important; }
+  .profile-drawer, .history-drawer, .notification-drawer { width: 100vw !important; max-width: 100vw !important; padding: 22px 16px calc(22px + env(safe-area-inset-bottom)) !important; }
+  .notification-drawer-tools { align-items: flex-start; }
+  .notification-drawer-tools > button { font-size: 9px; }
+  .footer { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 14px !important; padding: 24px 16px !important; }
+  .footer > .brand { grid-column: 1 / -1; width: auto !important; }
+}
+
+@media (max-width: 430px) {
+  .topbar .brand > span:last-child { display: none !important; }
+  .carousel-content h1, .carousel-meta { max-width: 64% !important; }
 }
