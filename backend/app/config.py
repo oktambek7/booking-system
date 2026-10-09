@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     # the upstream service again.
     cinematica_cache_fresh_seconds: int = 600
     cinematica_cache_stale_seconds: int = 86400
+    cinematica_refresh_interval_seconds: int = 600
     notification_poll_seconds: int = 60
     notification_retry_minutes: int = 10
     sms_mode: str = "mock"

@@ -30,6 +30,17 @@ def _refresh_cinematica_directory() -> None:
         result = sync_active_cinematica_halls(db)
     logger.info("Cinematica hall directory refresh complete: %s", result)
 
+async def _cinematica_refresh_loop() -> None:
+    """Warm the durable public-catalog cache outside customer requests."""
+    while True:
+        try:
+            await asyncio.to_thread(_refresh_cinematica_directory)
+        except Exception:
+            # Catalogue discovery can be retried later; booking remains online
+            # using the durable stale cache in the meantime.
+            logger.exception("Cinematica background cache refresh failed")
+        await asyncio.sleep(max(60, settings.cinematica_refresh_interval_seconds))
+
 async def _tmdb_refresh_loop() -> None:
     while True:
         try:
@@ -80,13 +91,8 @@ async def lifespan(app: FastAPI):
     if created:
         logger.info("Created %s rolling Parda demo screenings", created)
     # Discovery source failures must never prevent the booking API from
-    # starting. A protected endpoint can retry the same idempotent sync.
-    async def refresh_cinematica_once():
-        try:
-            await asyncio.to_thread(_refresh_cinematica_directory)
-        except Exception:
-            logger.exception("Cinematica hall directory refresh failed")
-    directory_task = asyncio.create_task(refresh_cinematica_once())
+    # starting. Refresh catalogue data in the background instead.
+    directory_task = asyncio.create_task(_cinematica_refresh_loop())
     refresh_task = None
     notification_task = asyncio.create_task(_booking_notification_loop())
     if settings.tmdb_read_token:
