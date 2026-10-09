@@ -28,7 +28,7 @@ function resizeAvatar(file:File):Promise<string>{
   })
 }
 
-export default function ProfileDrawer({user,lang,onClose,onSave,onSignOut}:{user:ProfileUser;lang:Lang;onClose:()=>void;onSave:(nickname:string,avatarData:string|null)=>Promise<void>;onSignOut:()=>void}){
+export default function ProfileDrawer({user,lang,onClose,onSave,onSignOut,onAvatarPreview}:{user:ProfileUser;lang:Lang;onClose:()=>void;onSave:(nickname:string,avatarData:string|null)=>Promise<void>;onSignOut:()=>void;onAvatarPreview:(avatar:string|null)=>void}){
   const t=(key:keyof typeof text.en)=>text[lang][key]
   const [nickname,setNickname]=useState(user.nickname),[avatar,setAvatar]=useState(user.avatar_data||null),[busy,setBusy]=useState(false),[error,setError]=useState('')
   const initial=(user.nickname.trim().charAt(0)||'P').toUpperCase()
@@ -36,11 +36,28 @@ export default function ProfileDrawer({user,lang,onClose,onSave,onSignOut}:{user
   const chooseAvatar=async(event:ChangeEvent<HTMLInputElement>)=>{
     const file=event.target.files?.[0]
     if(!file)return
-    try{setError('');setAvatar(await resizeAvatar(file))}catch{setError(t('imageError'))}
+    try{setError('');const nextAvatar=await resizeAvatar(file);setAvatar(nextAvatar);onAvatarPreview(nextAvatar)}catch{setError(t('imageError'))}
   }
   const submit=async(event:FormEvent)=>{
     event.preventDefault();setBusy(true);setError('')
     try{await onSave(nickname,avatar)}catch(reason){setError(reason instanceof Error?reason.message:t('profileError'))}finally{setBusy(false)}
   }
-  return <div className="modal-scrim profile-scrim" onMouseDown={event=>event.target===event.currentTarget&&onClose()}><aside className="profile-drawer" role="dialog" aria-modal="true" aria-label={t('profile')}><header><div><span>{t('account')}</span><h2>{t('profile')}</h2></div><button className="icon-button" onClick={onClose} aria-label={t('close')}><X/></button></header><form onSubmit={submit}><section className="profile-identity"><label className="profile-avatar-editor"><input className="profile-avatar-input" type="file" accept="image/png,image/jpeg,image/webp" onChange={event=>void chooseAvatar(event)}/>{avatar?<img src={avatar} alt=""/>:<b>{initial}</b>}<span><Camera size={16}/>{t('changePicture')}</span></label><div><h3>{nickname||user.nickname}</h3><p>{user.email}</p>{joined&&<small>{t('memberSince')} · {joined}</small>}</div></section><div className="profile-fields"><label>{t('username')}<input value={nickname} minLength={2} maxLength={40} pattern="[A-Za-z0-9_.-]+" onChange={event=>setNickname(event.target.value)} required/></label></div>{error&&<p className="dialog-error">{error}</p>}<button className="button-primary profile-save" disabled={busy}>{busy?t('saving'):<><Save size={16}/>{t('save')}</>}</button></form><button className="profile-signout" onClick={onSignOut}><LogOut size={16}/>{t('signOut')}</button></aside></div>
+  return <div className="modal-scrim profile-scrim" onMouseDown={event=>event.target===event.currentTarget&&onClose()}>
+    <aside className="profile-drawer" role="dialog" aria-modal="true" aria-label={t('profile')}>
+      <header><div><span>{t('account')}</span><h2>{t('profile')}</h2></div><button className="icon-button" onClick={onClose} aria-label={t('close')}><X/></button></header>
+      <form onSubmit={submit}>
+        <section className="profile-identity">
+          <div className="profile-avatar-stack">
+            <div className="profile-avatar-frame" aria-label={t('picture')}>{avatar?<img src={avatar} alt=""/>:<b>{initial}</b>}</div>
+            <label className="profile-upload"><Camera size={16}/><span>{t('changePicture')}</span><input type="file" accept="image/png,image/jpeg,image/webp" onChange={event=>void chooseAvatar(event)}/></label>
+          </div>
+          <div><h3>{nickname||user.nickname}</h3><p>{user.email}</p>{joined&&<small>{t('memberSince')} · {joined}</small>}</div>
+        </section>
+        <div className="profile-fields"><label>{t('username')}<input value={nickname} minLength={2} maxLength={40} pattern="[A-Za-z0-9_.-]+" onChange={event=>setNickname(event.target.value)} required/></label></div>
+        {error&&<p className="dialog-error">{error}</p>}
+        <button className="button-primary profile-save" disabled={busy}>{busy?t('saving'):<><Save size={16}/>{t('save')}</>}</button>
+      </form>
+      <button className="profile-signout" onClick={onSignOut}><LogOut size={16}/>{t('signOut')}</button>
+    </aside>
+  </div>
 }

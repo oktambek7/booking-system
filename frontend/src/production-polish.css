@@ -435,7 +435,10 @@
 
 /* Separate profile and booking spaces, sized for both wide and narrow screens. */
 .account-avatar { overflow: hidden !important; }
-.account-avatar > img { width: 100%; height: 100%; padding: 3px; object-fit: contain; object-position: center; }
+.account-button { background: var(--parda-orange) !important; border-color: var(--parda-orange) !important; color: var(--parda-orange-ink) !important; }
+.account-button:hover, .account-button:focus-visible { background: color-mix(in srgb, var(--parda-orange) 87%, #000) !important; border-color: var(--parda-orange) !important; color: var(--parda-orange-ink) !important; }
+.account-avatar { display: grid; overflow: hidden !important; place-items: center; border: 1px solid color-mix(in srgb, var(--parda-orange-ink) 25%, transparent); border-radius: 50%; background: color-mix(in srgb, var(--parda-orange-ink) 10%, var(--parda-orange)); }
+.account-avatar > img { width: 100%; height: 100%; padding: 0; border-radius: inherit; object-fit: cover; object-position: center; }
 .bookings-button {
   display: inline-flex;
   align-items: center;
@@ -455,7 +458,7 @@
   border-color: var(--parda-orange);
   background: color-mix(in srgb, var(--parda-orange) 20%, var(--surface));
 }
-.profile-scrim { justify-items: end; padding: 0; }
+.profile-scrim { justify-items: end !important; align-items: stretch !important; padding: 0 !important; }
 .profile-drawer {
   width: min(500px, 100vw);
   height: 100%;
@@ -470,12 +473,13 @@
 .profile-drawer h2 { margin: 5px 0 0; font-size: clamp(29px, 4vw, 39px); line-height: 1; letter-spacing: -.045em; }
 .profile-drawer form { display: grid; gap: 24px; margin-top: 38px; }
 .profile-identity { display: flex; align-items: center; gap: 19px; padding-bottom: 24px; border-bottom: 1px solid var(--line); }
-.profile-avatar-editor { position: relative; display: grid; flex: 0 0 104px; width: 104px; height: 104px; overflow: hidden; place-items: center; border: 1px solid color-mix(in srgb, var(--parda-orange) 60%, var(--line)); border-radius: 50%; background: color-mix(in srgb, var(--parda-orange) 13%, var(--surface)); color: var(--parda-orange-ink); cursor: pointer; }
-.profile-avatar-editor > img { width: 100%; height: 100%; padding: 6px; object-fit: contain; object-position: center; }
-.profile-avatar-editor > b { font-size: 42px; }
-.profile-avatar-editor > span { position: absolute; right: 4px; bottom: 4px; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; overflow: hidden; border: 2px solid var(--surface); border-radius: 50%; background: var(--parda-orange); color: var(--parda-orange-ink); }
-.profile-avatar-editor > span svg { flex: 0 0 auto; }
-.profile-avatar-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.profile-avatar-stack { display: grid; flex: 0 0 116px; gap: 9px; justify-items: center; }
+.profile-avatar-frame { display: grid; width: 104px; height: 104px; overflow: hidden; place-items: center; border: 1px solid color-mix(in srgb, var(--parda-orange) 60%, var(--line)); border-radius: 50%; background: color-mix(in srgb, var(--parda-orange) 13%, var(--surface)); color: var(--parda-orange-ink); }
+.profile-avatar-frame > img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; object-position: center; }
+.profile-avatar-frame > b { font-size: 42px; }
+.profile-upload { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 31px; padding: 0 10px; border: 1px solid color-mix(in srgb, var(--parda-orange) 65%, var(--line)); border-radius: 999px; background: color-mix(in srgb, var(--parda-orange) 10%, var(--surface)); color: var(--ink); font-size: 10px; font-weight: 800; cursor: pointer; }
+.profile-upload:hover, .profile-upload:focus-within { border-color: var(--parda-orange); background: color-mix(in srgb, var(--parda-orange) 20%, var(--surface)); }
+.profile-upload input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .profile-identity h3 { max-width: 280px; margin: 0; overflow-wrap: anywhere; font-size: clamp(21px, 3vw, 29px); letter-spacing: -.04em; }
 .profile-identity p { margin: 8px 0 4px; overflow-wrap: anywhere; color: var(--muted); font-size: 13px; }
 .profile-identity small { display: block; color: var(--muted); font-size: 10px; line-height: 1.5; }
@@ -501,8 +505,10 @@
   .bookings-button svg { width: 15px; height: 15px; }
   .profile-drawer { width: 100vw; padding: 22px 18px; }
   .profile-drawer form { margin-top: 28px; gap: 20px; }
-  .profile-avatar-editor { flex-basis: 82px; width: 82px; height: 82px; }
-  .profile-avatar-editor > b { font-size: 33px; }
+  .profile-avatar-stack { flex-basis: 90px; }
+  .profile-avatar-frame { width: 82px; height: 82px; }
+  .profile-avatar-frame > b { font-size: 33px; }
+  .profile-upload { min-height: 29px; padding: 0 8px; font-size: 9px; }
   .profile-identity { align-items: flex-start; gap: 14px; }
   .profile-identity h3 { font-size: 22px; }
   .profile-identity p { font-size: 12px; }
