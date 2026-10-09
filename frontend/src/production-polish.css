@@ -445,6 +445,7 @@
 .carousel-backdrop::after { content: '' !important; position: absolute !important; inset: 0 !important; background: rgba(248, 236, 225, .32) !important; }
 :root[data-theme='dark'] .carousel-backdrop { opacity: .73 !important; filter: saturate(.82) brightness(1.17) contrast(.92) !important; }
 :root[data-theme='dark'] .carousel-backdrop::after { background: rgba(105, 78, 61, .24) !important; }
+:root[data-theme='dark'] .carousel-content { background: transparent !important; }
 .bookings-button {
   display: inline-flex;
   align-items: center;
