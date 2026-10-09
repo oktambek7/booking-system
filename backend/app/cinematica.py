@@ -12,11 +12,13 @@ import time
 import httpx
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from .database import get_db
-from .models import Auditorium, Booking, BookingSeat, BookingStatus, CatalogScreeningLink, Movie, Role, Screening, Seat, User
+from .config import settings
+from .database import SessionLocal, get_db
+from .models import (Auditorium, Booking, BookingSeat, BookingStatus, CatalogResponseCache,
+                     CatalogScreeningLink, Movie, Role, Screening, Seat, User)
 from .schemas import CinemaDirectorySyncOut
 from .security import require_roles
 from .ticketon import show_for_title as ticketon_show_for_title, shows_for_title as ticketon_shows_for_title
@@ -27,16 +29,64 @@ BASE = "https://cinematica.uz/api/v1"
 # The upstream catalogue is a convenience feed.  A temporary upstream timeout
 # must not make a customer-facing programme disappear after its short fresh
 # cache lifetime.  Keep a bounded stale copy as a read-only fallback.
-_FRESH_CACHE_SECONDS = 5 * 60
-_STALE_CACHE_SECONDS = 24 * 60 * 60
+_FRESH_CACHE_SECONDS = settings.cinematica_cache_fresh_seconds
+_STALE_CACHE_SECONDS = max(_FRESH_CACHE_SECONDS, settings.cinematica_cache_stale_seconds)
 _cache: dict[str, tuple[float, float, dict]] = {}
 _lock = Lock()
 logger = logging.getLogger(__name__)
 ACTIVE_BOOKING_STATUSES = (BookingStatus.CONFIRMED, BookingStatus.COMPLETED)
 
 
+def _utc_after(value: datetime, now: datetime) -> bool:
+    """Compare PostgreSQL and SQLite timestamps without losing UTC intent."""
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value > now
+
+
+def _persistent_cache(path: str, now: datetime) -> tuple[dict | None, dict | None]:
+    """Return fresh and stale candidates from durable storage.
+
+    Cache storage must accelerate discovery, never become a reason a live
+    catalogue request fails. Database failures therefore fall through to the
+    normal upstream request path.
+    """
+    try:
+        with SessionLocal() as db:
+            cached = db.get(CatalogResponseCache, path)
+            if not cached or not isinstance(cached.payload, dict):
+                return None, None
+            if _utc_after(cached.fresh_until, now):
+                return cached.payload, cached.payload
+            if _utc_after(cached.stale_until, now):
+                return None, cached.payload
+    except SQLAlchemyError as exc:
+        logger.warning("Could not read persisted Cinematica cache for %s: %s", path, exc)
+    return None, None
+
+
+def _store_persistent_cache(path: str, payload: dict, now: datetime) -> None:
+    try:
+        with SessionLocal() as db:
+            cached = db.get(CatalogResponseCache, path)
+            if cached is None:
+                cached = CatalogResponseCache(cache_key=path, payload=payload,
+                    fetched_at=now, fresh_until=now + timedelta(seconds=_FRESH_CACHE_SECONDS),
+                    stale_until=now + timedelta(seconds=_STALE_CACHE_SECONDS))
+                db.add(cached)
+            else:
+                cached.payload = payload
+                cached.fetched_at = now
+                cached.fresh_until = now + timedelta(seconds=_FRESH_CACHE_SECONDS)
+                cached.stale_until = now + timedelta(seconds=_STALE_CACHE_SECONDS)
+            db.commit()
+    except SQLAlchemyError as exc:
+        logger.warning("Could not persist Cinematica cache for %s: %s", path, exc)
+
+
 def _get(path: str) -> dict:
     now = time.monotonic()
+    wall_now = datetime.now(timezone.utc)
     stale_payload: dict | None = None
     with _lock:
         cached = _cache.get(path)
@@ -46,6 +96,12 @@ def _get(path: str) -> dict:
                 return payload
             if stale_until > now:
                 stale_payload = payload
+    if stale_payload is None:
+        fresh_payload, stale_payload = _persistent_cache(path, wall_now)
+        if fresh_payload is not None:
+            with _lock:
+                _cache[path] = (now + _FRESH_CACHE_SECONDS, now + _STALE_CACHE_SECONDS, fresh_payload)
+            return fresh_payload
     try:
         response = httpx.get(f"{BASE}/{path.lstrip('/')}", timeout=8.0,
                              headers={"Accept": "application/json", "User-Agent": "PardaCinema/1.0"})
@@ -60,6 +116,7 @@ def _get(path: str) -> dict:
         raise HTTPException(502, "Cinematica's live catalog is temporarily unavailable") from exc
     with _lock:
         _cache[path] = (now + _FRESH_CACHE_SECONDS, now + _STALE_CACHE_SECONDS, payload)
+    _store_persistent_cache(path, payload, wall_now)
     return payload
 
 

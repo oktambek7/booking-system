@@ -117,6 +117,19 @@ class CatalogScreeningLink(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     screening: Mapped["Screening"] = relationship()
 
+class CatalogResponseCache(Base):
+    """Durable read-through cache for public catalogue responses.
+
+    It intentionally stores only Cinematica's public discovery payloads.
+    Availability and booking state remain owned by Parda's booking tables.
+    """
+    __tablename__ = "catalog_response_cache"
+    cache_key: Mapped[str] = mapped_column(String(500), primary_key=True)
+    payload: Mapped[dict] = mapped_column(JSON)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    fresh_until: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    stale_until: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
 class Booking(Base):
     __tablename__ = "bookings"
     id: Mapped[int] = mapped_column(primary_key=True)

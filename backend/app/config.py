@@ -10,6 +10,11 @@ class Settings(BaseSettings):
     tmdb_region: str = "UZ"
     tmdb_max_pages: int = 5
     tmdb_sync_interval_hours: int = 24
+    # The external cinema catalogue is discovery data.  Keep it in the
+    # production database so a Render restart does not make customers wait on
+    # the upstream service again.
+    cinematica_cache_fresh_seconds: int = 600
+    cinematica_cache_stale_seconds: int = 86400
     notification_poll_seconds: int = 60
     notification_retry_minutes: int = 10
     sms_mode: str = "mock"
