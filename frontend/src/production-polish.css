@@ -439,6 +439,12 @@
 .account-button:hover, .account-button:focus-visible { background: color-mix(in srgb, var(--parda-orange) 87%, #000) !important; border-color: var(--parda-orange) !important; color: var(--parda-orange-ink) !important; }
 .account-avatar { display: grid; overflow: hidden !important; place-items: center; border: 1px solid color-mix(in srgb, var(--parda-orange-ink) 25%, transparent); border-radius: 50%; background: color-mix(in srgb, var(--parda-orange-ink) 10%, var(--parda-orange)); }
 .account-avatar > img { width: 100%; height: 100%; padding: 0; border-radius: inherit; object-fit: cover; object-position: center; }
+
+/* A single warm overlay keeps the carousel luminous without a visible split. */
+.carousel-backdrop { opacity: .62 !important; filter: saturate(.78) brightness(1.03) !important; }
+.carousel-backdrop::after { content: '' !important; position: absolute !important; inset: 0 !important; background: rgba(248, 236, 225, .32) !important; }
+:root[data-theme='dark'] .carousel-backdrop { opacity: .66 !important; filter: saturate(.74) brightness(1.08) !important; }
+:root[data-theme='dark'] .carousel-backdrop::after { background: rgba(48, 39, 34, .42) !important; }
 .bookings-button {
   display: inline-flex;
   align-items: center;
