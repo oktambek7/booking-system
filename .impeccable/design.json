@@ -1,25 +1,42 @@
 {
   "name": "Parda Cinema",
-  "direction": "The Cinema Programme Board",
-  "description": "Light Uzbek-first repertory and seat-booking interface.",
+  "direction": "Aurora Glass Cinema",
+  "description": "Uzbek-first cinema booking: frosted glass over a drifting aurora, dark by default with a matching light theme.",
+  "themes": {
+    "dark": { "name": "Night Screen", "bg": "#0a0a18", "bg-elevated": "#12122a", "text": "#f5f5ff", "text-2": "#b4b4d0", "text-3": "#a0a0c0" },
+    "light": { "name": "Matinee", "bg": "#f6f5ff", "bg-elevated": "#ffffff", "text": "#14142b", "text-2": "#4a4a68", "text-3": "#61617f" }
+  },
   "colors": {
-    "ink": "#252624",
-    "muted": "#777970",
-    "paper": "#f8f7f3",
-    "white": "#fffefa",
-    "cream": "#efeee9",
-    "line": "#e5e3db",
-    "sage": "#52664f",
-    "sage-light": "#e5ebdf",
-    "coral": "#c96850"
+    "aurora-violet": "#7c5cff",
+    "aurora-magenta": "#ff3d8b",
+    "aurora-cyan": "#22d3ee",
+    "aurora-amber": "#ffb547",
+    "action-from": "#7653f8",
+    "action-to": "#d61f6e",
+    "seat-available": "#34d399",
+    "seat-selected": "#7653f8",
+    "seat-premium": "#ffb547",
+    "seat-taken": "#5b5b78",
+    "success": "#22c55e",
+    "warning": "#f59e0b",
+    "danger": "#f43f5e"
   },
   "typography": {
-    "display": "Playfair Display, Georgia, serif",
-    "body": "DM Sans, sans-serif"
+    "display": "Unbounded Variable (600)",
+    "body": "Manrope Variable (400-700)",
+    "floor": "12px"
   },
+  "glass": {
+    "glass-1": "cards, chips; white 6%; blur 16px (10px phones)",
+    "glass-2": "header, hero card, sticky bars; blur 24px (16px phones)",
+    "glass-3": "modals, drawers, menu; blur 32px (20px phones)"
+  },
+  "breakpoints": [481, 769, 1025, 1280],
+  "source": "frontend/src/styles/tokens.css",
   "principles": [
-    "Film, showtime, seats, and total remain clear at every step.",
-    "Seat status has text labels and distinct visual states.",
-    "The demo confirms reservations without charging a payment."
+    "One gradient primary action per screen, always in the same place.",
+    "Glass carries the interface; solid colour carries seat and status meaning.",
+    "Seat state is shown by colour, pattern or icon, and text.",
+    "Checkout is a demo and never implies a real charge."
   ]
 }

@@ -1,19 +1,19 @@
+## Direction contract
+
 THESIS
-The best next cinema choice is always easy to see: choose a film, a local showtime, a seat, then review a plain-language ticket summary.
+Choosing a film and a seat should feel like the lights going down: a calm, glowing glass interface where one clear action leads from poster to ticket. It refuses the usual booking page, a dense grid of competing buttons.
 
 OWN-WORLD
-A light repertory programme for Parda Cinema in Tashkent. Use warm ivory paper, deep ink, muted sage for available seats, and a restrained vermilion highlight for the selected screening. Avoid generic luxury and heavy dark cinema UI.
+Night Screen: near-black indigo ground (#0a0a18) with four drifting colour fields (violet, magenta, cyan, amber), frosted glass in three levels, Unbounded display type over Manrope body. One violet-to-magenta gradient is reserved for the primary action. Seats are solid green, violet, amber and hatched grey. A light theme (Matinee, #f6f5ff) shares every token. Recognisable with all copy removed: glass cards over soft coloured light and a glowing screen arc above the seat map.
 
 STORY
-A visitor browses fictional films, chooses a date and screening, selects up to eight seats, and places a ten-minute hold. Confirmation records the booking without taking payment. A cinema administrator manages films, halls, screenings, and booking status.
+A visitor opens the site on a phone, swipes through what is playing, picks a showtime from grouped time chips, chooses up to eight seats, sees the full summary and a ten-minute hold, confirms with an email code in a clearly labelled demo checkout, and keeps a QR ticket.
 
 FIRST VIEWPORT
-Show the Parda Cinema identity, Tashkent location, a clear date selector, and a featured film with title, genre, runtime, and next showtimes. Lead into a scannable film programme. Keep account/history accessible without obscuring the primary booking action.
+Desktop: sticky glass header (logo, nav, one account control), then a full-bleed hero tinted by the poster. A glass info card sits left (title, age badge, release and language, the next three showtimes as chips, one gradient "Get tickets" button and a secondary save), the poster stands right. Phone: poster first, then the glass card, controls in one row. The primary action is always the gradient pill inside the card.
 
 FORM
-Use confident editorial typography for film titles and a readable sans-serif for controls. Light responsive cards, visible focus, explicit seat states and legend, large touch targets, Uzbek language, UZS prices, and Asia/Tashkent date/time. Keep the seat map zoom-free on mobile and the selected-seat total persistent.
+Direction A "Poster Glow", chosen over the split-stage alternative because it keeps the real posters as the main colour, uses the fewest blurred layers and so stays smooth on phones. Seed: user-pinned brief (no roll).
 
 FINISH
 unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
-
-Seed: direction 916bb5d3; recorded assigned direction. The selected direction is adapted to the user's light visual preference and the programme-board booking flow.

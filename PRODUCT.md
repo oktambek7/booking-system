@@ -34,13 +34,13 @@ This is a web app for cinemas in Uzbekistan. The default interface is Uzbek, pri
 - One seat can have only one active assignment for a screening. Pending holds expire after ten minutes.
 - Booking status values are pending, confirmed, cancelled, and completed. Cancelling or expiring releases seats while preserving booking history.
 - This project has no connected payment processor. Demo confirmation must not imply a real charge.
-- Sample film titles and screenings are fictional demo content, not a live cinema catalogue.
+- Film listings, posters and showtimes come from Cinematica, with film metadata from TMDB (credited in the footer). Checkout is a demo.
 - “Parda Cinema” is a fictional demo label; no production cinema chain or catalogue was supplied.
 - The payment provider is undecided and intentionally absent from demo checkout.
 
 ## Evidence on Hand
 
-The user supplied the booking-system requirements and asked for a cinema seat-booking adaptation. There are no licensed film posters, cinema contracts, payment credentials, or production catalogue supplied. Illustrative sample imagery and data must be identified as demo content.
+The user supplied the booking-system requirements and asked for a cinema seat-booking adaptation. Catalogue data and posters are fetched from Cinematica and TMDB. No cinema contracts or payment credentials were supplied, so payment stays a labelled demo.
 
 ## Product Principles
 
