@@ -1,0 +1,119 @@
+@layer pages {
+  /* =========================================================
+     Header: logo · nav · one account button. Everything else lives in the menu.
+     ========================================================= */
+  .topbar {
+    position: sticky; top: 0; z-index: 40;
+    border-width: 0 0 1px 0;
+    transition: min-height var(--t-base) var(--ease);
+  }
+  .topbar-inner {
+    display: flex; align-items: center; justify-content: space-between; gap: var(--s-3);
+    width: 100%; max-width: var(--container); margin-inline: auto;
+    min-height: var(--header-h); padding-inline: var(--gutter);
+    transition: min-height var(--t-base) var(--ease);
+  }
+  .topbar.is-compact .topbar-inner { min-height: 56px; }
+
+  .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font-family: var(--font-display); font-weight: 700; font-size: 1.0625rem; letter-spacing: 0.04em; }
+  .brand-mark { display: grid; place-items: center; width: 40px; height: 40px; flex: none; overflow: hidden; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--bg-elevated); }
+  .brand-mark img { width: 100%; height: 100%; object-fit: cover; }
+  .brand-period { color: var(--aurora-magenta); }
+
+  .main-nav { display: none; align-items: center; gap: var(--s-1); margin-right: auto; margin-left: var(--s-4); }
+  .nav-link { position: relative; border: 0; background: transparent; color: var(--text-2); font-size: var(--fs-body); padding: 0 var(--s-3); }
+  .nav-link:hover { color: var(--text); background: transparent; }
+  .nav-link.is-active { color: var(--text); }
+  .nav-link.is-active::after { content: ''; position: absolute; left: var(--s-3); right: var(--s-3); bottom: 4px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, var(--aurora-violet), var(--aurora-magenta)); }
+
+  .top-actions { display: flex; align-items: center; gap: var(--s-2); position: relative; }
+
+  .account-trigger, .menu-trigger {
+    position: relative; display: inline-flex; align-items: center; gap: var(--s-2);
+    min-height: var(--tap); border-radius: var(--r-pill);
+    border: 1px solid var(--line-strong); background: var(--glass-1-bg);
+    color: var(--text); font-weight: 600; font-size: var(--fs-small);
+    transition: background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+  }
+  .account-trigger { padding: 3px 12px 3px 3px; }
+  .menu-trigger { justify-content: center; width: var(--tap); padding: 0; }
+  .account-trigger:hover, .menu-trigger:hover, .account-trigger[aria-expanded='true'], .menu-trigger[aria-expanded='true'] { background: color-mix(in srgb, var(--text) 12%, transparent); border-color: color-mix(in srgb, var(--aurora-violet) 70%, var(--text)); }
+  .account-name { display: none; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .account-trigger > svg { display: none; }
+  .account-avatar { display: grid; place-items: center; width: 36px; height: 36px; flex: none; overflow: hidden; border-radius: 50%; background: linear-gradient(135deg, var(--action-from), var(--action-to)); color: #fff; font-weight: 700; }
+  .account-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .notify-dot { position: absolute; top: 2px; right: 2px; width: 10px; height: 10px; border-radius: 50%; background: var(--aurora-magenta); border: 2px solid var(--bg-solid-2); }
+  .signin-button { min-height: var(--tap); padding: 0 var(--s-4); font-size: var(--fs-small); }
+
+  /* Menu scrim: transparent click-catcher on desktop, dim sheet backdrop on phones. */
+  .menu-scrim { position: fixed; inset: 0; z-index: 44; background: var(--scrim); animation: scrim-in var(--t-base) var(--ease) both; }
+
+  .account-menu {
+    position: fixed; z-index: 45; left: 0; right: 0; bottom: 0;
+    max-height: 88dvh; overflow-y: auto; overscroll-behavior: contain;
+    padding: var(--s-3) var(--gutter) calc(var(--s-4) + env(safe-area-inset-bottom));
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    background: var(--glass-3-bg);
+    -webkit-backdrop-filter: var(--glass-3-blur); backdrop-filter: var(--glass-3-blur);
+    box-shadow: var(--glass-highlight), var(--shadow-2);
+    animation: sheet-in var(--t-enter) var(--ease) both;
+  }
+  .account-menu::before { content: ''; display: block; width: 40px; height: 4px; margin: 0 auto var(--s-3); border-radius: 99px; background: var(--line-strong); }
+  .menu-head { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-2) 0 var(--s-3); border-bottom: 1px solid var(--line); margin-bottom: var(--s-2); }
+  .menu-head .account-avatar { width: 48px; height: 48px; }
+  .menu-head b { display: block; font-size: var(--fs-body); }
+  .menu-head small { color: var(--text-2); overflow-wrap: anywhere; }
+  .menu-list { display: grid; gap: 2px; }
+  .menu-item {
+    position: relative; display: flex; align-items: center; gap: var(--s-3);
+    width: 100%; min-height: 48px; padding: 0 var(--s-3);
+    border-radius: var(--r-sm); text-align: left; text-decoration: none;
+    color: var(--text); font-weight: 600; font-size: var(--fs-body);
+    transition: background var(--t-fast) var(--ease);
+  }
+  .menu-item:hover { background: color-mix(in srgb, var(--text) 10%, transparent); }
+  .menu-item svg { color: var(--text-2); flex: none; width: 20px; height: 20px; }
+  .menu-item .menu-dot { margin-left: auto; width: 8px; height: 8px; border-radius: 50%; background: var(--aurora-magenta); }
+  .menu-section { display: grid; gap: var(--s-2); padding: var(--s-3) var(--s-1) var(--s-1); margin-top: var(--s-2); border-top: 1px solid var(--line); }
+  .menu-label { display: flex; align-items: center; gap: var(--s-2); color: var(--text-2); font-size: var(--fs-label); font-weight: 700; letter-spacing: var(--tracking-label); text-transform: uppercase; }
+  .menu-label svg { width: 14px; height: 14px; }
+  .menu-section .segmented { width: 100%; }
+  .menu-section .segmented button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+  .menu-danger { margin-top: var(--s-3); width: 100%; }
+
+  /* =========================================================
+     Footer: compact glass band
+     ========================================================= */
+  .footer { padding: var(--s-6) var(--gutter) calc(var(--s-4) + env(safe-area-inset-bottom)); }
+  .footer-inner {
+    display: grid; gap: var(--s-3); align-items: center;
+    width: 100%; max-width: var(--container); margin-inline: auto; padding: var(--s-4);
+    border-radius: var(--r-lg);
+    color: var(--text-2); font-size: var(--fs-small);
+  }
+  .footer-meta { display: grid; gap: 4px; }
+  .footer-meta b { color: var(--text); font-size: var(--fs-label); letter-spacing: var(--tracking-label); }
+  .footer-links { display: flex; flex-wrap: wrap; gap: var(--s-3); }
+  .footer-links a { display: inline-flex; align-items: center; min-height: var(--tap); font-weight: 600; color: var(--text); }
+  .footer-links a:hover { color: var(--aurora-cyan); }
+
+  @media (min-width: 481px) {
+    .account-menu { width: min(100%, 520px); margin-inline: auto; }
+    .account-name { display: inline; }
+    .account-trigger > svg { display: block; width: 16px; height: 16px; }
+  }
+  @media (min-width: 769px) {
+    .main-nav { display: flex; }
+    .menu-scrim { background: transparent; animation: none; }
+    .account-menu {
+      /* Rendered outside the header (its backdrop-filter would trap fixed children). */
+      top: calc(var(--header-h) + var(--s-2)); right: max(var(--gutter), calc((100vw - var(--container)) / 2 + var(--gutter))); bottom: auto; left: auto;
+      width: 340px; margin-inline: 0; max-height: calc(100dvh - var(--header-h) - 24px);
+      padding: var(--s-3);
+      border-radius: var(--r-lg);
+      animation: dialog-in var(--t-base) var(--ease) both;
+    }
+    .account-menu::before { display: none; }
+    .footer-inner { grid-template-columns: auto 1fr auto; gap: var(--s-5); }
+  }
+}

@@ -1,0 +1,113 @@
+@layer pages {
+  /* =========================================================
+     Auth + password reset (centred glass-3 modal)
+     ========================================================= */
+  .auth-dialog, .confirm-dialog { display: grid; gap: var(--s-3); justify-items: stretch; }
+  .auth-dialog h2, .confirm-dialog h2 { font-size: var(--fs-h3); text-align: center; }
+  .auth-dialog > p, .confirm-dialog > p { color: var(--text-2); text-align: center; font-size: var(--fs-small); }
+  .auth-dialog > p:empty { display: none; }
+  .auth-dialog form { display: grid; gap: var(--s-3); }
+  .auth-close { position: absolute; top: var(--s-3); right: var(--s-3); }
+  .auth-mark { justify-self: center; width: 56px; height: 56px; border-radius: 16px; }
+  .auth-mark svg { width: 26px; height: 26px; }
+  .auth-tabs { justify-self: center; width: 100%; }
+  .auth-tabs button { flex: 1; }
+  .auth-submit { width: 100%; }
+  .auth-switch { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: var(--s-1); color: var(--text-2); font-size: var(--fs-small); text-align: center; }
+  .auth-dialog > button.auth-switch { width: 100%; min-height: var(--tap); }
+  .auth-security { display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--text-3); text-align: center; line-height: 1.4; }
+  .auth-security svg { flex: none; }
+  .auth-reset-success { padding: var(--s-3); border-radius: var(--r-sm); background: color-mix(in srgb, var(--success) 16%, transparent); border: 1px solid color-mix(in srgb, var(--success) 50%, transparent); color: var(--success-text); font-weight: 600; text-align: center; }
+  .confirm-dialog { justify-items: center; text-align: center; }
+  .confirm-dialog .button-primary { width: 100%; }
+
+  /* =========================================================
+     E-ticket
+     ========================================================= */
+  .ticket-dialog { display: grid; gap: var(--s-3); padding-top: var(--s-4); }
+  .ticket-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); }
+  .ticket-live-mark { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 12px; border-radius: var(--r-pill); background: color-mix(in srgb, var(--success) 18%, transparent); border: 1px solid color-mix(in srgb, var(--success) 55%, transparent); color: var(--success-text); font-size: var(--fs-label); font-weight: 700; }
+  .ticket-dialog h2 { font-size: var(--fs-h3); overflow-wrap: anywhere; }
+  .ticket-venue { color: var(--text-2); font-size: var(--fs-small); display: flex; flex-wrap: wrap; gap: 6px; }
+  .ticket-code-box { display: grid; justify-items: center; gap: var(--s-3); padding: var(--s-4) 0; border-block: 2px dashed var(--line-strong); }
+  .ticket-qr-wrap { padding: var(--s-2); border-radius: var(--r-md); background: #fff; box-shadow: 0 10px 30px rgba(2, 2, 12, 0.35); animation: poster-in var(--t-enter) var(--ease) 120ms both; }
+  .ticket-qr-wrap svg { width: 160px; height: 160px; }
+  .ticket-code-info { display: grid; gap: 4px; justify-items: center; text-align: center; }
+  .ticket-code-info span { color: var(--text-2); font-size: var(--fs-label); font-weight: 700; letter-spacing: var(--tracking-label); }
+  .ticket-code-info strong { font-family: var(--font-display); font-size: 1.375rem; letter-spacing: 0.06em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .ticket-code-info small { color: var(--text-2); max-width: 32ch; }
+  .ticket-details { display: grid; gap: var(--s-2); margin: 0; }
+  .ticket-details > div { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: var(--s-2); font-size: var(--fs-small); }
+  .ticket-details dt { color: var(--text-2); }
+  .ticket-details dd { font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+  .ticket-actions { display: grid; gap: var(--s-2); grid-template-columns: 1fr; }
+  .ticket-actions .ticket-calendar { width: 100%; }
+  .ticket-actions .ticket-done { width: 100%; }
+
+  /* =========================================================
+     Booking history + saved films (drawer content)
+     ========================================================= */
+  .history-greeting { color: var(--text-2); font-size: var(--fs-small); margin: calc(var(--s-1) * -1) 0 var(--s-3); }
+  .saved-movies-section { display: grid; gap: var(--s-2); padding: var(--s-3); border-radius: var(--r-md); margin-bottom: var(--s-3); }
+  .saved-movies-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s-3); }
+  .saved-movies-heading > div { display: flex; gap: var(--s-2); align-items: flex-start; min-width: 0; }
+  .saved-movies-heading > div > span { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 50%; background: color-mix(in srgb, var(--aurora-magenta) 24%, transparent); color: var(--aurora-magenta); }
+  .saved-movies-heading h3 { font-size: 1rem; }
+  .saved-movies-heading p { color: var(--text-2); font-size: var(--fs-small); margin-top: 2px; }
+  .saved-movies-heading > b { display: grid; place-items: center; min-width: 28px; height: 28px; padding: 0 8px; border-radius: 99px; background: color-mix(in srgb, var(--text) 12%, transparent); font-size: var(--fs-small); }
+  .saved-movies-list { display: grid; gap: var(--s-2); }
+  .saved-movie-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) var(--tap); gap: var(--s-3); align-items: center; padding: var(--s-1) 0; }
+  .saved-movie-row img { width: 40px; height: 60px; object-fit: cover; border-radius: 8px; }
+  .saved-movie-row b { display: block; font-size: var(--fs-small); overflow-wrap: anywhere; }
+  .saved-movie-row span { color: var(--text-2); font-size: var(--fs-label); }
+  .saved-movie-row button { display: grid; place-items: center; width: var(--tap); height: var(--tap); border-radius: 50%; color: var(--text-2); }
+  .saved-movie-row button:hover:not(:disabled) { color: var(--danger-text); background: color-mix(in srgb, var(--danger) 14%, transparent); }
+  .history-clear button { flex: none; white-space: nowrap; }
+  .history-clear { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); margin-bottom: var(--s-3); color: var(--text-2); font-size: var(--fs-small); }
+  .booking-history { display: grid; gap: var(--s-3); }
+  .history-card { display: grid; gap: var(--s-2); padding: var(--s-3); border-radius: var(--r-md); }
+  .history-card h3 { font-size: 1.0625rem; overflow-wrap: anywhere; }
+  .history-card > p { color: var(--text-2); font-size: var(--fs-small); }
+  .history-card-top { display: flex; align-items: center; gap: var(--s-2); font-size: var(--fs-small); }
+  .status-mark { width: 10px; height: 10px; border-radius: 50%; background: var(--text-3); }
+  .status-pending { background: var(--warning); }
+  .status-confirmed { background: var(--success); }
+  .status-cancelled { background: var(--danger); }
+  .status-completed { background: var(--aurora-cyan); }
+  .history-details { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-1) var(--s-3); font-size: var(--fs-small); color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .history-details b { margin-left: auto; color: var(--text); font-family: var(--font-display); font-size: 1rem; }
+  .history-card-actions { display: flex; flex-wrap: wrap; gap: var(--s-2); justify-content: space-between; padding-top: var(--s-2); border-top: 1px solid var(--line); }
+
+  /* Notifications */
+  .notification-drawer-tools { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); margin-bottom: var(--s-3); color: var(--text-2); font-size: var(--fs-small); }
+  .notification-list { display: grid; gap: var(--s-2); }
+  .notification-row { display: grid; grid-template-columns: 10px minmax(0, 1fr); gap: var(--s-3); align-items: start; padding: var(--s-3); border-radius: var(--r-md); }
+  .notification-row > div { display: grid; gap: 2px; min-width: 0; font-size: var(--fs-small); color: var(--text-2); }
+  .notification-row b { color: var(--text); font-size: var(--fs-body); }
+  .notification-row strong { color: var(--text); overflow-wrap: anywhere; }
+  .notification-dot { width: 10px; height: 10px; margin-top: 7px; border-radius: 50%; background: var(--aurora-cyan); }
+  .notification-dot.notification-scheduled { background: var(--warning); }
+  .notification-dot.notification-sent { background: var(--success); }
+  .notification-dot.notification-retrying { background: var(--danger); }
+  .notification-state { grid-column: 2; justify-self: start; display: inline-flex; align-items: center; min-height: 24px; padding: 0 10px; border-radius: var(--r-pill); background: color-mix(in srgb, var(--text) 10%, transparent); color: var(--text-2); font-size: var(--fs-label); font-weight: 700; }
+
+  /* Profile */
+  .profile-drawer form { display: grid; gap: var(--s-3); }
+  .profile-identity { display: grid; justify-items: center; gap: var(--s-3); padding: var(--s-3) 0 var(--s-2); text-align: center; }
+  .profile-avatar-stack { display: grid; justify-items: center; gap: var(--s-2); }
+  .profile-avatar-frame { display: grid; place-items: center; width: 96px; height: 96px; overflow: hidden; border-radius: 50%; border: 2px solid var(--line-strong); background: linear-gradient(135deg, var(--action-from), var(--action-to)); color: #fff; font-family: var(--font-display); font-size: 2rem; font-weight: 700; box-shadow: 0 12px 32px var(--action-glow); }
+  .profile-avatar-frame img { width: 100%; height: 100%; object-fit: cover; }
+  .profile-upload { display: inline-flex; align-items: center; gap: var(--s-2); min-height: var(--tap); padding: 0 var(--s-3); border-radius: var(--r-pill); border: 1px solid var(--line-strong); background: var(--glass-1-bg); color: var(--text); font-weight: 600; font-size: var(--fs-small); cursor: pointer; transition: border-color var(--t-fast) var(--ease); }
+  .profile-upload:hover, .profile-upload:focus-within { border-color: var(--aurora-violet); }
+  .profile-identity h3 { font-size: var(--fs-h3); overflow-wrap: anywhere; }
+  .profile-identity p, .profile-identity small { display: block; color: var(--text-2); overflow-wrap: anywhere; }
+  .profile-save { width: 100%; }
+  .profile-signout { width: 100%; margin-top: var(--s-5); }
+
+  @media (min-width: 481px) {
+    .ticket-actions { grid-template-columns: 1fr 1fr; }
+    .ticket-details > div { grid-template-columns: 110px minmax(0, 1fr); }
+    .ticket-code-box { grid-template-columns: auto 1fr; justify-items: start; gap: var(--s-4); }
+    .ticket-code-info { justify-items: start; text-align: left; }
+  }
+}

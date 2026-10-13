@@ -1,0 +1,230 @@
+@layer pages {
+  /* =========================================================
+     Hero carousel: poster-tinted backdrop, one glass info card, one primary action.
+     ========================================================= */
+  .film-carousel {
+    position: relative; isolation: isolate; overflow: hidden;
+    width: calc(100% - var(--gutter) * 2); max-width: calc(var(--container) - var(--gutter) * 2);
+    margin: var(--s-3) auto 0;
+    border-radius: var(--r-lg);
+    border: 1px solid var(--glass-border);
+    background: var(--bg-elevated);
+    touch-action: pan-y;
+  }
+  .carousel-backdrop {
+    position: absolute; inset: -12%; z-index: -2;
+    background-size: cover; background-position: center 25%;
+    filter: blur(36px) saturate(1.5);
+    opacity: 0.85;
+  }
+  .carousel-backdrop-in { animation: backdrop-in 700ms var(--ease) both; }
+  .carousel-backdrop-out { z-index: -2; animation: backdrop-out 700ms var(--ease) both; }
+  .carousel-scrim { position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(10, 10, 24, 0.35), rgba(10, 10, 24, 0.7)); }
+  :root[data-theme='light'] .carousel-scrim { background: linear-gradient(180deg, rgba(246, 245, 255, 0.4), rgba(246, 245, 255, 0.7)); }
+  @keyframes backdrop-in { from { opacity: 0; } }
+  @keyframes backdrop-out { to { opacity: 0; } }
+
+  .carousel-stage { display: flex; flex-direction: column; align-items: center; gap: var(--s-3); padding: var(--s-4) var(--s-3); }
+  .carousel-poster {
+    order: -1; flex: none; width: 148px; aspect-ratio: 2 / 3; overflow: hidden;
+    border-radius: var(--r-md); border: 1px solid var(--line-strong);
+    box-shadow: 0 20px 48px rgba(2, 2, 12, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    animation: poster-in var(--t-enter) var(--ease) both;
+    transition: transform var(--t-base) var(--ease);
+  }
+  .carousel-poster:hover { transform: translateY(-4px) rotate(-0.6deg); }
+  .carousel-poster img { width: 100%; height: 100%; object-fit: cover; }
+  @keyframes poster-in { from { opacity: 0; transform: translateY(12px) scale(0.97); } }
+
+  .carousel-content { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-3); width: 100%; padding: var(--s-4) var(--s-3); border-radius: var(--r-lg); }
+  .carousel-content-enter { animation: poster-in var(--t-enter) var(--ease) both; }
+  .carousel-content h1 {
+    font-size: var(--fs-hero);
+    display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+    overflow-wrap: anywhere;
+  }
+  .carousel-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3); color: var(--text-2); font-size: var(--fs-small); font-weight: 600; }
+  .hero-times { display: grid; gap: var(--s-2); }
+  .hero-times > span { color: var(--text-2); font-size: var(--fs-label); font-weight: 700; letter-spacing: var(--tracking-label); text-transform: uppercase; }
+  .hero-times div { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+  .carousel-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3); }
+  .carousel-actions .button-primary { flex: 1 1 200px; }
+  .carousel-controls { display: flex; align-items: center; gap: var(--s-2); }
+  .carousel-controls > span:not(.carousel-count) { display: flex; align-items: center; justify-content: center; flex: 1; min-width: 0; overflow: hidden; }
+  .carousel-count { display: none; }
+  .carousel-dot { position: relative; width: 20px; height: 24px; flex: none; }
+  .carousel-dot::before { content: ''; position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: var(--line-strong); transition: width var(--t-base) var(--ease), margin var(--t-base) var(--ease), background var(--t-base) var(--ease); }
+  .carousel-dot[aria-current='true']::before { width: 22px; margin-left: -11px; border-radius: 99px; background: linear-gradient(90deg, var(--aurora-violet), var(--aurora-magenta)); }
+  .carousel-controls > .carousel-count { color: var(--text-2); font-size: var(--fs-small); font-weight: 600; white-space: nowrap; }
+  .carousel-empty { min-height: 280px; align-content: center; }
+  .carousel-skeleton { min-height: 360px; align-content: center; justify-items: start; padding: var(--s-5); }
+  .carousel-skeleton span { height: 36px; width: 70%; }
+  .carousel-skeleton-title-short { width: 45%; }
+  .carousel-skeleton-action { width: 160px; height: 48px; border-radius: var(--r-pill); }
+
+  /* Save heart (hero + detail) */
+  .save-film-button {
+    display: inline-flex; align-items: center; justify-content: center; gap: var(--s-2);
+    min-height: var(--tap); padding: 0 var(--s-3); border-radius: var(--r-pill);
+    border: 1px solid var(--line-strong); background: var(--glass-1-bg);
+    color: var(--text); font-size: var(--fs-small); font-weight: 600; white-space: nowrap;
+    transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+  }
+  .save-film-button:hover:not(:disabled) { background: color-mix(in srgb, var(--text) 12%, transparent); }
+  .save-film-button.is-saved { color: var(--aurora-magenta); border-color: color-mix(in srgb, var(--aurora-magenta) 60%, transparent); }
+  :root[data-theme='light'] .save-film-button.is-saved { color: #b4135d; }
+  .save-film-button:disabled { opacity: 0.6; }
+
+  /* =========================================================
+     Catalogue
+     ========================================================= */
+  .programme-section { width: 100%; max-width: var(--container); margin-inline: auto; padding: var(--s-6) var(--gutter) var(--s-5); }
+  .section-head { display: grid; gap: var(--s-3); margin-bottom: var(--s-4); }
+  .section-head > div { display: grid; gap: var(--s-3); justify-items: start; }
+  .catalog-switch { display: inline-flex; padding: 4px; gap: 4px; border-radius: var(--r-pill); background: var(--glass-1-bg); border: 1px solid var(--glass-border); box-shadow: var(--glass-highlight); }
+  .search-box { display: flex; align-items: center; gap: var(--s-2); width: 100%; min-height: 48px; padding: 0 var(--s-3); border-radius: var(--r-pill); color: var(--text-2); transition: border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease); }
+  .search-box:focus-within { border-color: var(--focus-ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-ring) 30%, transparent); }
+  .search-box svg { flex: none; }
+  .search-box input { flex: 1; min-width: 0; min-height: 44px; padding: 0; border: 0; background: transparent; box-shadow: none; border-radius: 0; }
+  .search-box input:focus-visible { box-shadow: none; }
+
+  .film-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-4) var(--s-3); }
+  .film-card { position: relative; }
+  .film-card-open { display: grid; gap: var(--s-2); width: 100%; text-align: left; align-content: start; }
+  .film-poster-wrap {
+    position: relative; display: block; aspect-ratio: 2 / 3; overflow: hidden;
+    border-radius: var(--r-md); border: 1px solid var(--glass-border); background: var(--bg-elevated);
+    transition: transform var(--t-base) var(--ease), box-shadow var(--t-base) var(--ease), border-color var(--t-base) var(--ease);
+  }
+  .film-poster-wrap img { width: 100%; height: 100%; object-fit: cover; transition: transform 500ms var(--ease); }
+  .poster-glow { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(124, 92, 255, 0.5)); opacity: 0; transition: opacity var(--t-base) var(--ease); }
+  .film-card-open:hover .film-poster-wrap, .film-card-open:focus-visible .film-poster-wrap { transform: translateY(-4px); border-color: color-mix(in srgb, var(--aurora-violet) 70%, white); box-shadow: 0 16px 40px rgba(124, 92, 255, 0.4); }
+  .film-card-open:hover img { transform: scale(1.04); }
+  .film-card-open:hover .poster-glow, .film-card-open:focus-visible .poster-glow { opacity: 1; }
+  .film-card-open:focus-visible { outline-offset: 6px; border-radius: var(--r-md); }
+  .film-age { position: absolute; top: var(--s-2); left: var(--s-2); background: rgba(10, 10, 24, 0.72); color: #fff; border-color: rgba(255, 255, 255, 0.24); }
+  .film-card-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-weight: 600; font-size: var(--fs-small); line-height: 1.35; color: var(--text); overflow-wrap: anywhere; }
+  .film-saved-label { display: inline-flex; align-items: center; gap: 4px; color: var(--aurora-magenta); font-size: var(--fs-label); font-weight: 700; }
+  :root[data-theme='light'] .film-saved-label { color: #b4135d; }
+  .film-save {
+    position: absolute; top: var(--s-2); right: var(--s-2); z-index: 1;
+    display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(10, 10, 24, 0.66); border-color: rgba(255, 255, 255, 0.24); color: #fff;
+    transition: transform var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+  }
+  .film-save::after { content: ''; position: absolute; inset: -2px; }
+  .film-save:hover:not(:disabled) { background: rgba(10, 10, 24, 0.86); transform: scale(1.06); }
+  .film-save.is-saved { color: var(--aurora-magenta); }
+  .film-save svg { width: 18px; height: 18px; }
+
+  .load-more { display: grid; justify-items: center; gap: var(--s-2); margin-top: var(--s-5); color: var(--text-2); font-size: var(--fs-small); }
+
+  /* =========================================================
+     Movie detail: poster + info on the left (sticky), showtimes on the right
+     ========================================================= */
+  .movie-detail-panel { display: grid; gap: var(--s-4); }
+  .detail-aside { display: grid; gap: var(--s-3); align-content: start; }
+  .detail-back { justify-self: start; display: inline-flex; align-items: center; gap: var(--s-2); min-height: var(--tap); padding: 0 var(--s-3) 0 var(--s-2); border-radius: var(--r-pill); color: var(--text-2); font-weight: 600; font-size: var(--fs-small); }
+  .detail-back:hover { color: var(--text); background: color-mix(in srgb, var(--text) 10%, transparent); }
+  .detail-heading { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: var(--s-3); padding: var(--s-3); border-radius: var(--r-lg); align-items: start; }
+  .detail-heading > img { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: var(--r-sm); border: 1px solid var(--glass-border); }
+  .detail-heading > div { display: grid; gap: var(--s-2); min-width: 0; }
+  .detail-title-row { display: grid; gap: var(--s-2); justify-items: start; }
+  .detail-title-row h2 { font-size: clamp(1.25rem, 1rem + 1.4vw, 1.875rem); overflow-wrap: anywhere; }
+  .saved-film-hint { color: var(--text-2); font-size: var(--fs-small); }
+  .detail-facts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); color: var(--text-2); font-size: var(--fs-small); font-weight: 500; }
+  .detail-facts > span:not(.age-badge) { display: inline-flex; padding: 0 10px; min-height: 28px; align-items: center; border-radius: var(--r-pill); background: color-mix(in srgb, var(--text) 8%, transparent); }
+
+  .showtimes-panel { display: grid; gap: var(--s-3); min-width: 0; }
+  .showtimes-title { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); }
+  .showtimes-title h3 { display: inline-flex; align-items: center; gap: var(--s-2); font-size: var(--fs-h3); }
+  .showtimes-title h3 svg { color: var(--aurora-cyan); }
+  .showtimes-title > span { color: var(--text-2); font-size: var(--fs-small); }
+
+  .detail-dates { display: flex; gap: var(--s-2); overflow-x: auto; padding: 2px 2px var(--s-1); margin: 0 -2px; scroll-snap-type: x proximity; }
+  .detail-dates button {
+    display: grid; justify-items: center; gap: 2px; flex: none; scroll-snap-align: start;
+    min-width: 72px; min-height: 64px; padding: var(--s-2) var(--s-3);
+    border-radius: var(--r-md); border: 1px solid var(--line-strong); background: var(--glass-1-bg);
+    color: var(--text-2); font-size: var(--fs-label); font-weight: 600; text-transform: capitalize;
+    transition: background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+  }
+  .detail-dates button b { color: var(--text); font-size: var(--fs-small); text-transform: none; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .detail-dates button:hover { border-color: color-mix(in srgb, var(--aurora-violet) 70%, var(--text)); }
+  .detail-dates button.is-today:not(.detail-date-active) { border-color: color-mix(in srgb, var(--aurora-cyan) 70%, transparent); }
+  .detail-dates .detail-date-active { background: linear-gradient(135deg, var(--action-from), var(--action-to)); border-color: transparent; color: rgba(255, 255, 255, 0.9); box-shadow: 0 6px 20px var(--action-glow); }
+  .detail-dates .detail-date-active b { color: #fff; }
+  .detail-dates small { font-size: 12px; color: var(--aurora-cyan); font-weight: 700; }
+  .detail-dates .detail-date-active small { color: #fff; }
+
+  .showtime-filters { display: grid; gap: var(--s-2); }
+  .filters-toggle { justify-self: start; }
+  .filters-toggle b { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 99px; background: var(--action-from); color: #fff; font-size: var(--fs-label); }
+  .filter-panel { display: none; gap: var(--s-3); padding: var(--s-3); border-radius: var(--r-md); }
+  .filter-panel.is-open { display: grid; }
+  .filter-group { display: grid; gap: var(--s-2); min-width: 0; }
+  .filter-label { color: var(--text-2); font-size: var(--fs-label); font-weight: 700; letter-spacing: var(--tracking-label); text-transform: uppercase; }
+
+  .cinema-list { display: grid; gap: var(--s-3); }
+  .cinema-group { display: grid; gap: var(--s-3); padding: var(--s-3); border-radius: var(--r-md); }
+  .cinema-name { display: grid; gap: 2px; font-family: var(--font-display); font-size: 1.0625rem; font-weight: 600; letter-spacing: -0.01em; }
+  .cinema-name small { font-family: var(--font-body); font-weight: 500; color: var(--text-2); font-size: var(--fs-small); letter-spacing: 0; }
+  .hall-row { display: grid; gap: var(--s-2); }
+  .hall-name { display: flex; align-items: center; gap: var(--s-2); color: var(--text-2); font-size: var(--fs-small); font-weight: 600; }
+  .tag { display: inline-flex; align-items: center; min-height: 20px; padding: 0 8px; border-radius: var(--r-pill); border: 1px solid var(--line-strong); color: var(--text-2); font-size: var(--fs-label); font-weight: 700; line-height: 1; }
+  .tag-vip { color: var(--warning-text); border-color: color-mix(in srgb, var(--aurora-amber) 60%, transparent); background: color-mix(in srgb, var(--aurora-amber) 14%, transparent); }
+  .time-chips { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+  .time-chip {
+    display: grid; justify-items: start; align-content: center; gap: 2px;
+    min-width: 92px; min-height: 64px; padding: var(--s-2) var(--s-3);
+    border-radius: var(--r-md); border: 1px solid var(--line-strong); background: var(--glass-1-bg);
+    text-align: left;
+    transition: transform var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease), box-shadow var(--t-base) var(--ease);
+  }
+  .time-chip b { font-family: var(--font-display); font-size: 1.125rem; font-weight: 600; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .time-chip small { color: var(--text-2); font-size: var(--fs-label); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .time-chip .time-tags { display: flex; gap: 4px; }
+  .time-chip .time-tags span { color: var(--aurora-cyan); font-size: var(--fs-label); font-weight: 700; }
+  .time-chip:hover { transform: translateY(-2px); border-color: var(--aurora-violet); background: color-mix(in srgb, var(--aurora-violet) 20%, transparent); box-shadow: 0 8px 24px rgba(124, 92, 255, 0.3); }
+  .time-chip:active { transform: scale(0.97); }
+  .time-chip-compact { min-width: 0; min-height: 40px; padding: 0 14px; border-radius: var(--r-pill); display: inline-flex; align-items: center; gap: var(--s-2); }
+  .time-chip-compact b { font-size: var(--fs-small); }
+  :root[data-theme='light'] .time-chip .time-tags span, :root[data-theme='light'] .detail-dates small { color: #0a6e86; }
+  :root[data-theme='light'] .detail-dates .detail-date-active small { color: #fff; }
+
+  @media (min-width: 481px) {
+    .carousel-controls > .carousel-count { display: block; }
+    .film-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .carousel-poster { width: 176px; }
+    .section-head { grid-template-columns: 1fr auto; align-items: end; }
+    .search-box { width: 300px; }
+    .detail-heading { grid-template-columns: 144px minmax(0, 1fr); }
+    .detail-title-row { grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+  }
+  @media (min-width: 769px) {
+    .film-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-5) var(--s-4); }
+    .carousel-stage { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr); gap: var(--s-5); align-items: center; padding: var(--s-6) var(--s-5); min-height: 520px; }
+    .carousel-poster { order: 0; justify-self: center; width: min(100%, 280px); }
+    .carousel-content { padding: var(--s-5); }
+    .carousel-actions .button-primary { flex: 0 0 auto; min-width: 200px; }
+    .programme-section { padding-top: var(--s-7); }
+    .filters-toggle { display: none; }
+    .filter-panel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-3) var(--s-4); }
+    .filter-group:first-child { grid-column: 1 / -1; }
+    .filter-panel .chip-row { flex-wrap: wrap; overflow: visible; }
+    .showtime-filters { gap: 0; }
+    .time-chip { min-width: 104px; }
+  }
+  @media (min-width: 1025px) {
+    .film-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    .movie-detail-panel { grid-template-columns: minmax(280px, 340px) minmax(0, 1fr); gap: var(--s-5); align-items: start; }
+    .detail-aside { position: sticky; top: calc(var(--header-h) + var(--s-3)); }
+    .detail-heading { grid-template-columns: 1fr; }
+    .detail-heading > img { max-width: 260px; justify-self: center; }
+    .detail-title-row { grid-template-columns: 1fr; }
+    .carousel-poster { width: min(100%, 320px); }
+  }
+  @media (min-width: 1280px) {
+    .film-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  }
+}

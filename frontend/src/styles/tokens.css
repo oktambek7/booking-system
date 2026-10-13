@@ -1,0 +1,191 @@
+/* Parda design tokens. The only place colour, glass, type, space, radius, motion
+   and breakpoints are defined. Components read these; they never hard-code them.
+
+   Breakpoints (media queries cannot read custom properties, so the literal values
+   below are the only four used anywhere in the codebase):
+     sm  <= 480   base styles, written mobile-first
+     md  >= 481   @media (min-width: 481px)
+     lg  >= 769   @media (min-width: 769px)
+     xl  >= 1025  @media (min-width: 1025px)
+     2xl >= 1280  @media (min-width: 1280px)  (wide desktop, five/six column grids)
+*/
+@layer tokens {
+  :root {
+    color-scheme: dark;
+
+    /* ---- Aurora palette (identical in both themes) ---- */
+    --aurora-violet: #7c5cff;
+    --aurora-magenta: #ff3d8b;
+    --aurora-cyan: #22d3ee;
+    --aurora-amber: #ffb547;
+
+    /* ---- Semantic colours: always solid, never glass ---- */
+    --seat-available: #34d399;
+    --seat-available-ink: #04251a;
+    --seat-selected: #7653f8;
+    --seat-selected-ink: #ffffff;
+    --seat-premium: #ffb547;
+    --seat-premium-ink: #2b1a00;
+    --seat-taken: #5b5b78;
+    --seat-taken-ink: #f1f1fb;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --danger: #f43f5e;
+
+    /* ---- Night Screen (default) ---- */
+    --bg: #0a0a18;
+    --bg-elevated: #12122a;
+    --bg-solid-1: #151530;
+    --bg-solid-2: #1a1a38;
+    --bg-solid-3: #1f1f42;
+    --text: #f5f5ff;
+    --text-2: #b4b4d0;
+    --text-3: #a0a0c0;
+    --line: rgba(255, 255, 255, 0.12);
+    --line-strong: rgba(255, 255, 255, 0.22);
+    --focus-ring: #a99bff;
+    --danger-text: #ff8fa6;
+    --success-text: #6ee7a0;
+    --warning-text: #ffcf70;
+
+    --action-from: #7653f8;
+    --action-to: #d61f6e;
+    --action-ink: #ffffff;
+    --action-glow: rgba(214, 31, 110, 0.38);
+    --action-glow-hover: rgba(214, 31, 110, 0.55);
+
+    /* Aurora blobs (alpha is capped so text on top keeps AA contrast) */
+    --blob-violet: rgba(124, 92, 255, 0.3);
+    --blob-magenta: rgba(255, 61, 139, 0.22);
+    --blob-cyan: rgba(34, 211, 238, 0.16);
+    --blob-amber: rgba(255, 181, 71, 0.1);
+    --blob-poster: rgba(124, 92, 255, 0.22);
+
+    /* ---- Glass: exactly three levels ---- */
+    --glass-border: rgba(255, 255, 255, 0.12);
+    --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    --glass-1-bg: rgba(255, 255, 255, 0.06);
+    --glass-1-blur: blur(10px) saturate(150%);
+    --glass-2-bg: rgba(22, 22, 48, 0.62);
+    --glass-2-blur: blur(16px) saturate(160%);
+    --glass-3-bg: rgba(24, 24, 52, 0.84);
+    --glass-3-blur: blur(20px) saturate(160%);
+    --scrim: rgba(5, 5, 15, 0.6);
+    --scrim-blur: blur(6px);
+    --shadow-1: 0 8px 24px rgba(2, 2, 12, 0.35);
+    --shadow-2: 0 20px 56px rgba(2, 2, 12, 0.5);
+
+    /* ---- Typography ---- */
+    --font-display: 'Unbounded Variable', 'Unbounded', 'Manrope Variable', system-ui, sans-serif;
+    --font-body: 'Manrope Variable', 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --fs-display: clamp(2.5rem, 1.6rem + 3.6vw, 4.5rem);
+    --fs-hero: clamp(1.75rem, 1.1rem + 3vw, 3.5rem);
+    --fs-h2: clamp(1.75rem, 1.4rem + 1.5vw, 2.75rem);
+    --fs-h3: clamp(1.25rem, 1.1rem + 0.6vw, 1.5rem);
+    --fs-body: 0.9375rem;
+    --fs-small: 0.8125rem;
+    --fs-label: 0.75rem;
+    --tracking-label: 0.08em;
+
+    /* ---- Space (8px grid, 4px for tight groups) ---- */
+    --s-1: 4px;
+    --s-2: 8px;
+    --s-3: 16px;
+    --s-4: 24px;
+    --s-5: 32px;
+    --s-6: 48px;
+    --s-7: 64px;
+    --s-8: 96px;
+    --gutter: 16px;
+    --container: 1280px;
+    --header-h: 64px;
+
+    /* ---- Radius ---- */
+    --r-sm: 10px;
+    --r-md: 16px;
+    --r-lg: 24px;
+    --r-pill: 999px;
+
+    /* ---- Motion ---- */
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --t-fast: 150ms;
+    --t-base: 220ms;
+    --t-enter: 360ms;
+
+    --tap: 44px;
+  }
+
+  @media (min-width: 481px) {
+    :root { --gutter: 24px; }
+  }
+  @media (min-width: 769px) {
+    /* Full-strength glass from tablet up; phones keep smaller blur radii and no blur on scrolling lists. */
+    :root {
+      --gutter: 32px; --header-h: 72px; --fs-body: 1rem;
+      --glass-1-blur: blur(16px) saturate(160%);
+      --glass-2-blur: blur(24px) saturate(170%);
+      --glass-3-blur: blur(32px) saturate(170%);
+    }
+  }
+
+  /* ---- Matinee (light) ---- */
+  :root[data-theme='light'] {
+    color-scheme: light;
+    --bg: #f6f5ff;
+    --bg-elevated: #ffffff;
+    --bg-solid-1: #ffffff;
+    --bg-solid-2: #f0eeff;
+    --bg-solid-3: #ffffff;
+    --text: #14142b;
+    --text-2: #4a4a68;
+    --text-3: #61617f;
+    --line: rgba(20, 20, 43, 0.14);
+    --line-strong: rgba(20, 20, 43, 0.28);
+    --focus-ring: #5b3fe0;
+    --danger-text: #b4163f;
+    --success-text: #0f7a3a;
+    --warning-text: #8a5200;
+
+    --action-from: #6a45f5;
+    --action-to: #c21a64;
+    --action-glow: rgba(194, 26, 100, 0.28);
+    --action-glow-hover: rgba(194, 26, 100, 0.42);
+
+    --blob-violet: rgba(124, 92, 255, 0.2);
+    --blob-magenta: rgba(255, 61, 139, 0.18);
+    --blob-cyan: rgba(34, 211, 238, 0.16);
+    --blob-amber: rgba(255, 181, 71, 0.14);
+    --blob-poster: rgba(124, 92, 255, 0.16);
+
+    --glass-border: rgba(255, 255, 255, 0.7);
+    --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    --glass-1-bg: rgba(255, 255, 255, 0.55);
+    --glass-2-bg: rgba(255, 255, 255, 0.72);
+    --glass-3-bg: rgba(255, 255, 255, 0.9);
+    --scrim: rgba(20, 20, 43, 0.45);
+    --shadow-1: 0 8px 24px rgba(60, 40, 140, 0.12);
+    --shadow-2: 0 20px 56px rgba(60, 40, 140, 0.2);
+  }
+
+  /* Fallbacks: no backdrop-filter, or the user asked for less transparency. */
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    :root {
+      --glass-1-bg: var(--bg-solid-1);
+      --glass-2-bg: var(--bg-solid-2);
+      --glass-3-bg: var(--bg-solid-3);
+      --scrim: rgba(5, 5, 15, 0.8);
+    }
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    :root {
+      --glass-1-bg: var(--bg-solid-1);
+      --glass-2-bg: var(--bg-solid-2);
+      --glass-3-bg: var(--bg-solid-3);
+      --glass-1-blur: none;
+      --glass-2-blur: none;
+      --glass-3-blur: none;
+      --scrim-blur: none;
+      --scrim: rgba(5, 5, 15, 0.82);
+    }
+  }
+}
