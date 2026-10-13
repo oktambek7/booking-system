@@ -1,13 +1,14 @@
 import { Camera, LogOut, Save, X } from 'lucide-react'
 import { useState, type ChangeEvent, type FormEvent } from 'react'
+import Modal from './ui/Modal'
 
 type Lang = 'uz' | 'en' | 'ru'
 export type ProfileUser = {id:number;nickname:string;email:string;role:string;created_at?:string;avatar_data?:string|null}
 
 const text:Record<Lang,Record<string,string>> = {
-  uz:{profile:'Profil',account:'Hisob',username:'Foydalanuvchi nomi',email:'Email',memberSince:'Parda foydalanuvchisi bo‘lgan sana',picture:'Profil rasmi',changePicture:'Rasm tanlash',save:'O‘zgarishlarni saqlash',saving:'Saqlanmoqda…',signOut:'Tizimdan chiqish',close:'Yopish',imageError:'PNG, JPEG yoki WebP rasmini tanlang. Rasm 8 MB dan kichik bo‘lishi kerak.',profileError:'Profilni saqlab bo‘lmadi.'},
-  en:{profile:'Profile',account:'Account',username:'Username',email:'Email',memberSince:'Parda member since',picture:'Profile photo',changePicture:'Choose photo',save:'Save changes',saving:'Saving…',signOut:'Sign out',close:'Close',imageError:'Choose a PNG, JPEG, or WebP image smaller than 8 MB.',profileError:'Could not save your profile.'},
-  ru:{profile:'Профиль',account:'Аккаунт',username:'Имя пользователя',email:'Email',memberSince:'Пользователь Parda с',picture:'Фото профиля',changePicture:'Выбрать фото',save:'Сохранить изменения',saving:'Сохранение…',signOut:'Выйти',close:'Закрыть',imageError:'Выберите PNG, JPEG или WebP размером до 8 МБ.',profileError:'Не удалось сохранить профиль.'}
+  uz:{profile:'Profil',account:'Hisob',username:'Foydalanuvchi nomi',email:'Email',memberSince:'Parda foydalanuvchisi bo‘lgan sana',picture:'Profil rasmi',changePicture:'Rasm tanlash',save:'O‘zgarishlarni saqlash',saving:'Saqlanmoqda…',signOut:'Tizimdan chiqish',close:'Yopish',imageError:'PNG, JPEG yoki WebP rasmini tanlang. Rasm 8 MB dan kichik bo‘lishi kerak.',profileError:'Profilni saqlab bo‘lmadi.',signOutConfirm:'Tizimdan chiqasizmi?'},
+  en:{profile:'Profile',account:'Account',username:'Username',email:'Email',memberSince:'Parda member since',picture:'Profile photo',changePicture:'Choose photo',save:'Save changes',saving:'Saving…',signOut:'Sign out',close:'Close',imageError:'Choose a PNG, JPEG, or WebP image smaller than 8 MB.',profileError:'Could not save your profile.',signOutConfirm:'Sign out of Parda?'},
+  ru:{profile:'Профиль',account:'Аккаунт',username:'Имя пользователя',email:'Email',memberSince:'Пользователь Parda с',picture:'Фото профиля',changePicture:'Выбрать фото',save:'Сохранить изменения',saving:'Сохранение…',signOut:'Выйти',close:'Закрыть',imageError:'Выберите PNG, JPEG или WebP размером до 8 МБ.',profileError:'Не удалось сохранить профиль.',signOutConfirm:'Выйти из Parda?'}
 }
 
 function resizeAvatar(file:File):Promise<string>{
@@ -42,9 +43,8 @@ export default function ProfileDrawer({user,lang,onClose,onSave,onSignOut,onAvat
     event.preventDefault();setBusy(true);setError('')
     try{await onSave(nickname,avatar)}catch(reason){setError(reason instanceof Error?reason.message:t('profileError'))}finally{setBusy(false)}
   }
-  return <div className="modal-scrim profile-scrim" onMouseDown={event=>event.target===event.currentTarget&&onClose()}>
-    <aside className="profile-drawer" role="dialog" aria-modal="true" aria-label={t('profile')}>
-      <header><div><span>{t('account')}</span><h2>{t('profile')}</h2></div><button className="icon-button" onClick={onClose} aria-label={t('close')}><X/></button></header>
+  return <Modal as="aside" scrimClassName="profile-scrim" className="profile-drawer" label={t('profile')} onClose={onClose}>
+      <header><h2>{t('profile')}</h2><button className="icon-button" onClick={onClose} aria-label={t('close')}><X/></button></header>
       <form onSubmit={submit}>
         <section className="profile-identity">
           <div className="profile-avatar-stack">
@@ -57,7 +57,6 @@ export default function ProfileDrawer({user,lang,onClose,onSave,onSignOut,onAvat
         {error&&<p className="dialog-error">{error}</p>}
         <button className="button-primary profile-save" disabled={busy}>{busy?t('saving'):<><Save size={16}/>{t('save')}</>}</button>
       </form>
-      <button className="profile-signout" onClick={onSignOut}><LogOut size={16}/>{t('signOut')}</button>
-    </aside>
-  </div>
+      <button className="profile-signout" onClick={()=>{if(confirm(t('signOutConfirm')))onSignOut()}}><LogOut size={16}/>{t('signOut')}</button>
+  </Modal>
 }
