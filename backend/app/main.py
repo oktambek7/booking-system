@@ -68,6 +68,9 @@ async def _booking_notification_loop() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    settings.assert_production_ready()
+    if not settings.is_production and settings.production_problems():
+        logger.warning("Development configuration: %s production setting(s) would be rejected", len(settings.production_problems()))
     Base.metadata.create_all(bind=engine)
     with engine.begin() as conn:
         migrations = Path(__file__).resolve().parent.parent / "migrations"
