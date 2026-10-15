@@ -72,6 +72,11 @@ class Settings(BaseSettings):
     brevo_api_key: str = ""
     brevo_from: str = ""
     otp_secret: str = ""
+    # Encrypts two-step verification secrets at rest. Empty = derived from OTP_SECRET (then JWT_SECRET); changing it
+    # later makes enrolled secrets unreadable, so people would have to enrol again.
+    totp_encryption_key: str = ""
+    # When true, operator powers need a sign-in that included the second step; operators must enrol first.
+    require_operator_2fa: bool = False
     app_environment: str = "development"
     log_level: str = "INFO"
     # "json" for log search in production, "text" for a terminal. Empty = json in production, text otherwise.

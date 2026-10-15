@@ -3,6 +3,7 @@ import { useState, type ChangeEvent, type FormEvent } from 'react'
 import Modal from './ui/Modal'
 import TelegramConnect from './TelegramConnect'
 import PrivacySection from './PrivacySection'
+import TwoFactorSection from './TwoFactorSection'
 
 type Lang = 'uz' | 'en' | 'ru'
 export type ProfileUser = {id:number;nickname:string;email:string;role:string;created_at?:string;avatar_data?:string|null}
@@ -60,6 +61,7 @@ export default function ProfileDrawer({user,lang,api,token,onClose,onSave,onSign
         <button className="button-primary profile-save" disabled={busy}>{busy?t('saving'):<><Save size={16}/>{t('save')}</>}</button>
       </form>
       <TelegramConnect api={api} token={token} lang={lang}/>
+      <TwoFactorSection api={api} token={token} lang={lang} onSignedOut={onSignOut}/>
       <PrivacySection api={api} token={token} lang={lang} onDeleted={onAccountDeleted}/>
       <button className="profile-signout" onClick={()=>{if(confirm(t('signOutConfirm')))onSignOut()}}><LogOut size={16}/>{t('signOut')}</button>
       <button className="profile-signout" disabled={busy} onClick={async()=>{if(!confirm(t('signOutAllConfirm')))return;setBusy(true);setError('');try{await onSignOutAll()}catch(e){setError(e instanceof Error?e.message:t('signOutAll'));setBusy(false)}}}><LogOut size={16}/>{t('signOutAll')}</button>

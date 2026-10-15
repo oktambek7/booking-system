@@ -12,7 +12,8 @@ from .. import ratelimit, sessions
 from ..config import settings
 from ..database import get_db
 from ..models import (EmailOtpChallenge, PasswordResetChallenge, Role, User)
-from ..schemas import (EmailChallengeOut, EmailCodeVerify, EmailResend, Login, PasswordResetConfirm, PasswordResetRequest, ProfileUpdate, Token, UserCreate)
+from ..schemas import (EmailChallengeOut, EmailCodeVerify, EmailResend, Login, LoginOut, PasswordResetConfirm, PasswordResetRequest, ProfileUpdate, Token, UserCreate)
+from .. import twofactor
 from ..operators import scope_of
 from ..security import current_user, hash_password, make_token, verify_password
 from ..otp import new_code
@@ -198,7 +199,7 @@ def verify_email(data: EmailCodeVerify, request: Request, response: Response, db
     return {"access_token": make_token(user), "token_type": "bearer", "expires_in": _access_seconds(),
             "user": _user_payload(user, db)}
 
-@router.post("/auth/login", response_model=Token)
+@router.post("/auth/login", response_model=LoginOut)
 def login(data: Login, request: Request, response: Response, db: Session = Depends(get_db)):
     email = data.email.lower()
     ip = ratelimit.client_ip(request)
@@ -213,22 +214,25 @@ def login(data: Login, request: Request, response: Response, db: Session = Depen
     ratelimit.reset("login-fail-ip", f"{email}|{ip}")
     if not user.email_verified:
         raise HTTPException(403, "Verify your email before signing in")
+    if twofactor.confirmed(db, user.id):
+        # The password is right, but no session starts until the second step is done (/auth/login/2fa).
+        return LoginOut(two_factor_required=True, challenge=twofactor.make_challenge(user))
     sessions.start_session(db, user, request, response)
     db.commit()
-    return Token(access_token=make_token(user), expires_in=_access_seconds())
+    return LoginOut(access_token=make_token(user), expires_in=_access_seconds())
 
 @router.post("/auth/refresh", response_model=Token, dependencies=[ratelimit.per_ip("refresh", *REFRESH_IP_LIMIT)])
 def refresh_session(request: Request, response: Response, db: Session = Depends(get_db)):
     """Trade the httpOnly refresh cookie for a new access token (and a new cookie)."""
     require_trusted_origin(request)
     try:
-        user = sessions.rotate_session(db, request, response)
+        user, mfa = sessions.rotate_session(db, request, response)
     except sessions.SessionError as exc:
         rejected = JSONResponse(status_code=401, content={"detail": str(exc)})
         sessions.clear_cookie(rejected)
         return rejected
     db.commit()
-    return Token(access_token=make_token(user), expires_in=_access_seconds())
+    return Token(access_token=make_token(user, mfa=mfa), expires_in=_access_seconds())
 
 @router.post("/auth/logout", status_code=204)
 def logout(request: Request, response: Response, db: Session = Depends(get_db)):

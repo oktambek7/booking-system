@@ -32,6 +32,42 @@ class EmailChallengeOut(BaseModel):
     demo_mode: bool
     demo_code: str | None = None
 
+class LoginOut(BaseModel):
+    access_token: str | None = None
+    token_type: str = "bearer"
+    expires_in: int | None = None
+    # Set instead of a token when the account has two-step verification: finish with POST /auth/login/2fa
+    two_factor_required: bool = False
+    challenge: str | None = None
+
+class TwoFactorLoginIn(BaseModel):
+    challenge: str = Field(min_length=10, max_length=2000)
+    code: str = Field(min_length=6, max_length=20)
+
+class TwoFactorStatusOut(BaseModel):
+    enabled: bool
+    recovery_codes_left: int = 0
+    required: bool = False
+
+class TwoFactorSetupIn(BaseModel):
+    password: str = Field(max_length=128)
+
+class TwoFactorSetupOut(BaseModel):
+    secret: str
+    otpauth_uri: str
+
+class TwoFactorCodeIn(BaseModel):
+    code: str = Field(min_length=6, max_length=20)
+
+class TwoFactorProtectedIn(BaseModel):
+    password: str = Field(max_length=128)
+    code: str = Field(min_length=6, max_length=20)
+
+class TwoFactorEnabledOut(BaseModel):
+    recovery_codes: list[str]
+    access_token: str
+    expires_in: int | None = None
+
 class Login(BaseModel):
     email: EmailStr
     password: str

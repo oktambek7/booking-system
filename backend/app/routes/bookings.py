@@ -9,7 +9,7 @@ from ..database import get_db
 from ..models import (Auditorium, Booking, BookingSeat, BookingStatus, Payment, Role, Screening, Seat, User, WaitlistEntry)
 from ..schemas import (CancellationQuoteOut, RefundPolicyStep, BookingIn, BookingOut, BookingStatusIn,
                       BookingPriceIn)
-from ..security import current_user
+from ..security import acts_as_operator, current_user
 from ..config import settings
 from ..notifications import (deliver_due_waitlist_notifications,
                             queue_waitlist_notifications)
@@ -117,13 +117,13 @@ def confirm_booking(booking_id:int,db:Session=Depends(get_db),user:User=Depends(
 
 def _outside_scope(db: Session, user: User, item: Booking) -> bool:
     """A scoped operator never sees or touches bookings for cinemas they do not manage."""
-    return user.role == Role.ADMIN and not allows(scope_of(db, user), item.screening.auditorium.cinema_name)
+    return acts_as_operator(user) and not allows(scope_of(db, user), item.screening.auditorium.cinema_name)
 
 @router.get("/bookings",response_model=list[BookingOut])
 def booking_history(db:Session=Depends(get_db),user:User=Depends(current_user)):
     expire_holds(db)
     q=sa.select(Booking).order_by(Booking.created_at.desc())
-    if user.role!=Role.ADMIN: q=q.where(Booking.customer_id==user.id,Booking.archived_by_customer.is_(False))
+    if not acts_as_operator(user): q=q.where(Booking.customer_id==user.id,Booking.archived_by_customer.is_(False))
     elif (scope:=scope_of(db,user)) is not None:
         q=q.where(Booking.screening_id.in_(sa.select(Screening.id).join(Auditorium,Screening.auditorium_id==Auditorium.id).where(Auditorium.cinema_name.in_(scope))))
     items=db.scalars(q).all();result=[booking_out(x) for x in items];db.commit()
@@ -151,10 +151,10 @@ def refund_policy():
 def cancellation_quote(booking_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
     """Preview what cancelling would refund, before the customer confirms."""
     item = db.get(Booking, booking_id)
-    if not item or (user.role != Role.ADMIN and item.customer_id != user.id) or _outside_scope(db, user, item):
+    if not item or (not acts_as_operator(user) and item.customer_id != user.id) or _outside_scope(db, user, item):
         raise HTTPException(404, "Booking not found")
     paid = item.status == BookingStatus.CONFIRMED and paid_payment(db, item.id) is not None
-    quote = quote_refund(item, datetime.now(timezone.utc), OPERATOR if user.role == Role.ADMIN else CUSTOMER)
+    quote = quote_refund(item, datetime.now(timezone.utc), OPERATOR if acts_as_operator(user) else CUSTOMER)
     return CancellationQuoteOut(booking_id=item.id, status=item.status, paid=paid,
         refund_percent=quote.percent if paid else 0, refund_amount=quote.amount if paid else 0,
         points_restored=quote.points_restored if paid else 0, points_clawed_back=quote.points_clawed_back if paid else 0,
@@ -165,7 +165,7 @@ def update_booking_status(booking_id:int,data:BookingStatusIn,background_tasks:B
     item=db.scalar(sa.select(Booking).where(Booking.id==booking_id).with_for_update())
     if not item or _outside_scope(db, user, item): raise HTTPException(404,"Booking not found")
     previous_status=item.status
-    if user.role==Role.CUSTOMER:
+    if not acts_as_operator(user):
         if item.customer_id!=user.id or data.status!=BookingStatus.CANCELLED:
             raise HTTPException(403,"You can only cancel your own booking")
     allowed={BookingStatus.PENDING:{BookingStatus.CONFIRMED,BookingStatus.CANCELLED},
@@ -183,15 +183,15 @@ def update_booking_status(booking_id:int,data:BookingStatusIn,background_tasks:B
     if data.status==BookingStatus.CANCELLED and item.checked_in_at:
         raise HTTPException(409,"A checked-in ticket cannot be cancelled")
     item.status=data.status
-    if user.role==Role.ADMIN:
+    if acts_as_operator(user):
         record(db, user, "booking.status_changed", "booking", item.id, from_status=previous_status.value, to_status=data.status.value)
     if data.status==BookingStatus.CANCELLED:
         if previous_status == BookingStatus.PENDING:
             release_pending_points(db, item)
         if previous_status == BookingStatus.CONFIRMED:
-            issue_refund(db, item, user, OPERATOR if user.role==Role.ADMIN else CUSTOMER)
+            issue_refund(db, item, user, OPERATOR if acts_as_operator(user) else CUSTOMER)
         for assignment in item.seat_assignments: assignment.active=False
-        if user.role==Role.CUSTOMER and item.screening.ends_at <= datetime.now(timezone.utc):
+        if not acts_as_operator(user) and item.screening.ends_at <= datetime.now(timezone.utc):
             item.archived_by_customer=True
     if data.status!=BookingStatus.PENDING: item.hold_expires_at=None
     db.commit();db.refresh(item)

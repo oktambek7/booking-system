@@ -410,6 +410,24 @@ class RefreshToken(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     user_agent: Mapped[str | None] = mapped_column(String(200))
     ip: Mapped[str | None] = mapped_column(String(45))
+    # True when this sign-in passed the second step; carried to every access token the session mints.
+    mfa: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"), nullable=False)
+
+class UserTotp(Base):
+    """A user's two-step verification secret (encrypted). Pending until confirmed_at is set."""
+    __tablename__ = "user_totp"
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    secret_enc: Mapped[str] = mapped_column(Text)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_step: Mapped[int | None] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+class TotpRecoveryCode(Base):
+    __tablename__ = "totp_recovery_codes"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    code_hash: Mapped[str] = mapped_column(String(64), index=True)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 class Refund(Base):
     """Money returned for a cancelled paid booking. One row per payment, ever (unique index)."""

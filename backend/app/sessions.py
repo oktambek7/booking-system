@@ -39,20 +39,21 @@ def set_cookie(response: Response, token: str, expires_at: datetime) -> None:
 def clear_cookie(response: Response) -> None:
     response.delete_cookie(COOKIE_NAME, **_cookie_options())
 
-def _issue(db: Session, user_id: int, family_id: str, family_created_at: datetime, request: Request) -> tuple[str, RefreshToken]:
+def _issue(db: Session, user_id: int, family_id: str, family_created_at: datetime, request: Request,
+           mfa: bool = False) -> tuple[str, RefreshToken]:
     token = secrets.token_urlsafe(48)
     now = _now()
     row = RefreshToken(
         user_id=user_id, token_hash=_hash(token), family_id=family_id, family_created_at=family_created_at,
         expires_at=min(now + timedelta(days=settings.refresh_token_days),
                        family_created_at + timedelta(days=settings.refresh_family_max_days)),
-        user_agent=request.headers.get("user-agent", "")[:200] or None, ip=client_ip(request))
+        user_agent=request.headers.get("user-agent", "")[:200] or None, ip=client_ip(request), mfa=mfa)
     db.add(row)
     return token, row
 
-def start_session(db: Session, user: User, request: Request, response: Response) -> None:
-    """Begin a new sign-in. The caller commits."""
-    token, row = _issue(db, user.id, str(uuid.uuid4()), _now(), request)
+def start_session(db: Session, user: User, request: Request, response: Response, mfa: bool = False) -> None:
+    """Begin a new sign-in. `mfa` records that the second step was completed. The caller commits."""
+    token, row = _issue(db, user.id, str(uuid.uuid4()), _now(), request, mfa)
     set_cookie(response, token, row.expires_at)
 
 def revoke_family(db: Session, family_id: str) -> None:
@@ -72,8 +73,9 @@ def end_session(db: Session, request: Request, response: Response) -> None:
             revoke_family(db, row.family_id)
     clear_cookie(response)
 
-def rotate_session(db: Session, request: Request, response: Response) -> User:
-    """Validate the cookie's refresh token and replace it. Raises SessionError; the caller commits on success."""
+def rotate_session(db: Session, request: Request, response: Response) -> tuple[User, bool]:
+    """Validate the cookie's refresh token and replace it; returns the user and whether the session passed the
+    second step. Raises SessionError; the caller commits on success."""
     raw = request.cookies.get(COOKIE_NAME)
     if not raw:
         raise SessionError("Not signed in")
@@ -88,15 +90,15 @@ def rotate_session(db: Session, request: Request, response: Response) -> User:
         if (now - row.rotated_at).total_seconds() <= settings.refresh_reuse_grace_seconds:
             # Another tab refreshed a moment ago and the browser's cookie already holds its successor;
             # this request simply raced it. Hand out an access token but do not rotate again.
-            return user
+            return user, row.mfa
         revoke_family(db, row.family_id)
         record(db, user, "auth.refresh_reuse_detected", "user", user.id, family_id=row.family_id)
         db.commit()
         raise SessionError("Session expired. Sign in again")
     row.rotated_at = now
-    token, new_row = _issue(db, user.id, row.family_id, row.family_created_at, request)
+    token, new_row = _issue(db, user.id, row.family_id, row.family_created_at, request, row.mfa)
     set_cookie(response, token, new_row.expires_at)
-    return user
+    return user, row.mfa
 
 def purge_expired_refresh_tokens(retain_days: int = 7) -> int:
     """Delete tokens that expired or were revoked more than `retain_days` ago."""
