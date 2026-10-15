@@ -202,9 +202,6 @@ class CancellationTests(ApiTestCase):
         self.assertEqual(shop.set_status(booking["id"], "cancelled").status_code, 200)
         self.assertEqual(shop.set_status(booking["id"], "confirmed").status_code, 403)    # customers may only cancel
 
-    # KNOWN BUG (fixed in the next commit): the status is overwritten before the "was it pending?"
-    # check, so reserved Parda Points are never released.
-    @unittest.expectedFailure
     def test_cancelling_a_pending_booking_releases_reserved_points(self):
         hall, screening = self.venue(base_price=30000, surcharge=0)
         shop = self.shop(points=500)

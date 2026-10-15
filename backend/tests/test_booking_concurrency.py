@@ -1,9 +1,14 @@
 """Races that must be impossible: two customers on one seat, one promo code spent twice,
 one payment confirmed twice, one ticket admitted twice. Requests run on separate threads
 against the real app and a real PostgreSQL, so the row locks and unique indexes are exercised."""
+import time
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 
+from sqlalchemy import text
+
+from app.database import engine
 from app.models import Role
 from tests.support import (ApiTestCase, auth, make_hall, make_promo, make_screening, make_user,
                            run_parallel, scalar, sql)
@@ -52,9 +57,6 @@ class SeatRaceTests(ApiTestCase):
         results = run_parallel([lambda: shop.book(screening, [seat]) for _ in range(4)])
         self.assertEqual(sorted(r.status_code for r in results), [201, 409, 409, 409])
 
-    # KNOWN BUG (fixed in the next commit): _expire_holds() does not flush, so the booking request
-    # still sees the expired hold as taken and answers a spurious 409.
-    @unittest.expectedFailure
     def test_expired_hold_is_released_for_the_next_customer(self):
         hall, screening = self.venue()
         first, second = self.shop(), self.shop()
@@ -66,6 +68,15 @@ class SeatRaceTests(ApiTestCase):
         self.assertEqual(second.book(screening, [seat]).status_code, 201)
         self.assertEqual(sql("SELECT status FROM bookings WHERE id = :i", i=held.json()["id"])[0][0], "CANCELLED")
         self.assertEqual(active_assignments(screening), [(seat, 1)])
+
+    def test_seat_map_shows_an_expired_hold_as_free_immediately(self):
+        hall, screening = self.venue()
+        shop = self.shop()
+        seat = hall["seat_ids"][0]
+        held = shop.book(screening, [seat]).json()
+        sql("UPDATE bookings SET hold_expires_at = now() - interval '1 minute' WHERE id = :i", i=held["id"])
+        seats = self.client.get(f"/api/screenings/{screening}/seats").json()["seats"]
+        self.assertTrue(next(x for x in seats if x["id"] == seat)["available"])
 
     def test_cancelled_confirmed_ticket_frees_the_seat(self):
         hall, screening = self.venue()
@@ -109,6 +120,59 @@ class PaymentRaceTests(ApiTestCase):
         self.assertEqual(shop.points(), (30, 0))                                # 30 000 UZS / 1 000 earned once
         self.assertEqual(scalar("SELECT count(*) FROM booking_notifications WHERE booking_id = :b AND event_type = 'confirmation'",
                                 b=booking["id"]), 1)
+
+    def test_same_points_cannot_back_two_bookings_priced_at_once(self):
+        for _ in range(3):
+            hall, screening = self.venue(base_price=30000, surcharge=0)
+            shop = self.shop(points=100)
+            first = shop.book(screening, [hall["seat_ids"][0]]).json()
+            second = shop.book(screening, [hall["seat_ids"][1]]).json()
+            results = run_parallel([lambda: shop.price(first["id"], points=100), lambda: shop.price(second["id"], points=100)])
+            self.assertEqual(sorted(r.status_code for r in results), [200, 422], [r.text for r in results])
+            self.assertEqual(shop.points(), (100, 100))
+
+    def test_cancel_arriving_mid_payment_cannot_release_points_the_payment_spent(self):
+        """Deterministic interleaving: the payment is stalled on the wallet row while holding the booking
+        lock, a cancel arrives, then the payment is allowed to finish. The cancel must see the committed
+        (confirmed) booking, not the pending one it would have read without a lock."""
+        hall, screening = self.venue(base_price=30000, surcharge=0)
+        shop = self.shop(points=1000)
+        paid = shop.book(screening, [hall["seat_ids"][0]]).json()
+        other = shop.book(screening, [hall["seat_ids"][1]]).json()
+        shop.price(paid["id"], points=100)
+        shop.price(other["id"], points=50)                              # an unrelated reservation that must survive
+        started, otp = shop.start_payment(paid["id"])
+        pid = started.json()["payment_id"]
+
+        stall = engine.connect()
+        stall.execute(text("SELECT id FROM users WHERE id = :u FOR UPDATE"), {"u": shop.user["id"]})
+        try:
+            with ThreadPoolExecutor(2) as pool:
+                verify = pool.submit(shop.verify, pid, otp)
+                self.wait_for_lock_waiters(1)                           # payment holds the booking lock, waits for the wallet
+                cancel = pool.submit(shop.set_status, paid["id"], "cancelled")
+                self.wait_for_lock_waiters(2)                           # cancel is queued behind it
+                stall.rollback()                                        # release the wallet
+                verify_resp, cancel_resp = verify.result(30), cancel.result(30)
+        finally:
+            stall.close()
+        self.assertEqual(verify_resp.status_code, 200, verify_resp.text)
+        self.assertEqual(cancel_resp.status_code, 200, cancel_resp.text)   # confirmed tickets may still be cancelled
+        balance, reserved = shop.points()
+        self.assertEqual(reserved, 50, "the other booking's reservation must survive")
+        self.assertEqual(balance, 1000 - 100 + 20)                      # spent 100, earned 20 on 20 000 UZS
+        self.assertEqual(sql("SELECT status FROM bookings WHERE id = :i", i=paid["id"])[0][0], "CANCELLED")
+
+    @staticmethod
+    def wait_for_lock_waiters(count: int, timeout: float = 15.0):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            waiting = scalar("SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() "
+                             "AND wait_event_type = 'Lock'")
+            if waiting >= count:
+                return
+            time.sleep(0.05)
+        raise AssertionError(f"expected {count} sessions waiting on a lock")
 
     def test_one_ticket_is_admitted_once(self):
         hall = make_hall()

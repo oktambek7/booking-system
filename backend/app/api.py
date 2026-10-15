@@ -88,10 +88,22 @@ def _enforce_resend_cooldown(created_at: datetime | None, label: str) -> None:
     if remaining:
         raise HTTPException(429, f"Wait {remaining} seconds before requesting another {label} code")
 
+def _lock_user(db: Session, user_id: int) -> User | None:
+    """Row-lock an account and return it with its current balances.
+
+    The signed-in user is already in the session's identity map, and a plain
+    `SELECT ... FOR UPDATE` would hand back that object with its stale in-memory
+    values, letting two parallel requests spend the same Parda Points. Sessions run
+    with autoflush off, so pending edits are flushed first or the refresh would drop them.
+    """
+    db.flush()
+    return db.scalar(sa.select(User).where(User.id == user_id).with_for_update()
+                     .execution_options(populate_existing=True))
+
 def _release_pending_points(db: Session, booking: Booking) -> None:
     if not booking.points_redeemed:
         return
-    customer = db.scalar(sa.select(User).where(User.id == booking.customer_id).with_for_update())
+    customer = _lock_user(db, booking.customer_id)
     if customer:
         customer.reserved_points = max(0, customer.reserved_points - booking.points_redeemed)
 
@@ -104,6 +116,10 @@ def _expire_holds(db: Session):
         booking.status = BookingStatus.CANCELLED
         for assignment in booking.seat_assignments:
             assignment.active = False
+    if expired:
+        # Sessions run with autoflush off: without this the seat/availability queries that follow
+        # in the same request still see the expired holds as taken.
+        db.flush()
 
 def _screening_out(db: Session, screening: Screening) -> ScreeningOut:
     _expire_holds(db)
@@ -860,7 +876,7 @@ def price_booking(booking_id: int, data: BookingPriceIn, db: Session = Depends(g
         Payment.status == "awaiting_verification"))
     if open_payment:
         raise HTTPException(409, "A payment verification is already in progress for this booking")
-    customer = db.scalar(sa.select(User).where(User.id == user.id).with_for_update())
+    customer = _lock_user(db, user.id)
     _quote_booking(db, booking, customer, data.promo_code, data.points_to_redeem)
     db.commit()
     db.refresh(booking)
@@ -952,7 +968,7 @@ def start_payment(data: PaymentStartIn, db: Session = Depends(get_db), user: Use
         if discount != item.promotion_discount:
             raise HTTPException(409, "The promotion changed. Reapply it before paying")
     if item.points_redeemed:
-        wallet = db.scalar(sa.select(User).where(User.id == user.id).with_for_update())
+        wallet = _lock_user(db, user.id)
         if wallet.reserved_points < item.points_redeemed or wallet.parda_points < item.points_redeemed:
             raise HTTPException(409, "Your Parda Pass balance changed. Reapply your points")
     completed = db.scalar(sa.select(sa.exists().where(Payment.booking_id == item.id,
@@ -1018,7 +1034,7 @@ def verify_payment(payment_id:int,data:OtpVerifyIn,background_tasks:BackgroundTa
             raise HTTPException(429,"Too many incorrect codes. Start a new verification attempt")
         raise HTTPException(422,"Incorrect code. Check the 4 digits and try again")
     challenge.consumed_at=now
-    wallet = db.scalar(sa.select(User).where(User.id == user.id).with_for_update())
+    wallet = _lock_user(db, user.id)
     if booking.promotion_code:
         try:
             promotion, discount = _promotion_discount(db, booking.promotion_code, booking.subtotal_price, lock=True)
@@ -1094,8 +1110,9 @@ def check_in_ticket(data: TicketCheckInIn, db: Session = Depends(get_db), _: Use
 
 @router.patch("/bookings/{booking_id}/status",response_model=BookingOut)
 def update_booking_status(booking_id:int,data:BookingStatusIn,background_tasks:BackgroundTasks,db:Session=Depends(get_db),user:User=Depends(current_user)):
-    item=db.get(Booking,booking_id)
+    item=db.scalar(sa.select(Booking).where(Booking.id==booking_id).with_for_update())
     if not item: raise HTTPException(404,"Booking not found")
+    previous_status=item.status
     if user.role==Role.CUSTOMER:
         if item.customer_id!=user.id or data.status!=BookingStatus.CANCELLED:
             raise HTTPException(403,"You can only cancel your own booking")
@@ -1115,7 +1132,7 @@ def update_booking_status(booking_id:int,data:BookingStatusIn,background_tasks:B
         raise HTTPException(409,"A checked-in ticket cannot be cancelled")
     item.status=data.status
     if data.status==BookingStatus.CANCELLED:
-        if item.status == BookingStatus.PENDING:
+        if previous_status == BookingStatus.PENDING:
             _release_pending_points(db, item)
         for assignment in item.seat_assignments: assignment.active=False
         if user.role==Role.CUSTOMER and item.screening.ends_at <= datetime.now(timezone.utc):
