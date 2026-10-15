@@ -11,7 +11,7 @@ from app.config import settings
 from app.database import SessionLocal, engine
 from app.main import app
 from app.models import Role, User
-from app.security import hash_password, make_token
+from app.security import hash_password
 
 PASSWORD = "correct-horse-battery"
 

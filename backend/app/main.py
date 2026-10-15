@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select, text
-from . import models
+from . import models  # noqa: F401  (registers every table on Base.metadata)
 from .api import router
 from .cinematica import router as cinematica_router, sync_active_cinematica_halls
 from .config import settings

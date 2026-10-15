@@ -1,0 +1,7 @@
+target-version = "py312"
+line-length = 200
+
+[lint]
+# Real-bug rules only (syntax errors, undefined names, unused imports/variables).
+# Style rules are intentionally off: the codebase uses dense one-line handlers.
+select = ["E9", "F"]

@@ -201,9 +201,13 @@ The site asks for browser location only after the visitor presses **Find cinemas
 
 ## Verification
 
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `main` and every pull request: backend lint (`ruff`) and tests against a PostgreSQL 16 service, frontend type-check and production build, and a Docker build of the API image. To run the same checks locally:
+
 ```sh
-python -m unittest discover -s backend/tests -v
-cd frontend && npm run build
+cd backend && pip install -r requirements-dev.txt
+ruff check .
+DATABASE_URL=postgresql+psycopg://booking:booking@localhost:5432/booking pytest -q   # database tests skip if PostgreSQL is unreachable
+cd ../frontend && npm ci && npm run build
 ```
 
 The unit checks cover source-showtime normalization, source IDs, disabled/malformed rejection, and Asia/Tashkent-to-UTC conversion. PostgreSQL is responsible for active-seat uniqueness and hall-time exclusion; run concurrent booking checks against the configured PostgreSQL staging database before a commercial release.
