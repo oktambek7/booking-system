@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     # Cancellation policy for paid tickets: share of the price returned to a customer who cancels this many
     # hours before the screening starts (operators always refund in full).
     refund_full_hours: int = 24
+    # Live seat-map updates (Server-Sent Events fed by PostgreSQL NOTIFY).
+    live_updates_enabled: bool = True
+    live_heartbeat_seconds: float = 20.0
+    live_max_streams: int = 2000
+    live_max_streams_per_ip: int = 10
     refund_partial_hours: int = 2
     refund_partial_percent: int = 50
     max_pending_seats_per_screening: int = 8

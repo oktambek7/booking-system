@@ -1,6 +1,8 @@
 """Factories and helpers shared by the database-backed tests."""
 import itertools
+import queue
 import threading
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
@@ -167,3 +169,77 @@ class ApiTestCase(unittest.TestCase):
     def venue(self, **screening_kwargs) -> tuple[dict, int]:
         hall = make_hall()
         return hall, make_screening(hall, **screening_kwargs)
+
+
+class LiveServer:
+    """The real app on a real socket (uvicorn in a thread), for tests that need streaming responses."""
+    def __enter__(self):
+        import uvicorn
+        self.server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=0, log_level="warning"))
+        self.server.install_signal_handlers = lambda: None
+        self.thread = threading.Thread(target=self.server.run, daemon=True)
+        self.thread.start()
+        deadline = time.monotonic() + 30
+        while not self.server.started and time.monotonic() < deadline:
+            time.sleep(0.05)
+        if not self.server.started:
+            raise RuntimeError("test server did not start")
+        self.url = f"http://127.0.0.1:{self.server.servers[0].sockets[0].getsockname()[1]}"
+        return self
+
+    def __exit__(self, *exc):
+        self.server.should_exit = True
+        self.thread.join(timeout=10)
+
+
+class SSEReader:
+    """Reads a Server-Sent Events stream on a thread; `next()` returns parsed events (comments included)."""
+    def __init__(self, url: str):
+        import httpx
+        self.events: queue.Queue = queue.Queue()
+        self.status: int | None = None
+        self._client = httpx.Client(timeout=None)
+        self._ready = threading.Event()
+        self._thread = threading.Thread(target=self._read, args=(url,), daemon=True)
+        self._thread.start()
+        self._ready.wait(10)
+
+    def _read(self, url: str) -> None:
+        try:
+            with self._client.stream("GET", url) as response:
+                self.status = response.status_code
+                self._ready.set()
+                if response.status_code != 200:
+                    response.read()
+                    return
+                event: dict = {}
+                for line in response.iter_lines():
+                    if line == "":
+                        if "data" in event:
+                            self.events.put(event)
+                        event = {}
+                    elif line.startswith(":"):
+                        self.events.put({"comment": line[1:].strip()})
+                    else:
+                        field, _, value = line.partition(":")
+                        event[field] = value.strip()
+        except Exception:
+            pass
+        finally:
+            self._ready.set()
+
+    def next(self, timeout: float = 3.0) -> dict:
+        return self.events.get(timeout=timeout)
+
+    def drain(self, wait: float = 1.0) -> list[dict]:
+        """Everything that arrives within `wait` seconds."""
+        found, deadline = [], time.monotonic() + wait
+        while time.monotonic() < deadline:
+            try:
+                found.append(self.events.get(timeout=max(0.05, deadline - time.monotonic())))
+            except queue.Empty:
+                break
+        return found
+
+    def close(self) -> None:
+        self._client.close()

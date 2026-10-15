@@ -11,6 +11,7 @@ from .api import router
 from .cinematica import router as cinematica_router
 from .config import settings
 from .database import SessionLocal, health_engine
+from .live import start_live_updates, stop_live_updates
 from .migrate import assert_schema_current, upgrade_to_head
 from .models import Role, User
 from .observability import RequestContextMiddleware, configure_logging
@@ -37,9 +38,11 @@ async def lifespan(app: FastAPI):
     # Discovery source failures must never prevent the booking API from
     # starting. Refresh catalogue data in the background instead.
     tasks = jobs.start_all() if settings.run_background_jobs else []
+    await start_live_updates()
     try:
         yield
     finally:
+        await stop_live_updates()
         await jobs.stop_all(tasks)
 
 def _ensure_initial_admin() -> None:
