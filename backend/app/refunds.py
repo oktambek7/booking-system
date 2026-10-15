@@ -15,7 +15,9 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 from .audit import record
 from .config import settings
+from fastapi import HTTPException
 from .models import Booking, BookingNotification, Payment, Refund, User
+from .payment_providers import DEMO, PAID, ProviderError, get_provider
 from .services import lock_user
 
 REFUND_EVENT = "refund"
@@ -56,7 +58,7 @@ def quote_refund(booking: Booking, now: datetime, initiated_by: str) -> RefundQu
                        hours_until_start=(booking.screening.starts_at - now).total_seconds() / 3600)
 
 def paid_payment(db: Session, booking_id: int) -> Payment | None:
-    return db.scalar(sa.select(Payment).where(Payment.booking_id == booking_id, Payment.status == "succeeded_demo"))
+    return db.scalar(sa.select(Payment).where(Payment.booking_id == booking_id, Payment.status.in_(PAID)))
 
 def issue_refund(db: Session, booking: Booking, actor: User, initiated_by: str) -> RefundQuote | None:
     """Refund a booking that is being cancelled after payment. The caller commits. Returns None if nothing was paid."""
@@ -68,14 +70,27 @@ def issue_refund(db: Session, booking: Booking, actor: User, initiated_by: str) 
     booking.refund_percent = quote.percent
     if quote.percent == 0:
         return quote
+    demo = payment.provider == DEMO or payment.provider_reference is None
+    provider_reference = None
+    if not demo:
+        # The money goes back first: if the provider refuses, the caller rolls the whole cancellation back and
+        # the customer keeps a valid ticket. The idempotency key makes a retry refund once, not twice.
+        provider = get_provider(payment.provider)
+        try:
+            if provider is None:
+                raise ProviderError(f"payments from {payment.provider} cannot be refunded by this server")
+            provider_reference = provider.refund(payment, quote.amount, f"refund-{payment.id}")
+        except ProviderError as exc:
+            raise HTTPException(502, "The payment provider could not process the refund. Nothing was cancelled; try again shortly") from exc
     customer = lock_user(db, booking.customer_id)
     customer.parda_points = max(0, customer.parda_points + quote.points_restored - quote.points_clawed_back)
     booking.refund_amount = quote.amount
     booking.refunded_at = now
-    payment.status = "refunded_demo" if quote.percent == 100 else "partially_refunded_demo"
+    suffix = "_demo" if demo else ""
+    payment.status = ("refunded" if quote.percent == 100 else "partially_refunded") + suffix
     db.add(Refund(payment_id=payment.id, booking_id=booking.id, amount=quote.amount, percent=quote.percent,
                   points_restored=quote.points_restored, points_clawed_back=quote.points_clawed_back,
-                  status="succeeded_demo", initiated_by=initiated_by))
+                  status="succeeded" + suffix, initiated_by=initiated_by, provider_reference=provider_reference))
     db.add(BookingNotification(booking_id=booking.id, event_type=REFUND_EVENT, due_at=now))
     record(db, actor, "booking.refunded", "booking", booking.id, amount=quote.amount, percent=quote.percent,
            initiated_by=initiated_by, points_restored=quote.points_restored, points_clawed_back=quote.points_clawed_back)

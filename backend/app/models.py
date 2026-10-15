@@ -266,10 +266,33 @@ class Payment(Base):
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     status: Mapped[str] = mapped_column(String(24), default="awaiting_verification")
     provider: Mapped[str] = mapped_column(String(24), default="mock")
+    # The provider's own id for this payment, and the client's Idempotency-Key for the request that created it.
+    provider_reference: Mapped[str | None] = mapped_column(String(80))
+    idempotency_key: Mapped[str | None] = mapped_column(String(80))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     booking: Mapped[Booking] = relationship()
-    __table_args__ = (Index("uq_open_payment_per_booking", "booking_id", unique=True,
-                            postgresql_where=text("status = 'awaiting_verification'")),)
+    __table_args__ = (
+        # One unfinished payment per booking, whichever checkout started it.
+        Index("uq_open_payment_per_booking", "booking_id", unique=True,
+              postgresql_where=text("status IN ('awaiting_verification', 'awaiting_provider')")),
+        Index("uq_payment_provider_reference", "provider", "provider_reference", unique=True,
+              postgresql_where=text("provider_reference IS NOT NULL")),
+        Index("uq_payment_idempotency_key", "booking_id", "idempotency_key", unique=True,
+              postgresql_where=text("idempotency_key IS NOT NULL")),
+    )
+
+class PaymentEvent(Base):
+    """Every provider callback we acted on or deliberately ignored. The unique (provider, event_id) makes a
+    redelivered webhook a no-op: the row is inserted in the same transaction as the effects."""
+    __tablename__ = "payment_events"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    provider: Mapped[str] = mapped_column(String(24))
+    event_id: Mapped[str] = mapped_column(String(80))
+    payment_id: Mapped[int | None] = mapped_column(ForeignKey("payments.id", ondelete="SET NULL"), index=True)
+    kind: Mapped[str] = mapped_column(String(24))
+    outcome: Mapped[str] = mapped_column(String(32))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    __table_args__ = (UniqueConstraint("provider", "event_id", name="uq_payment_event"),)
 
 class Promotion(Base):
     __tablename__ = "promotions"

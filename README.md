@@ -74,6 +74,8 @@ The original assignment describes appointments. Parda applies the same booking m
 
 The checkout is intentionally a **demo payment**. It accepts a syntactically valid card number, holder name, current or future expiry date, and CVV for Visa or Mastercard, then emails a four-digit confirmation code and marks the Parda booking as confirmed. No processor is contacted and no money moves.
 
+That is the default (`PAYMENT_PROVIDER=demo`). See **Payment providers** below for the hosted-checkout path that a real gateway plugs into.
+
 On startup, Parda fills the next seven days of missing managed demo slots from its existing active films and halls. Existing screenings and conflicting slots are preserved.
 
 The app accepts card details only to validate this one demo attempt. It stores only the last four card digits on the payment receipt. It never stores, logs, returns, or emails a card number, holder name, expiry, or CVV. Payment email codes are HMAC digests, expire after five minutes, allow five attempts, and have resend limits. A successful ticket queues one confirmation email and, when the showtime permits, reminders 24 hours and 2 hours before the screening. Each notification is recorded in PostgreSQL so a service restart cannot duplicate it.
@@ -159,6 +161,16 @@ How it stays safe: the link token is single-use, expires in 15 minutes and only 
 
 In the operator panel's **Chiptalar** tab, "Kamera bilan skanerlash" opens the camera and checks tickets in from their QR codes (the e-ticket QR carries the ticket code). Decoding uses [jsQR](https://github.com/cozmo/jsQR) (Apache-2.0), loaded only when the scanner opens, so it works on every browser including iOS Safari. A ticket is submitted once each time it comes into view and again only after it has left the frame, so a steady hand does not repeat the request; QR codes that are not Parda tickets are ignored; the page keeps scanning between guests, and if the camera is denied or missing the manual code field still works. Camera access needs `camera=(self)` in the Permissions-Policy header (set in `frontend/vercel.json` and enforced by `npm run check:headers`) and HTTPS.
 
+## Payment providers
+
+`app/payment_providers.py` defines what a gateway must do: create a hosted checkout, authenticate its own webhooks, and refund. Parda ships the `demo` checkout and a `sandbox` provider that behaves like a real gateway (redirect out, signed webhook back, refund API) without any merchant account, so the whole path is tested end to end. **No real gateway (Payme, Click, Uzum, Stripe ...) is implemented yet: that needs merchant credentials and the gateway's documentation; it is one more class in that file plus an entry in `get_provider`.**
+
+Flow with a provider: `POST /api/payments/checkout {booking_id}` (optional `Idempotency-Key` header) creates a payment in `awaiting_provider` and returns the hosted page URL; the browser goes there; the provider calls `POST /api/payments/webhook/{provider}`; only that signed callback confirms the booking (`app/checkout.py`). The browser is sent back to `/?payment=<reference>` and the app polls `GET /api/payments/by-reference/{reference}` until the webhook has landed.
+
+What the webhook handler guarantees: the signature (HMAC-SHA256 over `timestamp.body`, constant-time compare) and a five-minute replay window are checked before anything is read; every event id is recorded in `payment_events` in the same transaction as its effects, so a redelivery, even a simultaneous one, is applied once; a reported amount that differs from the payment, or is missing, never confirms a booking and is audited; a payment whose booking was cancelled or expired meanwhile is refunded automatically (or flagged `paid_unfulfilled` in the audit log if the refund call fails); a pending booking whose hold has only just lapsed still owns its seats, so it is confirmed; and the price the customer paid is honoured even if the promotion has lapsed since. The same idempotency key from the same customer returns the same payment instead of a second one, and returning to checkout resumes an open payment. Cancelling a paid ticket calls the provider's refund first with a stable idempotency key; if the provider refuses, nothing is cancelled and the customer keeps the ticket (`502`).
+
+`PAYMENT_PROVIDER=sandbox` lets anyone approve their own payment, so the production validator refuses it, and any provider other than `demo` needs a `PAYMENT_WEBHOOK_SECRET` of at least 32 characters. Provider calls currently run inside the request's database transaction, which keeps the logic simple; a slow gateway would justify moving refunds to a background job.
+
 ## Installable app and offline tickets
 
 Parda is a Progressive Web App: `manifest.webmanifest` plus 192/512/maskable icons make it installable ("Add to Home Screen"), and `public/sw.js` keeps the app shell and its hashed build assets available without a connection. Pages are network-first (an online visitor always gets the newest build), build assets are cache-first with an 80-entry cap, and the worker never touches `/api`, `/health`, non-GET requests or other origins (film posters), so no personal data enters the browser cache. The worker is registered in production builds only and is served with `Cache-Control: max-age=0, must-revalidate`.
@@ -173,7 +185,7 @@ An open seat map updates by itself when someone else takes or releases a seat, a
 
 A customer who cancels a **paid** ticket is refunded a share of the price that depends on how far away the screening is: 100% from `REFUND_FULL_HOURS` (24) before it starts, `REFUND_PARTIAL_PERCENT` (50%) from `REFUND_PARTIAL_HOURS` (2) before, and nothing after that. An operator cancelling a ticket always refunds in full. The amount is rounded down to a whole sum. The Parda Points spent on the booking come back in the same proportion and the points it earned are taken back in the same proportion (never below zero). Unpaid holds have nothing to refund. Promo-code usage is not restored.
 
-`GET /api/bookings/{id}/cancellation-quote` previews the result (the app shows it before the customer confirms) and `GET /api/refund-policy` publishes the policy. Refunds are recorded in a ledger with one row per payment (a unique index makes a second refund impossible), in the same transaction as the cancellation; the payment becomes `refunded_demo` or `partially_refunded_demo`, the customer gets a refund email, the operator dashboard totals the money returned, and each refund is in the audit log. Payments are still the demo payment, so no money actually moves; a real payment provider would be called from `app/refunds.py`.
+`GET /api/bookings/{id}/cancellation-quote` previews the result (the app shows it before the customer confirms) and `GET /api/refund-policy` publishes the policy. Refunds are recorded in a ledger with one row per payment (a unique index makes a second refund impossible), in the same transaction as the cancellation; the payment becomes `refunded_demo` or `partially_refunded_demo`, the customer gets a refund email, the operator dashboard totals the money returned, and each refund is in the audit log. Demo payments move no money; a payment made through a payment provider is refunded through that provider (see **Payment providers**).
 
 ## Sessions
 
@@ -222,7 +234,7 @@ alembic revision -m "add thing"  # new revision: write explicit, tested SQL/ops 
 - Row locks and a partial unique index on active `(screening_id, seat_id)` assignments prevent competing bookings from taking the same seat. Collisions return HTTP 409.
 - A PostgreSQL exclusion constraint prevents overlapping screenings in one hall. Cancelled and expired holds release seats while retaining booking history.
 - Duplicate, foreign, past-screening, and excessive seat selections are rejected. Customers can only cancel their own eligible bookings.
-- Demo payment attempts are bound to the authenticated booking and server-calculated total. A production payment provider must verify signed callbacks and transaction amount/order before a booking can be confirmed.
+- Demo payment attempts are bound to the authenticated booking and server-calculated total. A payment provider's callbacks are verified by signature, replay window and amount/reference before a booking can be confirmed (see **Payment providers**).
 - Customer history clearing archives only cancelled and completed rows. Upcoming active holds/tickets remain visible; users cancel eligible bookings first.
 
 ## Backend layout

@@ -315,6 +315,25 @@ class PaymentVerifyOut(BaseModel):
     status: str
     booking: BookingOut
 
+class PaymentConfigOut(BaseModel):
+    provider: str
+
+class CheckoutIn(BaseModel):
+    booking_id: int
+
+class CheckoutOut(BaseModel):
+    payment_id: int
+    reference: str
+    status: str
+    amount: Decimal
+    checkout_url: str | None = None
+
+class PaymentStatusOut(BaseModel):
+    payment_id: int
+    reference: str
+    status: str
+    booking: BookingOut | None = None
+
 class CatalogSyncOut(BaseModel):
     imported_now_playing: int
     imported_upcoming: int

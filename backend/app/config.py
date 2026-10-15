@@ -3,6 +3,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 DEFAULT_JWT_SECRET = "change-me-before-deploying-this-app"
 MIN_SECRET_LENGTH = 32
 EMAIL_MODES = {"mock", "smtp", "resend", "brevo"}
+# "demo" is the card-form + e-mailed-code checkout; the others redirect to a hosted page and confirm through a signed webhook.
+PAYMENT_PROVIDERS = {"demo", "sandbox"}
 
 class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://booking:booking@localhost:5432/booking"
@@ -39,6 +41,11 @@ class Settings(BaseSettings):
     live_max_streams_per_ip: int = 10
     refund_partial_hours: int = 2
     refund_partial_percent: int = 50
+    # Which checkout is used (see app/payment_providers.py). A webhook secret signs the provider's callbacks.
+    payment_provider: str = "demo"
+    payment_webhook_secret: str = ""
+    # Where the hosted page sends the customer afterwards. Empty = the first CORS origin.
+    payment_return_url: str = ""
     max_pending_seats_per_screening: int = 8
     notification_poll_seconds: int = 60
     notification_retry_minutes: int = 10
@@ -108,6 +115,13 @@ class Settings(BaseSettings):
             problems.append("CORS_ORIGINS must list the exact frontend origin(s), not '*' or empty")
         if self.telegram_bot_token and (len(self.telegram_webhook_secret) < 16 or not self.telegram_bot_username):
             problems.append("TELEGRAM_BOT_TOKEN needs TELEGRAM_BOT_USERNAME and a TELEGRAM_WEBHOOK_SECRET of at least 16 characters")
+        provider = self.payment_provider.strip().lower()
+        if provider not in PAYMENT_PROVIDERS:
+            problems.append(f"PAYMENT_PROVIDER must be one of {', '.join(sorted(PAYMENT_PROVIDERS))}")
+        elif provider == "sandbox":
+            problems.append("PAYMENT_PROVIDER=sandbox lets anyone approve their own payment; it is for development only")
+        if provider != "demo" and len(self.payment_webhook_secret) < MIN_SECRET_LENGTH:
+            problems.append(f"PAYMENT_WEBHOOK_SECRET must be at least {MIN_SECRET_LENGTH} characters when a payment provider is used")
         if "booking:booking@" in self.database_url:
             problems.append("DATABASE_URL still uses the default development credentials")
         return problems

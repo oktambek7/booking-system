@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta, timezone
 from secrets import token_urlsafe
-from decimal import Decimal, ROUND_DOWN
 from zoneinfo import ZoneInfo
 import sqlalchemy as sa
 from sqlalchemy import update
@@ -8,17 +7,17 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from ..database import get_db
-from ..models import (Booking, BookingStatus, Payment, PaymentEmailChallenge, PromotionRedemption, User)
+from ..models import Booking, Payment, PaymentEmailChallenge, User
 from ..schemas import (OtpVerifyIn, PaymentStartIn,
                       PaymentStartOut, PaymentVerifyOut)
 from ..security import current_user
 from ..config import settings
 from ..otp import code_hash, code_matches, new_code
 from ..mail import (EmailDeliveryError, send_payment_verification_email)
-from ..notifications import (deliver_due_notifications, schedule_booking_notifications)
-from ..services import (
-    POINT_EARN_RATE_UZS, booking_out, calculate_promotion_discount, enforce_resend_cooldown, lock_user,
-    new_ticket_code, owned_pending_booking, resend_available_at)
+from ..notifications import deliver_due_notifications
+from ..checkout import FinalizeError, ensure_payable, finalize_payment
+from ..payment_providers import OPEN
+from ..services import booking_out, enforce_resend_cooldown, owned_pending_booking, resend_available_at
 
 router = APIRouter()
 
@@ -88,22 +87,9 @@ def _send_payment_code(payment: Payment, booking: Booking, user: User, db: Sessi
 def start_payment(data: PaymentStartIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
     card_last4 = _validate_demo_card(data)
     item = owned_pending_booking(data.booking_id, db, user, lock=True)
-    if not user.email_verified:
-        raise HTTPException(403, "Verify your account email before paying")
-    if item.promotion_code:
-        promotion, discount = calculate_promotion_discount(db, item.promotion_code, item.subtotal_price, lock=True)
-        if discount != item.promotion_discount:
-            raise HTTPException(409, "The promotion changed. Reapply it before paying")
-    if item.points_redeemed:
-        wallet = lock_user(db, user.id)
-        if wallet.reserved_points < item.points_redeemed or wallet.parda_points < item.points_redeemed:
-            raise HTTPException(409, "Your Parda Pass balance changed. Reapply your points")
-    completed = db.scalar(sa.select(sa.exists().where(Payment.booking_id == item.id,
-        Payment.status == "succeeded_demo")))
-    if completed:
-        raise HTTPException(409, "This booking has already been paid")
+    ensure_payable(db, item, user)
     open_payment = db.scalar(sa.select(Payment).where(Payment.booking_id == item.id,
-        Payment.status == "awaiting_verification").with_for_update())
+        Payment.status.in_(OPEN)).with_for_update())
     if open_payment:
         raise HTTPException(409, "A payment verification is already in progress. Resend its email code or wait for it to expire")
     recent = db.scalar(sa.select(sa.func.count(PaymentEmailChallenge.id)).where(
@@ -161,34 +147,12 @@ def verify_payment(payment_id:int,data:OtpVerifyIn,background_tasks:BackgroundTa
             raise HTTPException(429,"Too many incorrect codes. Start a new verification attempt")
         raise HTTPException(422,"Incorrect code. Check the 4 digits and try again")
     challenge.consumed_at=now
-    wallet = lock_user(db, user.id)
-    if booking.promotion_code:
-        try:
-            promotion, discount = calculate_promotion_discount(db, booking.promotion_code, booking.subtotal_price, lock=True)
-        except HTTPException as exc:
-            payment.status = "promotion_unavailable"
-            db.commit()
-            raise HTTPException(409, "The promotion is no longer available. Reapply checkout pricing") from exc
-        if discount != booking.promotion_discount:
-            payment.status = "promotion_unavailable"
-            db.commit()
-            raise HTTPException(409, "The promotion changed. Reapply checkout pricing")
-        promotion.usage_count += 1
-        db.add(PromotionRedemption(promotion_id=promotion.id, booking_id=booking.id,
-            customer_id=user.id, discount_amount=booking.promotion_discount))
-    if booking.points_redeemed:
-        if wallet.reserved_points < booking.points_redeemed or wallet.parda_points < booking.points_redeemed:
-            payment.status = "loyalty_unavailable"
-            db.commit()
-            raise HTTPException(409, "Your Parda Pass balance changed. Reapply checkout pricing")
-        wallet.reserved_points -= booking.points_redeemed
-        wallet.parda_points -= booking.points_redeemed
-    booking.points_earned = int((booking.total_price / Decimal(POINT_EARN_RATE_UZS)).to_integral_value(rounding=ROUND_DOWN))
-    wallet.parda_points += booking.points_earned
-    payment.status="succeeded_demo"
-    booking.status=BookingStatus.CONFIRMED;booking.hold_expires_at=None
-    booking.ticket_code = booking.ticket_code or new_ticket_code(db)
-    schedule_booking_notifications(db, booking, now=now)
+    try:
+        finalize_payment(db, payment, booking, now, paid_status="succeeded_demo", revalidate=True)
+    except FinalizeError as exc:
+        payment.status = exc.payment_status
+        db.commit()
+        raise HTTPException(409, exc.message) from exc
     db.commit();db.refresh(booking)
     background_tasks.add_task(deliver_due_notifications)
     return PaymentVerifyOut(payment_id=payment.id,reference=payment.reference,status=payment.status,booking=booking_out(booking))

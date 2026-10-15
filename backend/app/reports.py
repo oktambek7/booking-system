@@ -13,11 +13,12 @@ from zoneinfo import ZoneInfo
 import sqlalchemy as sa
 from .config import settings
 from .database import SessionLocal
+from .payment_providers import PAID_OR_REFUNDED
 from .models import Auditorium, Booking, BookingSeat, Movie, Payment, Screening, Seat, User
 
 MAX_RANGE_DAYS = 366
 BOM = "﻿"                    # lets Excel read Uzbek and Russian text as UTF-8
-PAID_STATUSES = ("succeeded_demo", "refunded_demo", "partially_refunded_demo")
+PAID_STATUSES = PAID_OR_REFUNDED
 _DANGEROUS_START = ("=", "+", "-", "@", "\t", "\r")
 
 def safe_cell(value) -> str:

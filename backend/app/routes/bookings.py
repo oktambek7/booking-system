@@ -17,6 +17,7 @@ from ..services import (
     ACTIVE_STATUSES, POINT_VALUE_UZS, booking_out, calculate_promotion_discount, expire_holds,
     lock_user, new_ticket_code, owned_pending_booking, release_pending_points)
 from ..audit import record
+from ..payment_providers import OPEN, PAID
 from ..refunds import CUSTOMER, OPERATOR, issue_refund, paid_payment, policy, quote_refund
 
 router = APIRouter()
@@ -100,7 +101,7 @@ def create_booking(data:BookingIn,db:Session=Depends(get_db),user:User=Depends(c
 def price_booking(booking_id: int, data: BookingPriceIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
     booking = owned_pending_booking(booking_id, db, user, lock=True)
     open_payment = db.scalar(sa.select(Payment.id).where(Payment.booking_id == booking.id,
-        Payment.status == "awaiting_verification"))
+        Payment.status.in_(OPEN)))
     if open_payment:
         raise HTTPException(409, "A payment verification is already in progress for this booking")
     customer = lock_user(db, user.id)
@@ -167,8 +168,8 @@ def update_booking_status(booking_id:int,data:BookingStatusIn,background_tasks:B
         raise HTTPException(422,f"Cannot change {item.status.value} to {data.status.value}")
     if data.status==BookingStatus.CONFIRMED:
         paid=db.scalar(sa.select(sa.exists().where(Payment.booking_id==item.id,
-            Payment.status=="succeeded_demo")))
-        if not paid: raise HTTPException(409,"Booking requires a verified demo payment before confirmation")
+            Payment.status.in_(PAID))))
+        if not paid: raise HTTPException(409,"Booking requires a verified payment before confirmation")
         item.ticket_code = item.ticket_code or new_ticket_code(db)
     if data.status==BookingStatus.COMPLETED and datetime.now(timezone.utc)<item.screening.ends_at:
         raise HTTPException(422,"A screening can only be marked completed after it ends")
