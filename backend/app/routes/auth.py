@@ -175,9 +175,9 @@ def verify_email(data: EmailCodeVerify, request: Request, response: Response, db
     if not user or not user.active:
         raise HTTPException(404, "Account awaiting verification was not found")
     if user.email_verified:
-        sessions.start_session(db, user, request, response)
-        db.commit()
-        return {"access_token": make_token(user), "token_type": "bearer", "expires_in": _access_seconds()}
+        # Nothing to verify. This must never hand out a session: no code has been checked, and anyone who
+        # knows the address could otherwise sign in as this account. Signing in goes through /auth/login.
+        raise HTTPException(404, "Account awaiting verification was not found")
     challenge = db.scalar(sa.select(EmailOtpChallenge).where(
         EmailOtpChallenge.user_id == user.id, EmailOtpChallenge.consumed_at.is_(None)
     ).order_by(EmailOtpChallenge.created_at.desc()).with_for_update())
