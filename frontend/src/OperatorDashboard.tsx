@@ -3,6 +3,7 @@ import { apiFetch } from './session'
 import { Armchair, CalendarDays, CheckCircle2, CircleDollarSign, Clapperboard, DoorOpen, Film, LayoutDashboard, LoaderCircle, Plus, RefreshCw, ScanLine, Ticket, Users, X } from 'lucide-react'
 import { calendarDate, formatDateTime, isoDateInTashkent } from './dateFormat'
 import Modal from './ui/Modal'
+import QrScanner from './ui/QrScanner'
 
 type Movie = { id:number; title:string; active:boolean; catalog_status?:string; duration_minutes?:number|null; language:string; age_rating:string; poster_url:string }
 type Hall = { id:number; name:string; cinema_name:string; city:string; address:string; hall_type:'standard'|'vip'; formats:string[]; seat_count:number; active?:boolean; source_name?:string|null }
@@ -32,8 +33,10 @@ export default function OperatorDashboard({ api, token, onClose }: { api:string;
   const visibleMovies = useMemo(() => movies.filter(movie => movie.active && movie.catalog_status !== 'upcoming' && movie.duration_minutes), [movies])
   const activeHalls = useMemo(() => halls.filter(hall => hall.active !== false), [halls])
 
-  async function load() {
-    setLoading(true); setError('')
+  // `silent` refreshes after an action keep the current content (and the open camera) on screen instead of
+  // swapping the whole panel for a spinner; only the first load and a change of day show the spinner.
+  async function load(silent = false) {
+    if (!silent) { setLoading(true); setError('') }
     try {
       const [dashboardResult, moviesResult, hallsResult, promotionsResult] = await Promise.all([
         apiFetch(`${api}/api/admin/dashboard?date=${day}`, { headers:headers(token) }),
@@ -59,7 +62,7 @@ export default function OperatorDashboard({ api, token, onClose }: { api:string;
       const result = await apiFetch(`${api}${path}`, { method:'POST', headers:headers(token), body:JSON.stringify(body) })
       const data = await result.json()
       if (!result.ok) throw new Error(data.detail || 'Saqlab bo‘lmadi.')
-      setNotice(success); form.reset(); await load()
+      setNotice(success); form.reset(); await load(true)
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Saqlab bo‘lmadi.') }
     finally { setBusy(false) }
   }
@@ -70,22 +73,26 @@ export default function OperatorDashboard({ api, token, onClose }: { api:string;
       const data = await result.json()
       if (!result.ok) throw new Error(data.detail || 'Chipta holati yangilanmadi.')
       setNotice(status === 'completed' ? 'Seans yakunlangan deb belgilandi.' : 'Buyurtma bekor qilindi va joylar bo‘shatildi.')
-      await load()
+      await load(true)
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Chipta holati yangilanmadi.') }
     finally { setBusy(false) }
   }
-  async function checkIn(event:FormEvent<HTMLFormElement>) {
-    event.preventDefault(); const form = event.currentTarget; const ticketCode = String(new FormData(form).get('ticket_code') || '').trim()
-    if (!ticketCode) return
+  async function submitTicketCode(ticketCode:string): Promise<boolean> {
     setBusy(true); setError(''); setNotice('')
     try {
       const result = await apiFetch(`${api}/api/admin/tickets/check-in`, { method:'POST', headers:headers(token), body:JSON.stringify({ ticket_code:ticketCode }) })
       const data = await result.json()
       if (!result.ok) throw new Error(data.detail || 'Chipta tekshirilmadi.')
       setNotice(`${data.booking.movie_title} · ${data.booking.seats.join(', ')} uchun kirish tasdiqlandi.`)
-      form.reset(); await load()
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Chipta tekshirilmadi.') }
+      await load(true)
+      return true
+    } catch (cause) { setError(cause instanceof Error ? `${ticketCode}: ${cause.message}` : 'Chipta tekshirilmadi.'); return false }
     finally { setBusy(false) }
+  }
+  async function checkIn(event:FormEvent<HTMLFormElement>) {
+    event.preventDefault(); const form = event.currentTarget; const ticketCode = String(new FormData(form).get('ticket_code') || '').trim()
+    if (!ticketCode) return
+    if (await submitTicketCode(ticketCode)) form.reset()
   }
   async function toggleHall(hall:Hall) {
     setBusy(true); setError(''); setNotice('')
@@ -94,7 +101,7 @@ export default function OperatorDashboard({ api, token, onClose }: { api:string;
       const data = await result.json()
       if (!result.ok) throw new Error(data.detail || 'Zal holati yangilanmadi.')
       setNotice(hall.active === false ? 'Zal qayta ochildi.' : 'Zal yangi seanslar uchun yopildi.')
-      await load()
+      await load(true)
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Zal holati yangilanmadi.') }
     finally { setBusy(false) }
   }
@@ -105,7 +112,7 @@ export default function OperatorDashboard({ api, token, onClose }: { api:string;
       const data = await result.json()
       if (!result.ok) throw new Error(data.detail || 'TMDB katalogini yangilab bo‘lmadi.')
       setNotice(`${data.imported_now_playing} namoyishdagi va ${data.imported_upcoming} yaqin premyera yangilandi.`)
-      await load()
+      await load(true)
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'TMDB katalogini yangilab bo‘lmadi.') }
     finally { setBusy(false) }
   }
@@ -130,7 +137,7 @@ export default function OperatorDashboard({ api, token, onClose }: { api:string;
             {tab === 'schedule' && <Schedule dashboard={dashboard} movies={visibleMovies} halls={activeHalls} day={day} busy={busy} onSubmit={submit}/>} 
             {tab === 'halls' && <Halls halls={halls} busy={busy} onSubmit={submit} onToggle={toggleHall}/>} 
             {tab === 'catalog' && <Catalog movies={movies} busy={busy} onSubmit={submit} onSync={syncCatalog}/>} 
-            {tab === 'tickets' && <Tickets bookings={dashboard?.bookings || []} busy={busy} onUpdate={updateBooking} onCheckIn={checkIn}/>} 
+            {tab === 'tickets' && <Tickets bookings={dashboard?.bookings || []} busy={busy} onUpdate={updateBooking} onCheckIn={checkIn} onScan={async code => { await submitTicketCode(code) }}/>} 
             {tab === 'promotions' && <Promotions promotions={promotions} busy={busy} onSubmit={submit}/>}
           </>}
         </main>
@@ -179,8 +186,9 @@ function Promotions({ promotions, busy, onSubmit }: { promotions:Promotion[]; bu
   return <div className="operator-two-column"><section className="operator-section"><div className="operator-section-head"><div><h2>Yangi promo kod</h2></div></div><form className="operator-form" onSubmit={event=>{const form=new FormData(event.currentTarget);const start=String(form.get('starts_at')||''),end=String(form.get('ends_at')||'');return void onSubmit(event,'/api/admin/promotions',{code:String(form.get('code')).trim().toUpperCase(),label:form.get('label'),percent_off:Number(form.get('percent_off')),min_order_amount:Number(form.get('min_order_amount')||0),max_discount_amount:form.get('max_discount_amount')?Number(form.get('max_discount_amount')):null,usage_limit:form.get('usage_limit')?Number(form.get('usage_limit')):null,starts_at:start?new Date(start).toISOString():null,ends_at:end?new Date(end).toISOString():null},'Promo kod yaratildi.')}}><label>Kod<input name="code" required maxLength={40} placeholder="WELCOME10" pattern="[A-Za-z0-9_-]+"/></label><label>Ko‘rinadigan nom<input name="label" required maxLength={120} placeholder="Yangi foydalanuvchi chegirmasi"/></label><div className="operator-field-row"><label>Chegirma (%)<input name="percent_off" type="number" min="1" max="100" defaultValue="10" required/></label><label>Foydalanish limiti<input name="usage_limit" type="number" min="1" placeholder="Cheklanmagan"/></label></div><div className="operator-field-row"><label>Minimal buyurtma<input name="min_order_amount" type="number" min="0" defaultValue="0" required/></label><label>Maks. chegirma<input name="max_discount_amount" type="number" min="0" placeholder="Cheklanmagan"/></label></div><div className="operator-field-row"><label>Boshlanishi<input name="starts_at" type="datetime-local"/></label><label>Tugashi<input name="ends_at" type="datetime-local"/></label></div><p className="operator-help">Kod checkout paytida qayta tekshiriladi. Uning limiti faqat tasdiqlangan paymentda ishlatilgan deb hisoblanadi.</p><button className="operator-primary" disabled={busy}><Plus size={16}/>Promo yaratish</button></form></section><section className="operator-section"><div className="operator-section-head"><div><h2>Promo kodlar</h2></div><b>{promotions.length} ta</b></div><div className="operator-hall-list">{promotions.length?promotions.map(promo=><article className="operator-hall" key={promo.id}><span><CircleDollarSign size={19}/></span><div><b>{promo.code} · {promo.percent_off}%</b><small>{promo.label} · {money(promo.min_order_amount)} dan</small><em>{promo.usage_count}{promo.usage_limit?` / ${promo.usage_limit}`:' marta'} ishlatildi</em></div></article>):<Empty icon={<CircleDollarSign/>} title="Promo kod yo‘q" text="Checkout uchun birinchi chegirma kampaniyasini yarating."/>}</div></section></div>
 }
 
-function Tickets({ bookings, busy, onUpdate, onCheckIn }: { bookings:Booking[]; busy:boolean; onUpdate:(booking:Booking,status:'cancelled'|'completed')=>Promise<void>; onCheckIn:(event:FormEvent<HTMLFormElement>)=>Promise<void> }) {
-  return <section className="operator-section"><div className="operator-section-head"><div><h2>Bugungi chiptalar</h2></div><b>{bookings.length} buyurtma</b></div><form className="operator-checkin" onSubmit={event=>void onCheckIn(event)}><ScanLine size={19}/><label>QR yoki chipta kodi<input name="ticket_code" required autoComplete="off" autoCapitalize="characters" maxLength={16} placeholder="PRD-XXXXXXXX"/></label><button className="operator-primary" disabled={busy}>Kirishni tasdiqlash</button><small>Faqat tasdiqlangan chipta bir marta, seansdan 2 soat oldin tekshiriladi.</small></form>{bookings.length ? <div className="operator-ticket-table">{bookings.map(booking => <TicketRow key={booking.id} booking={booking} actions onUpdate={onUpdate} busy={busy}/>)}</div> : <Empty icon={<Ticket/>} title="Bugungi chipta yo‘q" text="Tanlangan kunga tegishli buyurtmalar shu yerda chiqadi."/>}</section>
+function Tickets({ bookings, busy, onUpdate, onCheckIn, onScan }: { bookings:Booking[]; busy:boolean; onUpdate:(booking:Booking,status:'cancelled'|'completed')=>Promise<void>; onCheckIn:(event:FormEvent<HTMLFormElement>)=>Promise<void>; onScan:(code:string)=>Promise<void> }) {
+  const [scanning, setScanning] = useState(false)
+  return <section className="operator-section"><div className="operator-section-head"><div><h2>Bugungi chiptalar</h2></div><b>{bookings.length} buyurtma</b></div><form className="operator-checkin" onSubmit={event=>void onCheckIn(event)}><ScanLine size={19}/><label>QR yoki chipta kodi<input name="ticket_code" required autoComplete="off" autoCapitalize="characters" maxLength={16} placeholder="PRD-XXXXXXXX"/></label><button className="operator-primary" disabled={busy}>Kirishni tasdiqlash</button><small>Faqat tasdiqlangan chipta bir marta, seansdan 2 soat oldin tekshiriladi.</small></form><div className="operator-scan-toggle"><button type="button" className="operator-secondary" aria-pressed={scanning} onClick={() => setScanning(open => !open)}><ScanLine size={16}/> {scanning ? 'Kamerani yopish' : 'Kamera bilan skanerlash'}</button></div>{scanning && <QrScanner paused={busy} onCode={code => void onScan(code)}/>}{bookings.length ? <div className="operator-ticket-table">{bookings.map(booking => <TicketRow key={booking.id} booking={booking} actions onUpdate={onUpdate} busy={busy}/>)}</div> : <Empty icon={<Ticket/>} title="Bugungi chipta yo‘q" text="Tanlangan kunga tegishli buyurtmalar shu yerda chiqadi."/>}</section>
 }
 
 function TicketRow({ booking, actions, onUpdate, busy }: { booking:Booking; actions?:boolean; onUpdate?:(booking:Booking,status:'cancelled'|'completed')=>Promise<void>; busy?:boolean }) {

@@ -27,6 +27,8 @@ need(header('X-Content-Type-Options') === 'nosniff', 'X-Content-Type-Options mus
 need(header('X-Frame-Options') === 'DENY', 'X-Frame-Options must be DENY')
 need(Boolean(header('Referrer-Policy')), 'Referrer-Policy is missing')
 need(/geolocation=\(self\)/.test(header('Permissions-Policy') ?? ''), 'Permissions-Policy must scope geolocation to self')
+need(/camera=\(self\)/.test(header('Permissions-Policy') ?? ''), 'Permissions-Policy must allow the camera for our own pages only (ticket scanner)')
+need(/microphone=\(\)/.test(header('Permissions-Policy') ?? ''), 'Permissions-Policy must keep the microphone disabled')
 
 const dist = new URL('../dist/index.html', import.meta.url)
 if (fs.existsSync(dist)) {
