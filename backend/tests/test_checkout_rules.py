@@ -3,8 +3,10 @@ import unittest
 from datetime import timedelta
 from decimal import Decimal
 
+from app.config import settings
 from app.models import Role
-from tests.support import ApiTestCase, auth, make_hall, make_promo, make_screening, make_user, scalar, sql
+from tests.support import (ApiTestCase, auth, make_hall, make_promo, make_screening, make_user, run_parallel,
+                           scalar, sql)
 
 def money(value) -> Decimal:
     return Decimal(str(value))
@@ -42,6 +44,83 @@ class HoldValidationTests(ApiTestCase):
         booking = self.shop().book(screening, [hall["seat_ids"][0]]).json()
         self.assertEqual(booking["status"], "pending")
         self.assertTrue(540 <= booking["hold_seconds_remaining"] <= 600, booking["hold_seconds_remaining"])
+
+class HoldLimitTests(ApiTestCase):
+    """One customer must not be able to tie up seats with a pile of unpaid holds."""
+
+    def _hold_on_new_screenings(self, shop, count):
+        responses = []
+        for _ in range(count):
+            hall, screening = self.venue()
+            responses.append(shop.book(screening, [hall["seat_ids"][0]]))
+        return responses
+
+    def test_a_customer_can_only_have_three_unpaid_holds(self):
+        shop = self.shop()
+        codes = [r.status_code for r in self._hold_on_new_screenings(shop, 5)]
+        self.assertEqual(codes, [201, 201, 201, 409, 409])
+
+    def test_the_refusal_explains_what_to_do(self):
+        shop = self.shop()
+        self._hold_on_new_screenings(shop, 3)
+        hall, screening = self.venue()
+        detail = shop.book(screening, [hall["seat_ids"][0]]).json()["detail"]
+        self.assertIn("3 seat holds", detail)
+        self.assertRegex(detail, r"about \d+ min")
+
+    def test_cancelling_a_hold_makes_room(self):
+        shop = self.shop()
+        held = self._hold_on_new_screenings(shop, 3)
+        self.assertEqual(self._hold_on_new_screenings(shop, 1)[0].status_code, 409)
+        self.assertEqual(shop.set_status(held[0].json()["id"], "cancelled").status_code, 200)
+        self.assertEqual(self._hold_on_new_screenings(shop, 1)[0].status_code, 201)
+
+    def test_expired_holds_do_not_count(self):
+        shop = self.shop()
+        held = self._hold_on_new_screenings(shop, 3)
+        for response in held:
+            sql("UPDATE bookings SET hold_expires_at = now() - interval '1 minute' WHERE id = :i", i=response.json()["id"])
+        self.assertEqual(self._hold_on_new_screenings(shop, 1)[0].status_code, 201)
+
+    def test_paid_tickets_do_not_count(self):
+        shop = self.shop()
+        held = self._hold_on_new_screenings(shop, 3)
+        self.assertEqual(shop.pay(held[0].json()["id"]).status_code, 200)
+        self.assertEqual(self._hold_on_new_screenings(shop, 1)[0].status_code, 201)
+
+    def test_limits_are_per_customer(self):
+        busy, other = self.shop(), self.shop()
+        self._hold_on_new_screenings(busy, 3)
+        self.assertEqual(self._hold_on_new_screenings(other, 1)[0].status_code, 201)
+
+    def test_unpaid_seats_for_one_screening_are_capped(self):
+        hall, screening = self.venue()
+        shop = self.shop()
+        seats = hall["seat_ids"]
+        self.assertEqual(shop.book(screening, seats[0:5]).status_code, 201)
+        over = shop.book(screening, seats[5:9])                      # 5 held + 4 more = 9 > 8
+        self.assertEqual(over.status_code, 409)
+        self.assertIn("at most 8", over.json()["detail"])
+        self.assertEqual(shop.book(screening, seats[5:8]).status_code, 201)     # exactly 8 is fine
+
+    def test_parallel_requests_cannot_slip_past_the_cap(self):
+        for _ in range(2):
+            shop = self.shop()
+            venues = [self.venue() for _ in range(8)]
+            results = run_parallel([lambda sh=shop, h=hall, sc=screening: sh.book(sc, [h["seat_ids"][0]]) for hall, screening in venues])
+            codes = sorted(r.status_code for r in results)
+            self.assertEqual(codes, [201] * 3 + [409] * 5, [r.text for r in results])
+            self.assertEqual(scalar("SELECT count(*) FROM bookings WHERE customer_id = :c AND status = 'PENDING'",
+                                    c=shop.user["id"]), 3)
+
+    def test_limits_can_be_configured(self):
+        original = settings.max_pending_holds_per_user
+        settings.max_pending_holds_per_user = 1
+        try:
+            codes = [r.status_code for r in self._hold_on_new_screenings(self.shop(), 2)]
+        finally:
+            settings.max_pending_holds_per_user = original
+        self.assertEqual(codes, [201, 409])
 
 class PricingTests(ApiTestCase):
     def test_total_adds_premium_surcharge_per_seat(self):

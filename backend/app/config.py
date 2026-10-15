@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     cinematica_cache_fresh_seconds: int = 600
     cinematica_cache_stale_seconds: int = 86400
     cinematica_refresh_interval_seconds: int = 600
+    # Seat-hoarding limits: unpaid holds one customer may have at once, and how many seats of
+    # one screening they may hold unpaid. Paid tickets are not counted.
+    max_pending_holds_per_user: int = 3
+    max_pending_seats_per_screening: int = 8
     notification_poll_seconds: int = 60
     notification_retry_minutes: int = 10
     # After this many failed deliveries a notification is abandoned instead of retried forever.

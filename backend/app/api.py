@@ -121,6 +121,24 @@ def _expire_holds(db: Session):
         # in the same request still see the expired holds as taken.
         db.flush()
 
+def _enforce_hold_limits(db: Session, user_id: int, screening_id: int, new_seats: int) -> None:
+    """Stop one customer from tying up many seats with unpaid holds.
+
+    Callers hold the customer's row lock, so concurrent requests are admitted one at a time
+    and cannot all pass this check together."""
+    now = datetime.now(timezone.utc)
+    holds = db.execute(sa.select(Booking.screening_id, Booking.seat_count, Booking.hold_expires_at).where(
+        Booking.customer_id == user_id, Booking.status == BookingStatus.PENDING,
+        Booking.hold_expires_at > now)).all()
+    if len(holds) >= settings.max_pending_holds_per_user:
+        minutes = max(1, ceil((min(h.hold_expires_at for h in holds) - now).total_seconds() / 60))
+        raise HTTPException(409, f"You already have {len(holds)} seat holds in progress. Pay for or cancel one first, "
+                                 f"or wait about {minutes} min for the oldest to expire")
+    held_here = sum(h.seat_count for h in holds if h.screening_id == screening_id)
+    if held_here + new_seats > settings.max_pending_seats_per_screening:
+        raise HTTPException(409, f"You can hold at most {settings.max_pending_seats_per_screening} unpaid seats for one "
+                                 f"screening ({held_here} already held). Pay for or cancel a hold first")
+
 def _screening_out(db: Session, screening: Screening) -> ScreeningOut:
     _expire_holds(db)
     taken = db.scalar(sa.select(sa.func.count(BookingSeat.id)).join(Booking).where(
@@ -856,6 +874,8 @@ def create_booking(data:BookingIn,db:Session=Depends(get_db),user:User=Depends(c
     if not screening or screening.status!="scheduled": raise HTTPException(404,"Screening not found")
     if screening.starts_at<=datetime.now(timezone.utc): raise HTTPException(410,"This screening has already started")
     _expire_holds(db)
+    _lock_user(db, user.id)   # admit one customer's holds at a time so the limits below cannot be raced
+    _enforce_hold_limits(db, user.id, screening.id, len(data.seat_ids))
     seats=db.scalars(sa.select(Seat).where(Seat.id.in_(data.seat_ids),Seat.auditorium_id==screening.auditorium_id)
         .order_by(Seat.id).with_for_update()).all()
     if len(seats)!=len(data.seat_ids):
