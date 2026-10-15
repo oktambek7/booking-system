@@ -6,9 +6,9 @@ type Lang = 'uz' | 'en' | 'ru'
 export type ProfileUser = {id:number;nickname:string;email:string;role:string;created_at?:string;avatar_data?:string|null}
 
 const text:Record<Lang,Record<string,string>> = {
-  uz:{profile:'Profil',account:'Hisob',username:'Foydalanuvchi nomi',email:'Email',memberSince:'Parda foydalanuvchisi bo‘lgan sana',picture:'Profil rasmi',changePicture:'Rasm tanlash',save:'O‘zgarishlarni saqlash',saving:'Saqlanmoqda…',signOut:'Tizimdan chiqish',close:'Yopish',imageError:'PNG, JPEG yoki WebP rasmini tanlang. Rasm 8 MB dan kichik bo‘lishi kerak.',profileError:'Profilni saqlab bo‘lmadi.',signOutConfirm:'Tizimdan chiqasizmi?'},
-  en:{profile:'Profile',account:'Account',username:'Username',email:'Email',memberSince:'Parda member since',picture:'Profile photo',changePicture:'Choose photo',save:'Save changes',saving:'Saving…',signOut:'Sign out',close:'Close',imageError:'Choose a PNG, JPEG, or WebP image smaller than 8 MB.',profileError:'Could not save your profile.',signOutConfirm:'Sign out of Parda?'},
-  ru:{profile:'Профиль',account:'Аккаунт',username:'Имя пользователя',email:'Email',memberSince:'Пользователь Parda с',picture:'Фото профиля',changePicture:'Выбрать фото',save:'Сохранить изменения',saving:'Сохранение…',signOut:'Выйти',close:'Закрыть',imageError:'Выберите PNG, JPEG или WebP размером до 8 МБ.',profileError:'Не удалось сохранить профиль.',signOutConfirm:'Выйти из Parda?'}
+  uz:{profile:'Profil',account:'Hisob',username:'Foydalanuvchi nomi',email:'Email',memberSince:'Parda foydalanuvchisi bo‘lgan sana',picture:'Profil rasmi',changePicture:'Rasm tanlash',save:'O‘zgarishlarni saqlash',saving:'Saqlanmoqda…',signOut:'Tizimdan chiqish',close:'Yopish',imageError:'PNG, JPEG yoki WebP rasmini tanlang. Rasm 8 MB dan kichik bo‘lishi kerak.',profileError:'Profilni saqlab bo‘lmadi.',signOutConfirm:'Tizimdan chiqasizmi?',signOutAll:'Barcha qurilmalardan chiqish',signOutAllConfirm:'Hisobingiz barcha qurilmalardan chiqariladi. Davom etasizmi?'},
+  en:{profile:'Profile',account:'Account',username:'Username',email:'Email',memberSince:'Parda member since',picture:'Profile photo',changePicture:'Choose photo',save:'Save changes',saving:'Saving…',signOut:'Sign out',close:'Close',imageError:'Choose a PNG, JPEG, or WebP image smaller than 8 MB.',profileError:'Could not save your profile.',signOutConfirm:'Sign out of Parda?',signOutAll:'Sign out of all devices',signOutAllConfirm:'This signs your account out everywhere, including this device. Continue?'},
+  ru:{profile:'Профиль',account:'Аккаунт',username:'Имя пользователя',email:'Email',memberSince:'Пользователь Parda с',picture:'Фото профиля',changePicture:'Выбрать фото',save:'Сохранить изменения',saving:'Сохранение…',signOut:'Выйти',close:'Закрыть',imageError:'Выберите PNG, JPEG или WebP размером до 8 МБ.',profileError:'Не удалось сохранить профиль.',signOutConfirm:'Выйти из Parda?',signOutAll:'Выйти на всех устройствах',signOutAllConfirm:'Вы выйдете из аккаунта на всех устройствах, включая это. Продолжить?'}
 }
 
 function resizeAvatar(file:File):Promise<string>{
@@ -29,7 +29,7 @@ function resizeAvatar(file:File):Promise<string>{
   })
 }
 
-export default function ProfileDrawer({user,lang,onClose,onSave,onSignOut,onAvatarPreview}:{user:ProfileUser;lang:Lang;onClose:()=>void;onSave:(nickname:string,avatarData:string|null)=>Promise<void>;onSignOut:()=>void;onAvatarPreview:(avatar:string|null)=>void}){
+export default function ProfileDrawer({user,lang,onClose,onSave,onSignOut,onSignOutAll,onAvatarPreview}:{user:ProfileUser;lang:Lang;onClose:()=>void;onSave:(nickname:string,avatarData:string|null)=>Promise<void>;onSignOut:()=>void;onSignOutAll:()=>Promise<void>;onAvatarPreview:(avatar:string|null)=>void}){
   const t=(key:keyof typeof text.en)=>text[lang][key]
   const [nickname,setNickname]=useState(user.nickname),[avatar,setAvatar]=useState(user.avatar_data||null),[busy,setBusy]=useState(false),[error,setError]=useState('')
   const initial=(user.nickname.trim().charAt(0)||'P').toUpperCase()
@@ -58,5 +58,6 @@ export default function ProfileDrawer({user,lang,onClose,onSave,onSignOut,onAvat
         <button className="button-primary profile-save" disabled={busy}>{busy?t('saving'):<><Save size={16}/>{t('save')}</>}</button>
       </form>
       <button className="profile-signout" onClick={()=>{if(confirm(t('signOutConfirm')))onSignOut()}}><LogOut size={16}/>{t('signOut')}</button>
+      <button className="profile-signout" disabled={busy} onClick={async()=>{if(!confirm(t('signOutAllConfirm')))return;setBusy(true);setError('');try{await onSignOutAll()}catch(e){setError(e instanceof Error?e.message:t('signOutAll'));setBusy(false)}}}><LogOut size={16}/>{t('signOutAll')}</button>
   </Modal>
 }

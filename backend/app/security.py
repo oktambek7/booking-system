@@ -19,7 +19,7 @@ def verify_password(password: str, hashed: str) -> bool:
 
 def make_token(user: User) -> str:
     now = datetime.now(timezone.utc)
-    return jwt.encode({"sub": str(user.id), "role": user.role.value, "iat": now,
+    return jwt.encode({"sub": str(user.id), "role": user.role.value, "tv": user.token_version or 0, "iat": now,
                        "exp": now + timedelta(minutes=settings.jwt_expire_minutes)}, settings.jwt_secret, algorithm="HS256")
 
 def current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer), db: Session = Depends(get_db)) -> User:
@@ -27,6 +27,9 @@ def current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer), db
         data = jwt.decode(credentials.credentials, settings.jwt_secret, algorithms=["HS256"])
         user = db.get(User, int(data["sub"]))
         if not user or not user.active:
+            raise ValueError()
+        # Tokens minted before versioning existed carry no "tv" claim and count as version 0.
+        if int(data.get("tv", 0)) != (user.token_version or 0):
             raise ValueError()
         return user
     except (jwt.PyJWTError, ValueError, KeyError):

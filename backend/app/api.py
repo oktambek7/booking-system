@@ -413,8 +413,15 @@ def confirm_password_reset(data: PasswordResetConfirm, db: Session = Depends(get
     challenge.consumed_at = now
     user.password_hash = hash_password(data.password)
     user.email_verified = True
+    user.token_version = (user.token_version or 0) + 1   # a reset signs the account out everywhere
     db.commit()
     return {"message": "Password reset complete"}
+
+@router.post("/auth/logout-all", status_code=204)
+def logout_all_devices(db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """Revoke every access token issued to this account, including the caller's own."""
+    db.execute(update(User).where(User.id == user.id).values(token_version=User.token_version + 1))
+    db.commit()
 
 @router.get("/auth/me")
 def me(user: User = Depends(current_user)):

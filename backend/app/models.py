@@ -35,6 +35,8 @@ class User(Base):
     # from card details and are only changed inside the payment transaction.
     parda_points: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     reserved_points: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Bumped to revoke every access token issued earlier (password reset, sign-out everywhere).
+    token_version: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 class Movie(Base):
