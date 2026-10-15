@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { apiFetch } from './session'
-import { Armchair, CalendarDays, CheckCircle2, CircleDollarSign, Clapperboard, DoorOpen, Film, LayoutDashboard, LoaderCircle, Plus, RefreshCw, ScanLine, Ticket, Users, X } from 'lucide-react'
+import { Armchair, CalendarDays, CheckCircle2, CircleDollarSign, Clapperboard, DoorOpen, Film, FileSpreadsheet, LayoutDashboard, LoaderCircle, Plus, RefreshCw, ScanLine, Ticket, Users, X } from 'lucide-react'
 import { calendarDate, formatDateTime, isoDateInTashkent } from './dateFormat'
 import Modal from './ui/Modal'
 import QrScanner from './ui/QrScanner'
+import { saveResponse } from './download'
 
 type Movie = { id:number; title:string; active:boolean; catalog_status?:string; duration_minutes?:number|null; language:string; age_rating:string; poster_url:string }
 type Hall = { id:number; name:string; cinema_name:string; city:string; address:string; hall_type:'standard'|'vip'; formats:string[]; seat_count:number; active?:boolean; source_name?:string|null }
@@ -20,7 +21,7 @@ function headers(token:string) { return { Authorization:`Bearer ${token}`, 'Cont
 function isoFromForm(day:string, value:string) { return new Date(`${day}T${value}:00+05:00`).toISOString() }
 
 export default function OperatorDashboard({ api, token, onClose }: { api:string; token:string; onClose:()=>void }) {
-  const [tab, setTab] = useState<'overview'|'schedule'|'halls'|'catalog'|'tickets'|'promotions'>('overview')
+  const [tab, setTab] = useState<'overview'|'schedule'|'halls'|'catalog'|'tickets'|'promotions'|'reports'>('overview')
   const [day, setDay] = useState(dateKey())
   const [dashboard, setDashboard] = useState<Dashboard|null>(null)
   const [movies, setMovies] = useState<Movie[]>([])
@@ -94,6 +95,16 @@ export default function OperatorDashboard({ api, token, onClose }: { api:string;
     if (!ticketCode) return
     if (await submitTicketCode(ticketCode)) form.reset()
   }
+  async function downloadReport(kind:'bookings'|'revenue', from:string, to:string) {
+    setBusy(true); setError(''); setNotice('')
+    try {
+      const result = await apiFetch(`${api}/api/admin/reports/${kind}.csv?from=${from}&to=${to}`, { headers:headers(token) })
+      if (!result.ok) throw new Error((await result.json().catch(() => ({}))).detail || 'Hisobot yuklanmadi.')
+      await saveResponse(result, `parda-${kind}.csv`)
+      setNotice('Hisobot yuklab olindi.')
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Hisobot yuklanmadi.') }
+    finally { setBusy(false) }
+  }
   async function toggleHall(hall:Hall) {
     setBusy(true); setError(''); setNotice('')
     try {
@@ -117,7 +128,7 @@ export default function OperatorDashboard({ api, token, onClose }: { api:string;
     finally { setBusy(false) }
   }
   const nav = [
-    ['overview', 'Umumiy', LayoutDashboard], ['schedule', 'Seanslar', CalendarDays], ['halls', 'Zallar', DoorOpen], ['catalog', 'Filmlar', Film], ['tickets', 'Chiptalar', Ticket], ['promotions', 'Promolar', CircleDollarSign],
+    ['overview', 'Umumiy', LayoutDashboard], ['schedule', 'Seanslar', CalendarDays], ['halls', 'Zallar', DoorOpen], ['catalog', 'Filmlar', Film], ['tickets', 'Chiptalar', Ticket], ['promotions', 'Promolar', CircleDollarSign], ['reports', 'Hisobotlar', FileSpreadsheet],
   ] as const
   const selected = nav.find(item => item[0] === tab)?.[1]
 
@@ -139,6 +150,7 @@ export default function OperatorDashboard({ api, token, onClose }: { api:string;
             {tab === 'catalog' && <Catalog movies={movies} busy={busy} onSubmit={submit} onSync={syncCatalog}/>} 
             {tab === 'tickets' && <Tickets bookings={dashboard?.bookings || []} busy={busy} onUpdate={updateBooking} onCheckIn={checkIn} onScan={async code => { await submitTicketCode(code) }}/>} 
             {tab === 'promotions' && <Promotions promotions={promotions} busy={busy} onSubmit={submit}/>}
+            {tab === 'reports' && <Reports busy={busy} onDownload={downloadReport}/>}
           </>}
         </main>
       </div>
@@ -184,6 +196,23 @@ function Catalog({ movies, busy, onSubmit, onSync }: { movies:Movie[]; busy:bool
 
 function Promotions({ promotions, busy, onSubmit }: { promotions:Promotion[]; busy:boolean; onSubmit:(event:FormEvent<HTMLFormElement>,path:string,body:unknown,success:string)=>Promise<void> }) {
   return <div className="operator-two-column"><section className="operator-section"><div className="operator-section-head"><div><h2>Yangi promo kod</h2></div></div><form className="operator-form" onSubmit={event=>{const form=new FormData(event.currentTarget);const start=String(form.get('starts_at')||''),end=String(form.get('ends_at')||'');return void onSubmit(event,'/api/admin/promotions',{code:String(form.get('code')).trim().toUpperCase(),label:form.get('label'),percent_off:Number(form.get('percent_off')),min_order_amount:Number(form.get('min_order_amount')||0),max_discount_amount:form.get('max_discount_amount')?Number(form.get('max_discount_amount')):null,usage_limit:form.get('usage_limit')?Number(form.get('usage_limit')):null,starts_at:start?new Date(start).toISOString():null,ends_at:end?new Date(end).toISOString():null},'Promo kod yaratildi.')}}><label>Kod<input name="code" required maxLength={40} placeholder="WELCOME10" pattern="[A-Za-z0-9_-]+"/></label><label>Ko‘rinadigan nom<input name="label" required maxLength={120} placeholder="Yangi foydalanuvchi chegirmasi"/></label><div className="operator-field-row"><label>Chegirma (%)<input name="percent_off" type="number" min="1" max="100" defaultValue="10" required/></label><label>Foydalanish limiti<input name="usage_limit" type="number" min="1" placeholder="Cheklanmagan"/></label></div><div className="operator-field-row"><label>Minimal buyurtma<input name="min_order_amount" type="number" min="0" defaultValue="0" required/></label><label>Maks. chegirma<input name="max_discount_amount" type="number" min="0" placeholder="Cheklanmagan"/></label></div><div className="operator-field-row"><label>Boshlanishi<input name="starts_at" type="datetime-local"/></label><label>Tugashi<input name="ends_at" type="datetime-local"/></label></div><p className="operator-help">Kod checkout paytida qayta tekshiriladi. Uning limiti faqat tasdiqlangan paymentda ishlatilgan deb hisoblanadi.</p><button className="operator-primary" disabled={busy}><Plus size={16}/>Promo yaratish</button></form></section><section className="operator-section"><div className="operator-section-head"><div><h2>Promo kodlar</h2></div><b>{promotions.length} ta</b></div><div className="operator-hall-list">{promotions.length?promotions.map(promo=><article className="operator-hall" key={promo.id}><span><CircleDollarSign size={19}/></span><div><b>{promo.code} · {promo.percent_off}%</b><small>{promo.label} · {money(promo.min_order_amount)} dan</small><em>{promo.usage_count}{promo.usage_limit?` / ${promo.usage_limit}`:' marta'} ishlatildi</em></div></article>):<Empty icon={<CircleDollarSign/>} title="Promo kod yo‘q" text="Checkout uchun birinchi chegirma kampaniyasini yarating."/>}</div></section></div>
+}
+
+function Reports({ busy, onDownload }: { busy:boolean; onDownload:(kind:'bookings'|'revenue', from:string, to:string)=>Promise<void> }) {
+  const today = isoDateInTashkent(new Date())
+  const [from, setFrom] = useState(isoDateInTashkent(new Date(Date.now() - 29 * 86_400_000)))
+  const [to, setTo] = useState(today)
+  const valid = Boolean(from && to && from <= to)
+  return <section className="operator-section"><div className="operator-section-head"><div><h2>Hisobotlar (CSV)</h2></div></div>
+    <div className="operator-form"><div className="operator-field-row">
+      <label>Boshlanish sanasi<input type="date" value={from} max={to} onChange={event => setFrom(event.target.value)}/></label>
+      <label>Tugash sanasi<input type="date" value={to} min={from} onChange={event => setTo(event.target.value)}/></label>
+    </div>
+    <p className="operator-help">Seans sanasi (Toshkent vaqti) bo‘yicha, ko‘pi bilan 366 kun. Fayl Excel va Google Sheets’da ochiladi.</p>
+    <div className="operator-field-row">
+      <button type="button" className="operator-primary" disabled={busy || !valid} onClick={() => void onDownload('bookings', from, to)}><FileSpreadsheet size={16}/> Buyurtmalar</button>
+      <button type="button" className="operator-secondary" disabled={busy || !valid} onClick={() => void onDownload('revenue', from, to)}><CircleDollarSign size={16}/> Daromad</button>
+    </div></div></section>
 }
 
 function Tickets({ bookings, busy, onUpdate, onCheckIn, onScan }: { bookings:Booking[]; busy:boolean; onUpdate:(booking:Booking,status:'cancelled'|'completed')=>Promise<void>; onCheckIn:(event:FormEvent<HTMLFormElement>)=>Promise<void>; onScan:(code:string)=>Promise<void> }) {

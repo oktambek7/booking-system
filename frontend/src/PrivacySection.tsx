@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Download, Trash2 } from 'lucide-react'
 import { apiFetch } from './session'
+import { saveResponse } from './download'
 
 type Lang = 'uz' | 'en' | 'ru'
 
@@ -23,14 +24,7 @@ export default function PrivacySection({ api, token, lang, onDeleted }: { api: s
     try {
       const response = await apiFetch(`${api}/api/account/export`, { headers })
       if (!response.ok) throw new Error((await response.json().catch(() => ({}))).detail || t('failed'))
-      const url = URL.createObjectURL(await response.blob())
-      const link = document.createElement('a')
-      link.href = url
-      link.download = (/filename="([^"]+)"/.exec(response.headers.get('Content-Disposition') ?? '') ?? [])[1] ?? 'parda-data.json'
-      document.body.append(link)
-      link.click()
-      link.remove()
-      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+      await saveResponse(response, 'parda-data.json')
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('failed')) }
     finally { setBusy(false) }
   }
