@@ -103,6 +103,14 @@
   .profile-identity h3 { font-size: var(--fs-h3); overflow-wrap: anywhere; }
   .profile-identity p, .profile-identity small { display: block; color: var(--text-2); overflow-wrap: anywhere; }
   .profile-save { width: 100%; }
+  .profile-telegram { display: grid; gap: var(--s-2); margin-top: var(--s-5); padding: var(--s-3); border-radius: var(--r-md); border: 1px solid color-mix(in srgb, var(--text) 14%, transparent); }
+  .profile-telegram h3 { display: flex; align-items: center; gap: var(--s-2); margin: 0; font-size: var(--fs-body); }
+  .profile-telegram p { margin: 0; font-size: var(--fs-small); color: var(--text-2); }
+  .profile-telegram a { color: var(--text); text-decoration: underline; }
+  .profile-telegram-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); }
+  .profile-telegram-ok { color: var(--success-text); font-weight: 600; }
+  .profile-telegram-button { justify-self: start; min-height: 40px; padding: 0 var(--s-4); border-radius: var(--r-pill); border: 1px solid color-mix(in srgb, var(--text) 30%, transparent); background: transparent; color: var(--text); font: inherit; font-weight: 600; cursor: pointer; }
+  .profile-telegram-button:hover { background: color-mix(in srgb, var(--text) 10%, transparent); }
   .profile-signout { width: 100%; margin-top: var(--s-5); }
 
   @media (min-width: 481px) {

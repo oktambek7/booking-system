@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 
+from . import telegram
 from .config import settings
 from .database import SessionLocal
 from .mail import (EmailDeliveryError, send_booking_confirmation_email, send_refund_email, send_screening_reminder_email,
@@ -63,6 +64,17 @@ def _details(booking: Booking) -> dict[str, str]:
         "seats": ", ".join(f"{item.seat.row_label}{item.seat.seat_number}" for item in booking.seat_assignments),
         "ticket_code": booking.ticket_code or str(booking.id),
     }
+
+
+def _booking_message(event: str, booking: Booking, details: dict[str, str]) -> str:
+    where = f"Movie: {details['movie']}\nCinema: {details['cinema']}\nTime: {details['starts_at']}\nSeats: {details['seats']}"
+    if event == CONFIRMATION:
+        return f"Parda Cinema: your ticket is confirmed.\n{where}\nTicket code: {details['ticket_code']}\nPaid: {booking.total_price:,.0f} UZS"
+    if event == REFUND:
+        return (f"Parda Cinema: your ticket was cancelled and {booking.refund_percent or 0}% was refunded "
+                f"({booking.refund_amount:,.0f} UZS).\n{where}")
+    when = "in about 24 hours" if event == REMINDER_24H else "in about 2 hours"
+    return f"Parda Cinema: your screening starts {when}.\n{where}\nTicket code: {details['ticket_code']}"
 
 
 def _claim(db, model, notice_id: int):
@@ -144,6 +156,7 @@ def _deliver_booking_notice(db, notice_id: int, now: datetime) -> bool:
     except EmailDeliveryError as exc:
         _fail(notice, now, str(exc), "booking notification")
         return False
+    telegram.notify_user(db, booking.customer_id, _booking_message(notice.event_type, booking, details))
     notice.sent_at = now
     notice.last_error = None
     return True
@@ -211,6 +224,8 @@ def _deliver_waitlist_notice(db, notice_id: int, now: datetime) -> bool:
     except EmailDeliveryError as exc:
         _fail(notice, now, str(exc), "waitlist notification")
         return False
+    telegram.notify_user(db, entry.user_id, f"Parda Cinema: seats are available again for {entry.screening.movie.title} at "
+                         f"{entry.screening.auditorium.cinema_name}, {starts_at.strftime('%d %b %Y, %H:%M')}. Seats go to whoever books first.")
     notice.sent_at = now
     notice.last_error = None
     return True
@@ -269,6 +284,8 @@ def _deliver_saved_movie_notice(db, notice_id: int, now: datetime) -> bool:
     except EmailDeliveryError as exc:
         _fail(notice, now, str(exc), "saved-movie notification")
         return False
+    telegram.notify_user(db, watch.user_id, f"Parda Cinema: {watch.movie.title} now has a showtime at "
+                         f"{screening.auditorium.cinema_name}, {starts_at.strftime('%d %b %Y, %H:%M')}.")
     watch.alert_sent_at = now
     notice.sent_at = now
     notice.last_error = None

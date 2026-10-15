@@ -243,3 +243,32 @@ class SSEReader:
 
     def close(self) -> None:
         self._client.close()
+
+
+class NotificationTestCase(ApiTestCase):
+    def setUp(self):
+        sql("UPDATE booking_notifications SET sent_at = now() WHERE sent_at IS NULL")    # isolate from other tests
+        patcher = mock.patch("app.routes.payments.deliver_due_notifications")                         # no post-payment delivery
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def tickets(self, count: int) -> list[str]:
+        """Confirmed bookings, each with one confirmation notice due now. Returns their ticket codes."""
+        codes = []
+        for _ in range(count):
+            hall = make_hall()
+            screening = make_screening(hall)
+            shop = self.shop()
+            booking = shop.book(screening, [hall["seat_ids"][0]]).json()
+            codes.append(shop.pay(booking["id"]).json()["booking"]["ticket_code"])
+        return codes
+
+    def notice(self, ticket: str):
+        return sql("SELECT n.sent_at IS NOT NULL, n.attempts, n.last_error FROM booking_notifications n "
+                   "JOIN bookings b ON b.id = n.booking_id WHERE b.ticket_code = :t AND n.event_type = 'confirmation'",
+                   t=ticket)[0]
+
+    def make_due(self, ticket: str, minutes_ago: int = 1):
+        sql("UPDATE booking_notifications SET due_at = now() - make_interval(mins => :m) "
+            "WHERE event_type = 'confirmation' AND booking_id = (SELECT id FROM bookings WHERE ticket_code = :t)",
+            m=minutes_ago, t=ticket)

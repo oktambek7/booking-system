@@ -50,6 +50,11 @@ class Settings(BaseSettings):
     sms_password: str = ""
     sms_sender: str = "4546"
     email_mode: str = "mock"
+    # Telegram notifications are off until a bot token is set. The webhook secret must be registered with
+    # Telegram too (python -m app.telegram_setup); bot_username is the bot's handle without the @.
+    telegram_bot_token: str = ""
+    telegram_bot_username: str = ""
+    telegram_webhook_secret: str = ""
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_username: str = ""
@@ -101,6 +106,8 @@ class Settings(BaseSettings):
         origins = [x.strip() for x in self.cors_origins.split(",") if x.strip()]
         if not origins or "*" in origins:
             problems.append("CORS_ORIGINS must list the exact frontend origin(s), not '*' or empty")
+        if self.telegram_bot_token and (len(self.telegram_webhook_secret) < 16 or not self.telegram_bot_username):
+            problems.append("TELEGRAM_BOT_TOKEN needs TELEGRAM_BOT_USERNAME and a TELEGRAM_WEBHOOK_SECRET of at least 16 characters")
         if "booking:booking@" in self.database_url:
             problems.append("DATABASE_URL still uses the default development credentials")
         return problems
