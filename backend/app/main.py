@@ -1,15 +1,15 @@
 from contextlib import asynccontextmanager
 import asyncio
 import logging
-from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select, text
+from sqlalchemy import select
 from . import models  # noqa: F401  (registers every table on Base.metadata)
 from .api import router
 from .cinematica import router as cinematica_router, sync_active_cinematica_halls
 from .config import settings
-from .database import Base, SessionLocal, engine
+from .database import SessionLocal
+from .migrate import assert_schema_current, upgrade_to_head
 from .models import Role, User
 from .notifications import (deliver_due_notifications, deliver_due_waitlist_notifications,
                             deliver_due_saved_movie_notifications, queue_saved_movie_notifications,
@@ -73,23 +73,10 @@ async def lifespan(app: FastAPI):
     settings.assert_production_ready()
     if not settings.is_production and settings.production_problems():
         logger.warning("Development configuration: %s production setting(s) would be rejected", len(settings.production_problems()))
-    Base.metadata.create_all(bind=engine)
-    with engine.begin() as conn:
-        migrations = Path(__file__).resolve().parent.parent / "migrations"
-        # Apply only additive schema migrations here. 001_cinema_constraints.sql
-        # contains a PL/pgSQL DO block and must not be split on semicolons; the
-        # exclusion constraint is installed idempotently just below.
-        for migration_name in ("002_persistent_product_data.sql", "003_email_verification_and_hall_type.sql", "004_booking_history_archive.sql", "005_demo_card_payments.sql", "006_catalog_screening_links.sql", "007_password_reset.sql", "008_cinematica_hall_directory.sql", "009_ticket_checkin.sql", "010_booking_notifications.sql", "011_screening_waitlist.sql", "012_movie_watchlists.sql", "013_cinematica_movie_identity.sql", "014_promotions_and_parda_pass.sql", "015_cinematica_response_cache.sql", "016_user_profile_avatar.sql", "017_rate_limit_buckets.sql", "018_token_version.sql"):
-            migration = migrations / migration_name
-            for statement in migration.read_text(encoding="utf-8").split(";"):
-                if statement.strip():
-                    conn.exec_driver_sql(statement)
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS btree_gist"))
-        conn.execute(text("""DO $$ BEGIN
-          ALTER TABLE screenings ADD CONSTRAINT screenings_no_overlap
-          EXCLUDE USING gist (auditorium_id WITH =, tstzrange(starts_at, ends_at, '[)') WITH &&)
-          WHERE (status = 'scheduled');
-        EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;"""))
+    if settings.auto_migrate:
+        upgrade_to_head()
+    else:
+        assert_schema_current()
     _ensure_initial_admin()
     _ensure_operator_bootstrap()
     created = ensure_current_demo_schedule()

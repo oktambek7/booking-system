@@ -128,6 +128,23 @@ public users cannot self-assign roles.
 
 Set `VITE_API_URL` to the API origin and redeploy. Set the API `CORS_ORIGINS` to the exact Vercel site origin.
 
+## Database migrations (Alembic)
+
+The schema is versioned with Alembic (`backend/alembic/`). Revision `0001` is a frozen baseline: it builds a fresh database and brings a database left by any earlier release up to date (idempotent, `IF NOT EXISTS`). Every later schema change is a new revision.
+
+```sh
+cd backend
+python -m app.migrate            # upgrade to the latest revision
+python -m app.migrate current    # show the database's revision
+python -m app.migrate check      # exit 1 if the database is behind
+alembic revision -m "add thing"  # new revision: write explicit, tested SQL/ops in alembic/versions/
+```
+
+- `AUTO_MIGRATE=true` (default) upgrades the database when the API starts, under a PostgreSQL advisory lock so several instances starting together cannot collide. This is what keeps Render's free plan working, since it has no pre-deploy command.
+- Once migrations run as their own release step (for example Render's `preDeployCommand: python -m app.migrate` on a paid plan), set `AUTO_MIGRATE=false`: the API then refuses to start on an out-of-date schema instead of altering it.
+- Always change the models and add the revision in the same commit. A test builds a database from the migrations and fails if a model defines a table or column that no migration creates.
+- Never edit `baseline_tables.sql`, `baseline_indexes.sql` or `migrations/*.sql`: they describe the schema existing databases already have.
+
 ## Booking and data safeguards
 
 - Passwords and email-code digests are HMAC-protected, expire, and have attempt limits.

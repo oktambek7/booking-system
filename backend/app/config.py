@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     # Scheduled catalogue refreshes and notification delivery. Tests turn this off; a
     # dedicated worker deployment can turn it off on web instances.
     run_background_jobs: bool = True
+    # Apply pending Alembic migrations when the API starts. Turn off once migrations run as a
+    # separate release step (`python -m app.migrate`); the API then refuses to start on an old schema.
+    auto_migrate: bool = True
     # Header carrying the real caller address behind a proxy (Render: cf-connecting-ip).
     # Empty means use the socket peer; never trust a header the proxy does not overwrite.
     client_ip_header: str = ""
