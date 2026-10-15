@@ -315,6 +315,19 @@ class PaymentVerifyOut(BaseModel):
     status: str
     booking: BookingOut
 
+class OperatorOut(BaseModel):
+    user_id: int
+    email: str
+    nickname: str
+    active: bool
+    owner: bool
+    cinemas: list[str]
+
+class OperatorGrantIn(BaseModel):
+    email: EmailStr
+    # null = owner (every cinema and the global settings); a list = limited to those cinemas
+    cinemas: list[str] | None = Field(default=None, max_length=200)
+
 class PaymentConfigOut(BaseModel):
     provider: str
 

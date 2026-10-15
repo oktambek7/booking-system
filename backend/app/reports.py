@@ -56,7 +56,7 @@ BOOKING_COLUMNS = ["booking_id", "screening_start", "cinema", "hall", "movie", "
                    "seats", "seat_count", "subtotal_uzs", "promo_code", "promo_discount_uzs", "points_redeemed", "total_uzs",
                    "refund_percent", "refund_uzs", "ticket_code", "checked_in_at", "booked_at"]
 
-def bookings_csv(start: date, end: date) -> Iterator[str]:
+def bookings_csv(start: date, end: date, cinemas: frozenset[str] | None = None) -> Iterator[str]:
     """One row per booking whose screening starts in the range, oldest screening first."""
     begin, finish = day_bounds(start, end)
     seat_list = (sa.select(sa.func.string_agg(Seat.row_label + sa.cast(Seat.seat_number, sa.String), sa.literal(", ")))
@@ -66,6 +66,8 @@ def bookings_csv(start: date, end: date) -> Iterator[str]:
              .join(Screening, Booking.screening_id == Screening.id).join(Movie, Screening.movie_id == Movie.id)
              .join(Auditorium, Screening.auditorium_id == Auditorium.id).join(User, Booking.customer_id == User.id)
              .where(Screening.starts_at >= begin, Screening.starts_at < finish).order_by(Screening.starts_at, Booking.id))
+    if cinemas is not None:
+        query = query.where(Auditorium.cinema_name.in_(cinemas))
     buffer = io.StringIO()
     writer = _writer(buffer)
     buffer.write(BOM)
@@ -84,7 +86,7 @@ def bookings_csv(start: date, end: date) -> Iterator[str]:
 
 REVENUE_COLUMNS = ["date", "cinema", "hall", "movie", "paid_tickets", "seats", "paid_uzs", "refunded_uzs", "net_uzs"]
 
-def revenue_csv(start: date, end: date) -> Iterator[str]:
+def revenue_csv(start: date, end: date, cinemas: frozenset[str] | None = None) -> Iterator[str]:
     """Money actually paid, refunded and kept, per screening day, hall and film (cancelled and refunded tickets included)."""
     begin, finish = day_bounds(start, end)
     day = sa.func.date(sa.func.timezone(settings.business_timezone, Screening.starts_at))
@@ -95,6 +97,8 @@ def revenue_csv(start: date, end: date) -> Iterator[str]:
              .join(Movie, Screening.movie_id == Movie.id).join(Auditorium, Screening.auditorium_id == Auditorium.id)
              .where(Payment.status.in_(PAID_STATUSES), Screening.starts_at >= begin, Screening.starts_at < finish)
              .group_by(day, Auditorium.cinema_name, Auditorium.name, Movie.title).order_by(day, Auditorium.cinema_name, Auditorium.name, Movie.title))
+    if cinemas is not None:
+        query = query.where(Auditorium.cinema_name.in_(cinemas))
     buffer = io.StringIO()
     writer = _writer(buffer)
     buffer.write(BOM)

@@ -10,6 +10,7 @@ from ..models import (AuditLog, Auditorium, Booking, BookingStatus, Promotion, R
 from ..schemas import (AuditLogPage, AuditoriumOut, CatalogSyncOut, CinemaDirectorySyncOut, OperatorBookingOut,
                       OperatorDashboardOut, OperatorMetricsOut, OperatorScreeningOut,
                       TicketCheckInIn, TicketCheckInOut, PromotionIn, PromotionOut)
+from ..operators import allows, owner, scope_of
 from ..security import require_roles
 from ..config import settings
 from ..tmdb import TMDBUnavailable, sync_catalog
@@ -25,11 +26,11 @@ def _operator_booking_out(item: Booking) -> OperatorBookingOut:
         customer_nickname=item.customer.nickname, customer_email=item.customer.email)
 
 @router.get("/admin/promotions", response_model=list[PromotionOut])
-def list_promotions(db: Session = Depends(get_db), _: User = admin):
+def list_promotions(db: Session = Depends(get_db), _: User = owner):
     return db.scalars(sa.select(Promotion).order_by(Promotion.created_at.desc())).all()
 
 @router.post("/admin/promotions", response_model=PromotionOut, status_code=201)
-def create_promotion(data: PromotionIn, db: Session = Depends(get_db), actor: User = admin):
+def create_promotion(data: PromotionIn, db: Session = Depends(get_db), actor: User = owner):
     if data.ends_at and data.starts_at and data.ends_at <= data.starts_at:
         raise HTTPException(422, "Promotion end time must be after its start time")
     item = Promotion(code=data.code.strip().upper(), label=data.label.strip(), percent_off=data.percent_off,
@@ -50,7 +51,7 @@ def create_promotion(data: PromotionIn, db: Session = Depends(get_db), actor: Us
 @router.get("/admin/audit-log", response_model=AuditLogPage)
 def audit_log(limit: int = Query(50, ge=1, le=200), before_id: int | None = Query(None, ge=1),
               action: str | None = Query(None, max_length=60), actor_id: int | None = Query(None, ge=1),
-              db: Session = Depends(get_db), _: User = admin):
+              db: Session = Depends(get_db), _: User = owner):
     """Newest first. Pass the previous page's next_before_id as before_id to continue."""
     query = sa.select(AuditLog).order_by(AuditLog.id.desc()).limit(limit + 1)
     if before_id:
@@ -64,7 +65,7 @@ def audit_log(limit: int = Query(50, ge=1, le=200), before_id: int | None = Quer
     return AuditLogPage(items=page, next_before_id=page[-1].id if len(rows) > limit else None)
 
 @router.get("/admin/diagnostics/client-ip")
-def client_ip_diagnostics(request: Request, _: User = admin):
+def client_ip_diagnostics(request: Request, _: User = owner):
     """Show which proxy header carries the caller's real address, so CLIENT_IP_HEADER can be set correctly.
 
     Per-address rate limits are only as good as this value: behind a proxy that does not forward
@@ -75,7 +76,7 @@ def client_ip_diagnostics(request: Request, _: User = admin):
             "headers": {name: request.headers.get(name) for name in names}}
 
 @router.post("/catalog/sync", response_model=CatalogSyncOut)
-def sync_movie_catalog(db: Session = Depends(get_db), actor: User = admin):
+def sync_movie_catalog(db: Session = Depends(get_db), actor: User = owner):
     try:
         current, upcoming = sync_catalog(db)
     except TMDBUnavailable as exc:
@@ -85,26 +86,30 @@ def sync_movie_catalog(db: Session = Depends(get_db), actor: User = admin):
     return CatalogSyncOut(imported_now_playing=current, imported_upcoming=upcoming)
 
 @router.post("/admin/catalog-sync", response_model=CinemaDirectorySyncOut)
-def sync_cinematica_catalog(db: Session = Depends(get_db), actor: User = admin):
+def sync_cinematica_catalog(db: Session = Depends(get_db), actor: User = owner):
     result = sync_active_cinematica_halls(db)
     record(db, actor, "catalog.cinematica_sync")
     db.commit()
     return result
 
 @router.get("/admin/catalog-sync/status")
-def catalog_sync_status(db: Session = Depends(get_db), _: User = admin):
+def catalog_sync_status(db: Session = Depends(get_db), _: User = owner):
     latest = db.scalar(sa.select(sa.func.max(Auditorium.last_synced_at)).where(Auditorium.source_name == "cinematica"))
     halls = db.scalar(sa.select(sa.func.count(Auditorium.id)).where(Auditorium.source_name == "cinematica")) or 0
     return {"source": "cinematica", "halls": halls, "last_synced_at": latest}
 
 @router.get("/admin/cinemas", response_model=list[AuditoriumOut])
-def admin_cinemas(db: Session = Depends(get_db), _: User = admin):
-    """All halls, including disabled halls, for the operator workspace."""
-    rows = db.scalars(sa.select(Auditorium).order_by(Auditorium.cinema_name, Auditorium.name)).all()
+def admin_cinemas(db: Session = Depends(get_db), actor: User = admin):
+    """All halls the operator manages, including disabled halls, for the operator workspace."""
+    query = sa.select(Auditorium).order_by(Auditorium.cinema_name, Auditorium.name)
+    scope = scope_of(db, actor)
+    if scope is not None:
+        query = query.where(Auditorium.cinema_name.in_(scope))
+    rows = db.scalars(query).all()
     return [auditorium_out(row) for row in rows]
 
 @router.get("/admin/dashboard", response_model=OperatorDashboardOut)
-def operator_dashboard(day: date = Query(alias="date"), db: Session = Depends(get_db), _: User = admin):
+def operator_dashboard(day: date = Query(alias="date"), db: Session = Depends(get_db), actor: User = admin):
     """A date-scoped operator view. All metrics come from Parda's owned data."""
     expire_holds(db)
     try:
@@ -114,10 +119,12 @@ def operator_dashboard(day: date = Query(alias="date"), db: Session = Depends(ge
     local_start = datetime.combine(day, time.min, tzinfo=business_zone)
     utc_start = local_start.astimezone(timezone.utc)
     utc_end = (local_start + timedelta(days=1)).astimezone(timezone.utc)
-    screening_rows = db.scalars(
-        sa.select(Screening).where(Screening.starts_at >= utc_start, Screening.starts_at < utc_end)
-        .order_by(Screening.starts_at)
-    ).all()
+    screening_query = (sa.select(Screening).join(Auditorium, Screening.auditorium_id == Auditorium.id)
+                       .where(Screening.starts_at >= utc_start, Screening.starts_at < utc_end).order_by(Screening.starts_at))
+    scope = scope_of(db, actor)
+    if scope is not None:
+        screening_query = screening_query.where(Auditorium.cinema_name.in_(scope))
+    screening_rows = db.scalars(screening_query).all()
     screening_ids = [row.id for row in screening_rows]
     booking_rows = [] if not screening_ids else db.scalars(
         sa.select(Booking).where(Booking.screening_id.in_(screening_ids))
@@ -158,7 +165,7 @@ def check_in_ticket(data: TicketCheckInIn, db: Session = Depends(get_db), actor:
     """Admit one paid ticket once, within a bounded screening-entry window."""
     ticket_code = data.ticket_code.strip().upper()
     item = db.scalar(sa.select(Booking).where(Booking.ticket_code == ticket_code).with_for_update())
-    if not item:
+    if not item or not allows(scope_of(db, actor), item.screening.auditorium.cinema_name):
         raise HTTPException(404, "Ticket code was not found")
     if item.status != BookingStatus.CONFIRMED:
         raise HTTPException(409, "Only confirmed tickets can be checked in")

@@ -10,6 +10,7 @@ from ..models import (Auditorium, Booking, BookingSeat, Movie,
                      Role, Screening, Seat, User, WaitlistEntry)
 from ..schemas import (AuditoriumIn, AuditoriumOut, AuditoriumUpdate, NearbyAuditoriumOut, MovieIn, MovieOut, ScreeningIn, ScreeningOut,
                       ScreeningSeatsOut, SeatOut, WaitlistIn, WaitlistOut)
+from ..operators import allows, owner, scope_of
 from ..security import current_user, require_roles
 from ..services import ACTIVE_STATUSES, auditorium_out, expire_holds, screening_out
 from ..audit import record
@@ -39,7 +40,7 @@ def movie_details(movie_id: int, db: Session = Depends(get_db)):
     return movie
 
 @router.post("/movies", response_model=MovieOut, status_code=201)
-def create_movie(data: MovieIn, db: Session = Depends(get_db), actor: User = admin):
+def create_movie(data: MovieIn, db: Session = Depends(get_db), actor: User = owner):
     movie = Movie(**data.model_dump())
     db.add(movie); db.flush()
     record(db, actor, "movie.created", "movie", movie.id, title=movie.title)
@@ -47,7 +48,7 @@ def create_movie(data: MovieIn, db: Session = Depends(get_db), actor: User = adm
     return movie
 
 @router.patch("/movies/{movie_id}", response_model=MovieOut)
-def update_movie(movie_id: int, data: MovieIn, db: Session = Depends(get_db), actor: User = admin):
+def update_movie(movie_id: int, data: MovieIn, db: Session = Depends(get_db), actor: User = owner):
     movie = db.get(Movie, movie_id)
     if not movie: raise HTTPException(404, "Movie not found")
     changed = [key for key, value in data.model_dump().items() if getattr(movie, key) != value]
@@ -57,7 +58,7 @@ def update_movie(movie_id: int, data: MovieIn, db: Session = Depends(get_db), ac
     return movie
 
 @router.delete("/movies/{movie_id}", status_code=204)
-def archive_movie(movie_id: int, db: Session = Depends(get_db), actor: User = admin):
+def archive_movie(movie_id: int, db: Session = Depends(get_db), actor: User = owner):
     movie = db.get(Movie, movie_id)
     if not movie: raise HTTPException(404, "Movie not found")
     movie.active = False
@@ -86,6 +87,8 @@ def cinemas(city: str | None = None, db: Session = Depends(get_db)):
 
 @router.post("/cinemas", response_model=AuditoriumOut, status_code=201)
 def create_cinema(data: AuditoriumIn, db: Session = Depends(get_db), actor: User = admin):
+    if not allows(scope_of(db, actor), data.cinema_name.strip()):
+        raise HTTPException(403, "You do not manage this cinema")
     try: ZoneInfo(data.timezone)
     except ZoneInfoNotFoundError: raise HTTPException(422, "Unknown timezone")
     auditorium = Auditorium(name=data.name.strip(), cinema_name=data.cinema_name.strip(), city=data.city,
@@ -105,6 +108,8 @@ def update_cinema(auditorium_id: int, data: AuditoriumUpdate, db: Session = Depe
     auditorium = db.get(Auditorium, auditorium_id)
     if not auditorium:
         raise HTTPException(404, "Cinema hall not found")
+    if not allows(scope_of(db, actor), auditorium.cinema_name):
+        raise HTTPException(403, "You do not manage this cinema")
     values = data.model_dump(exclude_unset=True)
     if ("latitude" in values) != ("longitude" in values):
         raise HTTPException(422, "Set latitude and longitude together")
@@ -141,6 +146,8 @@ def create_screening(data: ScreeningIn, db: Session = Depends(get_db), actor: Us
     movie, room=db.get(Movie,data.movie_id),db.get(Auditorium,data.auditorium_id)
     if not movie or not movie.active or not room or not room.active:
         raise HTTPException(404,"Active movie or cinema hall not found")
+    if not allows(scope_of(db, actor), room.cinema_name):
+        raise HTTPException(403,"You do not manage this cinema")
     if not movie.duration_minutes: raise HTTPException(422,"A screening requires a known movie duration")
     if data.format_type not in (room.formats or ["2D"]): raise HTTPException(422,"This hall does not support the selected format")
     if data.starts_at.tzinfo is None or data.starts_at.utcoffset() is None:

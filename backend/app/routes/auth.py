@@ -13,6 +13,7 @@ from ..config import settings
 from ..database import get_db
 from ..models import (EmailOtpChallenge, PasswordResetChallenge, Role, User)
 from ..schemas import (EmailChallengeOut, EmailCodeVerify, EmailResend, Login, PasswordResetConfirm, PasswordResetRequest, ProfileUpdate, Token, UserCreate)
+from ..operators import scope_of
 from ..security import current_user, hash_password, make_token, verify_password
 from ..otp import new_code
 from ..mail import (EmailDeliveryError, email_code_hash, email_code_matches, send_email_code,
@@ -68,10 +69,15 @@ _AVATAR_DATA_URL = re.compile(r"^data:image/(?:jpeg|png|webp);base64,([A-Za-z0-9
 
 _MAX_AVATAR_BYTES = 300 * 1024
 
-def _user_payload(user: User) -> dict:
-    return {"id": user.id, "name": user.nickname, "nickname": user.nickname,
+def _user_payload(user: User, db: Session | None = None) -> dict:
+    payload = {"id": user.id, "name": user.nickname, "nickname": user.nickname,
             "email": user.email, "role": user.role.value, "created_at": user.created_at,
             "avatar_data": user.avatar_data}
+    if user.role == Role.ADMIN:
+        # null = an owner (every cinema); a list = an operator limited to those cinemas
+        scope = scope_of(db, user) if db is not None else None
+        payload["operator_cinemas"] = None if scope is None else sorted(scope)
+    return payload
 
 def _validated_avatar(value: str | None) -> str | None:
     if value is None:
@@ -190,7 +196,7 @@ def verify_email(data: EmailCodeVerify, request: Request, response: Response, db
     sessions.start_session(db, user, request, response)
     db.commit()
     return {"access_token": make_token(user), "token_type": "bearer", "expires_in": _access_seconds(),
-            "user": _user_payload(user)}
+            "user": _user_payload(user, db)}
 
 @router.post("/auth/login", response_model=Token)
 def login(data: Login, request: Request, response: Response, db: Session = Depends(get_db)):
@@ -304,8 +310,8 @@ def logout_all_devices(response: Response, db: Session = Depends(get_db), user: 
     db.commit()
 
 @router.get("/auth/me")
-def me(user: User = Depends(current_user)):
-    return _user_payload(user)
+def me(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    return _user_payload(user, db)
 
 @router.patch("/auth/profile")
 def update_profile(data: ProfileUpdate, db: Session = Depends(get_db), user: User = Depends(current_user)):
@@ -323,4 +329,4 @@ def update_profile(data: ProfileUpdate, db: Session = Depends(get_db), user: Use
         db.rollback()
         raise HTTPException(409, "This username is already in use") from exc
     db.refresh(user)
-    return _user_payload(user)
+    return _user_payload(user, db)

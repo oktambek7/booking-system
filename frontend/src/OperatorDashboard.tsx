@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { apiFetch } from './session'
-import { Armchair, CalendarDays, CheckCircle2, CircleDollarSign, Clapperboard, DoorOpen, Film, FileSpreadsheet, LayoutDashboard, LoaderCircle, Plus, RefreshCw, ScanLine, Ticket, Users, X } from 'lucide-react'
+import { Armchair, CalendarDays, CheckCircle2, CircleDollarSign, Clapperboard, DoorOpen, Film, FileSpreadsheet, LayoutDashboard, LoaderCircle, Plus, RefreshCw, ScanLine, ShieldCheck, Ticket, Users, X } from 'lucide-react'
 import { calendarDate, formatDateTime, isoDateInTashkent } from './dateFormat'
 import Modal from './ui/Modal'
 import QrScanner from './ui/QrScanner'
 import { saveResponse } from './download'
+import OperatorAccess from './OperatorAccess'
 
 type Movie = { id:number; title:string; active:boolean; catalog_status?:string; duration_minutes?:number|null; language:string; age_rating:string; poster_url:string }
 type Hall = { id:number; name:string; cinema_name:string; city:string; address:string; hall_type:'standard'|'vip'; formats:string[]; seat_count:number; active?:boolean; source_name?:string|null }
@@ -20,8 +21,10 @@ const dateKey = (value = new Date()) => isoDateInTashkent(value)
 function headers(token:string) { return { Authorization:`Bearer ${token}`, 'Content-Type':'application/json' } }
 function isoFromForm(day:string, value:string) { return new Date(`${day}T${value}:00+05:00`).toISOString() }
 
-export default function OperatorDashboard({ api, token, onClose }: { api:string; token:string; onClose:()=>void }) {
-  const [tab, setTab] = useState<'overview'|'schedule'|'halls'|'catalog'|'tickets'|'promotions'|'reports'>('overview')
+// `cinemas` is null for an owner and the list of cinema names for an operator limited to those cinemas.
+export default function OperatorDashboard({ api, token, cinemas, onClose }: { api:string; token:string; cinemas:string[]|null; onClose:()=>void }) {
+  const scoped = cinemas !== null
+  const [tab, setTab] = useState<'overview'|'schedule'|'halls'|'catalog'|'tickets'|'promotions'|'reports'|'operators'>('overview')
   const [day, setDay] = useState(dateKey())
   const [dashboard, setDashboard] = useState<Dashboard|null>(null)
   const [movies, setMovies] = useState<Movie[]>([])
@@ -43,14 +46,14 @@ export default function OperatorDashboard({ api, token, onClose }: { api:string;
         apiFetch(`${api}/api/admin/dashboard?date=${day}`, { headers:headers(token) }),
         apiFetch(`${api}/api/movies`, { headers:headers(token) }),
         apiFetch(`${api}/api/admin/cinemas`, { headers:headers(token) }),
-        apiFetch(`${api}/api/admin/promotions`, { headers:headers(token) }),
+        scoped ? Promise.resolve(null) : apiFetch(`${api}/api/admin/promotions`, { headers:headers(token) }),
       ])
       const payload = await dashboardResult.json()
       if (!dashboardResult.ok) throw new Error(payload.detail || 'Boshqaruv ma’lumotlari yuklanmadi.')
       setDashboard(payload)
       if (moviesResult.ok) setMovies(await moviesResult.json())
       if (hallsResult.ok) setHalls(await hallsResult.json())
-      if (promotionsResult.ok) setPromotions(await promotionsResult.json())
+      if (promotionsResult?.ok) setPromotions(await promotionsResult.json())
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Boshqaruv ma’lumotlari yuklanmadi.')
     } finally { setLoading(false) }
@@ -127,9 +130,11 @@ export default function OperatorDashboard({ api, token, onClose }: { api:string;
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'TMDB katalogini yangilab bo‘lmadi.') }
     finally { setBusy(false) }
   }
-  const nav = [
-    ['overview', 'Umumiy', LayoutDashboard], ['schedule', 'Seanslar', CalendarDays], ['halls', 'Zallar', DoorOpen], ['catalog', 'Filmlar', Film], ['tickets', 'Chiptalar', Ticket], ['promotions', 'Promolar', CircleDollarSign], ['reports', 'Hisobotlar', FileSpreadsheet],
+  const everything = [
+    ['overview', 'Umumiy', LayoutDashboard], ['schedule', 'Seanslar', CalendarDays], ['halls', 'Zallar', DoorOpen], ['catalog', 'Filmlar', Film], ['tickets', 'Chiptalar', Ticket], ['promotions', 'Promolar', CircleDollarSign], ['reports', 'Hisobotlar', FileSpreadsheet], ['operators', 'Operatorlar', ShieldCheck],
   ] as const
+  // Films, promotions and operator accounts are global, so an operator limited to some cinemas does not get them.
+  const nav = everything.filter(item => !scoped || !['catalog', 'promotions', 'operators'].includes(item[0]))
   const selected = nav.find(item => item[0] === tab)?.[1]
 
   return <Modal scrimClassName="operator-scrim" className="operator-shell" label="Parda cinema operator dashboard">
@@ -138,7 +143,7 @@ export default function OperatorDashboard({ api, token, onClose }: { api:string;
         <div className="operator-header-actions"><button className="operator-refresh" onClick={() => void load()} disabled={loading || busy}><RefreshCw size={16}/>Yangilash</button><button className="operator-close" onClick={onClose} aria-label="Boshqaruvni yopish"><X size={19}/></button></div>
       </header>
       <div className="operator-layout">
-        <aside className="operator-sidebar"><div className="operator-brand"><img src="/parda-logo-mark.jpg" alt=""/><span>PARDA</span></div><nav>{nav.map(([key,label,Icon]) => <button key={key} className={tab === key ? 'operator-nav-active' : ''} onClick={() => setTab(key)}><Icon size={17}/><span>{label}</span></button>)}</nav><small>Asia/Tashkent<br/>Operator workspace</small></aside>
+        <aside className="operator-sidebar"><div className="operator-brand"><img src="/parda-logo-mark.jpg" alt=""/><span>PARDA</span></div><nav>{nav.map(([key,label,Icon]) => <button key={key} className={tab === key ? 'operator-nav-active' : ''} onClick={() => setTab(key)}><Icon size={17}/><span>{label}</span></button>)}</nav><small>Asia/Tashkent<br/>{scoped ? (cinemas.length ? cinemas.join(', ') : 'Kinoteatr biriktirilmagan') : 'Operator workspace'}</small></aside>
         <main className="operator-content">
           <div className="operator-toolbar"><label>Sana<input type="date" value={day} min={dateKey()} onChange={event => setDay(event.target.value)}/></label><span>{calendarDate(day, 'uz')}</span></div>
           {notice && <p className="operator-alert operator-success"><CheckCircle2 size={16}/>{notice}</p>}
@@ -151,6 +156,7 @@ export default function OperatorDashboard({ api, token, onClose }: { api:string;
             {tab === 'tickets' && <Tickets bookings={dashboard?.bookings || []} busy={busy} onUpdate={updateBooking} onCheckIn={checkIn} onScan={async code => { await submitTicketCode(code) }}/>} 
             {tab === 'promotions' && <Promotions promotions={promotions} busy={busy} onSubmit={submit}/>}
             {tab === 'reports' && <Reports busy={busy} onDownload={downloadReport}/>}
+            {tab === 'operators' && !scoped && <OperatorAccess api={api} token={token} cinemaNames={[...new Set(halls.map(hall => hall.cinema_name))]}/>}
           </>}
         </main>
       </div>

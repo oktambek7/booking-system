@@ -6,6 +6,7 @@ from .. import ratelimit, reports
 from ..audit import record
 from ..database import get_db
 from ..models import Role, User
+from ..operators import scope_of
 from ..security import require_roles
 
 router = APIRouter()
@@ -13,9 +14,11 @@ admin = Depends(require_roles(Role.ADMIN))
 
 def _stream(kind: str, generator, start: date, end: date, db: Session, actor: User) -> StreamingResponse:
     ratelimit.hit("report-export", str(actor.id), 30, 3600)
-    record(db, actor, "report.exported", "report", kind, start=start.isoformat(), end=end.isoformat())
+    scope = scope_of(db, actor)
+    record(db, actor, "report.exported", "report", kind, start=start.isoformat(), end=end.isoformat(),
+           cinemas=None if scope is None else sorted(scope))
     db.commit()
-    return StreamingResponse(generator(start, end), media_type="text/csv; charset=utf-8", headers={
+    return StreamingResponse(generator(start, end, scope), media_type="text/csv; charset=utf-8", headers={
         "Content-Disposition": f'attachment; filename="parda-{kind}-{start.isoformat()}_{end.isoformat()}.csv"', "Cache-Control": "no-store"})
 
 def _checked(start: date, end: date) -> None:

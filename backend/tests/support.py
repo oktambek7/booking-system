@@ -43,10 +43,10 @@ def make_user(*, points: int = 0, role: Role = Role.CUSTOMER) -> dict:
         db.commit()
         return {"id": user.id, "email": user.email, "token": make_token(user)}
 
-def make_hall(*, rows: int = 3, cols: int = 6, premium_rows: int = 1) -> dict:
+def make_hall(*, rows: int = 3, cols: int = 6, premium_rows: int = 1, cinema: str = "Test cinema") -> dict:
     """A hall whose first `premium_rows` rows are premium. Seat ids are ordered by row, then number."""
     with SessionLocal() as db:
-        hall = Auditorium(name=f"Test hall {uuid.uuid4().hex[:6]}", cinema_name="Test cinema")
+        hall = Auditorium(name=f"Test hall {uuid.uuid4().hex[:6]}", cinema_name=cinema)
         hall.seats = [Seat(row_label=chr(65 + r), seat_number=n, seat_type="premium" if r < premium_rows else "standard")
                       for r in range(rows) for n in range(1, cols + 1)]
         db.add(hall)

@@ -38,6 +38,8 @@ class User(Base):
     reserved_points: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     # Bumped to revoke every access token issued earlier (password reset, sign-out everywhere).
     token_version: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"), nullable=False)
+    # An operator limited to the cinemas listed in cinema_operators (see app/operators.py). False = an owner.
+    cinema_scoped: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 class Movie(Base):
@@ -280,6 +282,14 @@ class Payment(Base):
         Index("uq_payment_idempotency_key", "booking_id", "idempotency_key", unique=True,
               postgresql_where=text("idempotency_key IS NOT NULL")),
     )
+
+class CinemaOperator(Base):
+    """A cinema a scoped operator may manage (matched on Auditorium.cinema_name)."""
+    __tablename__ = "cinema_operators"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    cinema_name: Mapped[str] = mapped_column(String(160))
+    __table_args__ = (UniqueConstraint("user_id", "cinema_name", name="uq_cinema_operator"),)
 
 class PaymentEvent(Base):
     """Every provider callback we acted on or deliberately ignored. The unique (provider, event_id) makes a

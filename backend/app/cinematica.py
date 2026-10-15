@@ -20,6 +20,7 @@ from .database import SessionLocal, get_db
 from .models import (Auditorium, Booking, BookingSeat, BookingStatus, CatalogResponseCache,
                      CatalogScreeningLink, Movie, Role, Screening, Seat, User)
 from .schemas import CinemaDirectorySyncOut
+from .operators import owner
 from .security import require_roles
 from .ticketon import show_for_title as ticketon_show_for_title, shows_for_title as ticketon_shows_for_title
 
@@ -483,7 +484,7 @@ def movie_screenings(movie_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/sync", response_model=CinemaDirectorySyncOut)
-def sync_cinema_directory(db: Session = Depends(get_db), _: User = admin):
+def sync_cinema_directory(db: Session = Depends(get_db), _: User = owner):
     return sync_active_cinematica_halls(db)
 
 

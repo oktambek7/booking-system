@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from ..database import get_db
-from ..models import (Booking, BookingSeat, BookingStatus, Payment, Role, Screening, Seat, User, WaitlistEntry)
+from ..models import (Auditorium, Booking, BookingSeat, BookingStatus, Payment, Role, Screening, Seat, User, WaitlistEntry)
 from ..schemas import (CancellationQuoteOut, RefundPolicyStep, BookingIn, BookingOut, BookingStatusIn,
                       BookingPriceIn)
 from ..security import current_user
@@ -17,6 +17,7 @@ from ..services import (
     ACTIVE_STATUSES, POINT_VALUE_UZS, booking_out, calculate_promotion_discount, expire_holds,
     lock_user, new_ticket_code, owned_pending_booking, release_pending_points)
 from ..audit import record
+from ..operators import allows, scope_of
 from ..payment_providers import OPEN, PAID
 from ..refunds import CUSTOMER, OPERATOR, issue_refund, paid_payment, policy, quote_refund
 
@@ -114,11 +115,17 @@ def price_booking(booking_id: int, data: BookingPriceIn, db: Session = Depends(g
 def confirm_booking(booking_id:int,db:Session=Depends(get_db),user:User=Depends(current_user)):
     raise HTTPException(409,"Complete the demo payment email verification step to confirm a booking")
 
+def _outside_scope(db: Session, user: User, item: Booking) -> bool:
+    """A scoped operator never sees or touches bookings for cinemas they do not manage."""
+    return user.role == Role.ADMIN and not allows(scope_of(db, user), item.screening.auditorium.cinema_name)
+
 @router.get("/bookings",response_model=list[BookingOut])
 def booking_history(db:Session=Depends(get_db),user:User=Depends(current_user)):
     expire_holds(db)
     q=sa.select(Booking).order_by(Booking.created_at.desc())
     if user.role!=Role.ADMIN: q=q.where(Booking.customer_id==user.id,Booking.archived_by_customer.is_(False))
+    elif (scope:=scope_of(db,user)) is not None:
+        q=q.where(Booking.screening_id.in_(sa.select(Screening.id).join(Auditorium,Screening.auditorium_id==Auditorium.id).where(Auditorium.cinema_name.in_(scope))))
     items=db.scalars(q).all();result=[booking_out(x) for x in items];db.commit()
     return result
 
@@ -144,7 +151,7 @@ def refund_policy():
 def cancellation_quote(booking_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
     """Preview what cancelling would refund, before the customer confirms."""
     item = db.get(Booking, booking_id)
-    if not item or (user.role != Role.ADMIN and item.customer_id != user.id):
+    if not item or (user.role != Role.ADMIN and item.customer_id != user.id) or _outside_scope(db, user, item):
         raise HTTPException(404, "Booking not found")
     paid = item.status == BookingStatus.CONFIRMED and paid_payment(db, item.id) is not None
     quote = quote_refund(item, datetime.now(timezone.utc), OPERATOR if user.role == Role.ADMIN else CUSTOMER)
@@ -156,7 +163,7 @@ def cancellation_quote(booking_id: int, db: Session = Depends(get_db), user: Use
 @router.patch("/bookings/{booking_id}/status",response_model=BookingOut)
 def update_booking_status(booking_id:int,data:BookingStatusIn,background_tasks:BackgroundTasks,db:Session=Depends(get_db),user:User=Depends(current_user)):
     item=db.scalar(sa.select(Booking).where(Booking.id==booking_id).with_for_update())
-    if not item: raise HTTPException(404,"Booking not found")
+    if not item or _outside_scope(db, user, item): raise HTTPException(404,"Booking not found")
     previous_status=item.status
     if user.role==Role.CUSTOMER:
         if item.customer_id!=user.id or data.status!=BookingStatus.CANCELLED:
