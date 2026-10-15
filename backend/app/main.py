@@ -1,72 +1,20 @@
 from contextlib import asynccontextmanager
-import asyncio
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from . import models  # noqa: F401  (registers every table on Base.metadata)
+from . import jobs
 from .api import router
-from .cinematica import router as cinematica_router, sync_active_cinematica_halls
+from .cinematica import router as cinematica_router
 from .config import settings
 from .database import SessionLocal
 from .migrate import assert_schema_current, upgrade_to_head
 from .models import Role, User
-from .notifications import (deliver_due_notifications, deliver_due_waitlist_notifications,
-                            deliver_due_saved_movie_notifications, queue_saved_movie_notifications,
-                            queue_waitlist_notifications, schedule_missing_reminders)
-from .ratelimit import purge_expired as purge_expired_rate_limits
 from .security import hash_password
 from .seed_demo import ensure_current_demo_schedule
-from .tmdb import TMDBUnavailable, sync_catalog
 
 logger = logging.getLogger(__name__)
-
-def _refresh_tmdb_catalog() -> None:
-    with SessionLocal() as db:
-        now_playing, upcoming = sync_catalog(db)
-    logger.info("TMDB refresh complete: %s now playing, %s upcoming", now_playing, upcoming)
-
-def _refresh_cinematica_directory() -> None:
-    with SessionLocal() as db:
-        result = sync_active_cinematica_halls(db)
-    logger.info("Cinematica hall directory refresh complete: %s", result)
-
-async def _cinematica_refresh_loop() -> None:
-    """Warm the durable public-catalog cache outside customer requests."""
-    while True:
-        try:
-            await asyncio.to_thread(_refresh_cinematica_directory)
-        except Exception:
-            # Catalogue discovery can be retried later; booking remains online
-            # using the durable stale cache in the meantime.
-            logger.exception("Cinematica background cache refresh failed")
-        await asyncio.sleep(max(60, settings.cinematica_refresh_interval_seconds))
-
-async def _tmdb_refresh_loop() -> None:
-    while True:
-        try:
-            await asyncio.to_thread(_refresh_tmdb_catalog)
-        except TMDBUnavailable:
-            logger.exception("TMDB catalog refresh failed")
-        except Exception:
-            logger.exception("Unexpected TMDB catalog refresh error")
-        await asyncio.sleep(max(1, settings.tmdb_sync_interval_hours) * 60 * 60)
-
-async def _booking_notification_loop() -> None:
-    while True:
-        try:
-            await asyncio.to_thread(schedule_missing_reminders)
-            await asyncio.to_thread(purge_expired_rate_limits)
-            waitlist_queued = await asyncio.to_thread(queue_waitlist_notifications)
-            saved_movie_queued = await asyncio.to_thread(queue_saved_movie_notifications)
-            delivered = await asyncio.to_thread(deliver_due_notifications)
-            waitlist_delivered = await asyncio.to_thread(deliver_due_waitlist_notifications)
-            saved_movie_delivered = await asyncio.to_thread(deliver_due_saved_movie_notifications)
-            if delivered or waitlist_delivered or saved_movie_delivered or waitlist_queued or saved_movie_queued:
-                logger.info("Customer notifications: bookings=%s waitlist=%s/%s saved_movies=%s/%s", delivered, waitlist_queued, waitlist_delivered, saved_movie_queued, saved_movie_delivered)
-        except Exception:
-            logger.exception("Booking notification delivery failed")
-        await asyncio.sleep(max(30, settings.notification_poll_seconds))
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -84,22 +32,11 @@ async def lifespan(app: FastAPI):
         logger.info("Created %s rolling Parda demo screenings", created)
     # Discovery source failures must never prevent the booking API from
     # starting. Refresh catalogue data in the background instead.
-    tasks: list[asyncio.Task] = []
-    if settings.run_background_jobs:
-        tasks.append(asyncio.create_task(_cinematica_refresh_loop()))
-        tasks.append(asyncio.create_task(_booking_notification_loop()))
-        if settings.tmdb_read_token:
-            tasks.append(asyncio.create_task(_tmdb_refresh_loop()))
+    tasks = jobs.start_all() if settings.run_background_jobs else []
     try:
         yield
     finally:
-        for task in tasks:
-            task.cancel()
-        for task in tasks:
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
+        await jobs.stop_all(tasks)
 
 def _ensure_initial_admin() -> None:
     if not settings.admin_email and not settings.admin_password:

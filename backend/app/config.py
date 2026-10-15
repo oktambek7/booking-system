@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     cinematica_refresh_interval_seconds: int = 600
     notification_poll_seconds: int = 60
     notification_retry_minutes: int = 10
+    # After this many failed deliveries a notification is abandoned instead of retried forever.
+    notification_max_attempts: int = 8
     sms_mode: str = "mock"
     sms_api_url: str = "https://notify.eskiz.uz/api"
     sms_email: str = ""

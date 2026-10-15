@@ -64,46 +64,87 @@ def _details(booking: Booking) -> dict[str, str]:
     }
 
 
-def deliver_due_notifications(limit: int = 50) -> int:
-    """Send due records and retry transient delivery errors on a short schedule."""
+def _claim(db, model, notice_id: int):
+    """Lock one notification for this worker. Returns None if another worker already holds it."""
+    return db.scalar(sa.select(model).where(model.id == notice_id).with_for_update(skip_locked=True))
+
+
+def _fail(notice, now: datetime, reason: str, label: str) -> None:
+    """Schedule a retry, or abandon the notification once it has failed too often."""
+    notice.attempts += 1
+    if notice.attempts >= settings.notification_max_attempts:
+        notice.sent_at = now
+        notice.last_error = f"Gave up after {notice.attempts} attempts: {reason}"[:300]
+        logger.error("Parda %s abandoned after %s attempts: id=%s", label, notice.attempts, notice.id)
+    else:
+        notice.last_error = reason[:300]
+        notice.due_at = now + timedelta(minutes=settings.notification_retry_minutes)
+        logger.warning("Parda %s retry scheduled: id=%s attempt=%s", label, notice.id, notice.attempts)
+
+
+def _deliver_batch(model, handler, label: str, limit: int) -> int:
+    """Run `handler` for each due notification in its own transaction.
+
+    Committing after every message means a crash can lose track of at most the one email in
+    flight, and SKIP LOCKED lets concurrent workers (and the post-payment background task)
+    take different messages instead of queueing behind each other.
+    """
     now = datetime.now(timezone.utc)
     delivered = 0
     with SessionLocal() as db:
-        ids = db.scalars(sa.select(BookingNotification.id).where(
-            BookingNotification.sent_at.is_(None), BookingNotification.due_at <= now
-        ).order_by(BookingNotification.due_at).limit(limit)).all()
+        ids = db.scalars(sa.select(model.id).where(model.sent_at.is_(None), model.due_at <= now)
+                         .order_by(model.due_at).limit(limit)).all()
         for notice_id in ids:
-            notice = db.scalar(sa.select(BookingNotification).where(
-                BookingNotification.id == notice_id).with_for_update())
-            if not notice or notice.sent_at or notice.due_at > now:
-                continue
-            booking = db.scalar(sa.select(Booking).where(Booking.id == notice.booking_id).with_for_update())
-            if not booking or booking.status != BookingStatus.CONFIRMED:
-                notice.sent_at = now
-                notice.last_error = "Skipped because the ticket is no longer confirmed"
-                continue
             try:
-                details = _details(booking)
-                if notice.event_type == CONFIRMATION:
-                    send_booking_confirmation_email(booking.customer.email, amount=f"{booking.total_price:,.0f} UZS", **details)
-                elif notice.event_type == REMINDER_24H:
-                    send_screening_reminder_email(booking.customer.email, when="in about 24 hours", **details)
-                elif notice.event_type == REMINDER_2H:
-                    send_screening_reminder_email(booking.customer.email, when="in about 2 hours", **details)
-                else:
-                    notice.sent_at = now
-                    notice.last_error = "Skipped unknown notification type"
-                    continue
-                notice.sent_at = now
-                notice.last_error = None
-                delivered += 1
-            except EmailDeliveryError as exc:
-                notice.attempts += 1
-                notice.last_error = str(exc)[:300]
-                notice.due_at = now + timedelta(minutes=settings.notification_retry_minutes)
-                logger.warning("Parda notification retry scheduled: booking=%s event=%s", booking.id, notice.event_type)
-        db.commit()
+                if handler(db, notice_id, now):
+                    delivered += 1
+                db.commit()
+            except Exception as exc:
+                db.rollback()
+                logger.exception("Parda %s failed unexpectedly: id=%s", label, notice_id)
+                try:
+                    notice = _claim(db, model, notice_id)
+                    if notice and not notice.sent_at:
+                        _fail(notice, now, f"{type(exc).__name__}: {exc}", label)
+                    db.commit()
+                except Exception:
+                    db.rollback()
+                    logger.exception("Parda %s failure could not be recorded: id=%s", label, notice_id)
     return delivered
+
+
+def _deliver_booking_notice(db, notice_id: int, now: datetime) -> bool:
+    notice = _claim(db, BookingNotification, notice_id)
+    if not notice or notice.sent_at or notice.due_at > now:
+        return False
+    booking = db.scalar(sa.select(Booking).where(Booking.id == notice.booking_id).with_for_update())
+    if not booking or booking.status != BookingStatus.CONFIRMED:
+        notice.sent_at = now
+        notice.last_error = "Skipped because the ticket is no longer confirmed"
+        return False
+    try:
+        details = _details(booking)
+        if notice.event_type == CONFIRMATION:
+            send_booking_confirmation_email(booking.customer.email, amount=f"{booking.total_price:,.0f} UZS", **details)
+        elif notice.event_type == REMINDER_24H:
+            send_screening_reminder_email(booking.customer.email, when="in about 24 hours", **details)
+        elif notice.event_type == REMINDER_2H:
+            send_screening_reminder_email(booking.customer.email, when="in about 2 hours", **details)
+        else:
+            notice.sent_at = now
+            notice.last_error = "Skipped unknown notification type"
+            return False
+    except EmailDeliveryError as exc:
+        _fail(notice, now, str(exc), "booking notification")
+        return False
+    notice.sent_at = now
+    notice.last_error = None
+    return True
+
+
+def deliver_due_notifications(limit: int = 50) -> int:
+    """Send due records and retry transient delivery errors on a short schedule."""
+    return _deliver_batch(BookingNotification, _deliver_booking_notice, "booking notification", limit)
 
 
 def _available_seats_for_waitlist(db, entry: WaitlistEntry, now: datetime) -> int:
@@ -145,41 +186,32 @@ def queue_waitlist_notifications() -> int:
     return queued
 
 
+def _deliver_waitlist_notice(db, notice_id: int, now: datetime) -> bool:
+    notice = _claim(db, WaitlistNotification, notice_id)
+    if not notice or notice.sent_at or notice.due_at > now:
+        return False
+    entry = db.scalar(sa.select(WaitlistEntry).where(WaitlistEntry.id == notice.waitlist_entry_id).with_for_update())
+    if not entry or entry.screening.status != "scheduled" or entry.screening.starts_at <= now:
+        notice.sent_at = now
+        notice.last_error = "Skipped because the screening is unavailable"
+        return False
+    try:
+        starts_at = entry.screening.starts_at.astimezone(ZoneInfo(settings.business_timezone))
+        send_waitlist_available_email(entry.user.email,
+            movie=entry.screening.movie.title,
+            cinema=f"{entry.screening.auditorium.cinema_name} · {entry.screening.auditorium.name}",
+            starts_at=starts_at.strftime("%d %b %Y, %H:%M"), seat_count=entry.seat_count)
+    except EmailDeliveryError as exc:
+        _fail(notice, now, str(exc), "waitlist notification")
+        return False
+    notice.sent_at = now
+    notice.last_error = None
+    return True
+
+
 def deliver_due_waitlist_notifications(limit: int = 50) -> int:
     """Deliver availability alerts without reserving a seat or overselling a screening."""
-    now = datetime.now(timezone.utc)
-    delivered = 0
-    with SessionLocal() as db:
-        ids = db.scalars(sa.select(WaitlistNotification.id).where(
-            WaitlistNotification.sent_at.is_(None), WaitlistNotification.due_at <= now
-        ).order_by(WaitlistNotification.due_at).limit(limit)).all()
-        for notice_id in ids:
-            notice = db.scalar(sa.select(WaitlistNotification).where(
-                WaitlistNotification.id == notice_id).with_for_update())
-            if not notice or notice.sent_at or notice.due_at > now:
-                continue
-            entry = db.scalar(sa.select(WaitlistEntry).where(
-                WaitlistEntry.id == notice.waitlist_entry_id).with_for_update())
-            if not entry or entry.screening.status != "scheduled" or entry.screening.starts_at <= now:
-                notice.sent_at = now
-                notice.last_error = "Skipped because the screening is unavailable"
-                continue
-            try:
-                starts_at = entry.screening.starts_at.astimezone(ZoneInfo(settings.business_timezone))
-                send_waitlist_available_email(entry.user.email,
-                    movie=entry.screening.movie.title,
-                    cinema=f"{entry.screening.auditorium.cinema_name} · {entry.screening.auditorium.name}",
-                    starts_at=starts_at.strftime("%d %b %Y, %H:%M"), seat_count=entry.seat_count)
-                notice.sent_at = now
-                notice.last_error = None
-                delivered += 1
-            except EmailDeliveryError as exc:
-                notice.attempts += 1
-                notice.last_error = str(exc)[:300]
-                notice.due_at = now + timedelta(minutes=settings.notification_retry_minutes)
-                logger.warning("Parda waitlist notification retry scheduled: entry=%s", entry.id)
-        db.commit()
-    return delivered
+    return _deliver_batch(WaitlistNotification, _deliver_waitlist_notice, "waitlist notification", limit)
 
 
 def queue_saved_movie_notifications() -> int:
@@ -211,39 +243,30 @@ def queue_saved_movie_notifications() -> int:
     return queued
 
 
+def _deliver_saved_movie_notice(db, notice_id: int, now: datetime) -> bool:
+    notice = _claim(db, MovieWatchlistNotification, notice_id)
+    if not notice or notice.sent_at or notice.due_at > now:
+        return False
+    watch = db.scalar(sa.select(MovieWatchlist).where(MovieWatchlist.id == notice.watchlist_id).with_for_update())
+    screening = db.get(Screening, notice.screening_id)
+    if not watch or not screening or screening.status != "scheduled" or screening.starts_at <= now:
+        notice.sent_at = now
+        notice.last_error = "Skipped because no future screening remains"
+        return False
+    try:
+        starts_at = screening.starts_at.astimezone(ZoneInfo(settings.business_timezone))
+        send_saved_movie_showtime_email(watch.user.email,
+            movie=watch.movie.title,
+            cinema=f"{screening.auditorium.cinema_name} · {screening.auditorium.name}",
+            starts_at=starts_at.strftime("%d %b %Y, %H:%M"))
+    except EmailDeliveryError as exc:
+        _fail(notice, now, str(exc), "saved-movie notification")
+        return False
+    watch.alert_sent_at = now
+    notice.sent_at = now
+    notice.last_error = None
+    return True
+
+
 def deliver_due_saved_movie_notifications(limit: int = 50) -> int:
-    now = datetime.now(timezone.utc)
-    delivered = 0
-    with SessionLocal() as db:
-        ids = db.scalars(sa.select(MovieWatchlistNotification.id).where(
-            MovieWatchlistNotification.sent_at.is_(None), MovieWatchlistNotification.due_at <= now
-        ).order_by(MovieWatchlistNotification.due_at).limit(limit)).all()
-        for notice_id in ids:
-            notice = db.scalar(sa.select(MovieWatchlistNotification).where(
-                MovieWatchlistNotification.id == notice_id).with_for_update())
-            if not notice or notice.sent_at or notice.due_at > now:
-                continue
-            watch = db.scalar(sa.select(MovieWatchlist).where(
-                MovieWatchlist.id == notice.watchlist_id).with_for_update())
-            screening = db.get(Screening, notice.screening_id)
-            if not watch or not screening or screening.status != "scheduled" or screening.starts_at <= now:
-                notice.sent_at = now
-                notice.last_error = "Skipped because no future screening remains"
-                continue
-            try:
-                starts_at = screening.starts_at.astimezone(ZoneInfo(settings.business_timezone))
-                send_saved_movie_showtime_email(watch.user.email,
-                    movie=watch.movie.title,
-                    cinema=f"{screening.auditorium.cinema_name} · {screening.auditorium.name}",
-                    starts_at=starts_at.strftime("%d %b %Y, %H:%M"))
-                watch.alert_sent_at = now
-                notice.sent_at = now
-                notice.last_error = None
-                delivered += 1
-            except EmailDeliveryError as exc:
-                notice.attempts += 1
-                notice.last_error = str(exc)[:300]
-                notice.due_at = now + timedelta(minutes=settings.notification_retry_minutes)
-                logger.warning("Parda saved-movie notification retry scheduled: watchlist=%s", watch.id)
-        db.commit()
-    return delivered
+    return _deliver_batch(MovieWatchlistNotification, _deliver_saved_movie_notice, "saved-movie notification", limit)

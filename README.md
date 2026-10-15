@@ -128,6 +128,15 @@ public users cannot self-assign roles.
 
 Set `VITE_API_URL` to the API origin and redeploy. Set the API `CORS_ORIGINS` to the exact Vercel site origin.
 
+## Background jobs and scaling
+
+Booking and waitlist e-mails, reminders and the Cinematica/TMDB refreshes run as scheduled jobs (`backend/app/jobs.py`).
+
+- **Single service (default):** the API runs the jobs itself (`RUN_BACKGROUND_JOBS=true`). This is what a one-instance Render deploy uses.
+- **Several API instances:** every job takes a PostgreSQL advisory lock for its pass, so instances never run the same job twice, and each e-mail is claimed with `FOR UPDATE SKIP LOCKED` and committed on its own. Nothing is sent twice, and a crash can lose track of at most the one message in flight.
+- **Dedicated worker:** set `RUN_BACKGROUND_JOBS=false` on the web services and run `python -m app.worker` as a separate process (on Render, a Background Worker service with the same image/root directory). `python -m app.worker --once` runs every job once and exits non-zero if any failed, for use as a cron job.
+- A notification that keeps failing is retried every `NOTIFICATION_RETRY_MINUTES` and abandoned after `NOTIFICATION_MAX_ATTEMPTS` (default 8); the last error stays on the row.
+
 ## Database migrations (Alembic)
 
 The schema is versioned with Alembic (`backend/alembic/`). Revision `0001` is a frozen baseline: it builds a fresh database and brings a database left by any earlier release up to date (idempotent, `IF NOT EXISTS`). Every later schema change is a new revision.

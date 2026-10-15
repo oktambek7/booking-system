@@ -42,3 +42,11 @@ services:
         sync: false
       - key: CLIENT_IP_HEADER
         value: cf-connecting-ip
+# To scale out, set RUN_BACKGROUND_JOBS=false on the API above and add a paid Background Worker
+# that runs the same image with the same environment variables:
+#
+#  - type: worker
+#    name: parda-cinema-worker
+#    runtime: docker
+#    rootDir: backend
+#    dockerCommand: python -m app.worker
