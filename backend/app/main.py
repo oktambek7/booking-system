@@ -14,6 +14,7 @@ from .models import Role, User
 from .notifications import (deliver_due_notifications, deliver_due_waitlist_notifications,
                             deliver_due_saved_movie_notifications, queue_saved_movie_notifications,
                             queue_waitlist_notifications, schedule_missing_reminders)
+from .ratelimit import purge_expired as purge_expired_rate_limits
 from .security import hash_password
 from .seed_demo import ensure_current_demo_schedule
 from .tmdb import TMDBUnavailable, sync_catalog
@@ -55,6 +56,7 @@ async def _booking_notification_loop() -> None:
     while True:
         try:
             await asyncio.to_thread(schedule_missing_reminders)
+            await asyncio.to_thread(purge_expired_rate_limits)
             waitlist_queued = await asyncio.to_thread(queue_waitlist_notifications)
             saved_movie_queued = await asyncio.to_thread(queue_saved_movie_notifications)
             delivered = await asyncio.to_thread(deliver_due_notifications)
@@ -77,7 +79,7 @@ async def lifespan(app: FastAPI):
         # Apply only additive schema migrations here. 001_cinema_constraints.sql
         # contains a PL/pgSQL DO block and must not be split on semicolons; the
         # exclusion constraint is installed idempotently just below.
-        for migration_name in ("002_persistent_product_data.sql", "003_email_verification_and_hall_type.sql", "004_booking_history_archive.sql", "005_demo_card_payments.sql", "006_catalog_screening_links.sql", "007_password_reset.sql", "008_cinematica_hall_directory.sql", "009_ticket_checkin.sql", "010_booking_notifications.sql", "011_screening_waitlist.sql", "012_movie_watchlists.sql", "013_cinematica_movie_identity.sql", "014_promotions_and_parda_pass.sql", "015_cinematica_response_cache.sql", "016_user_profile_avatar.sql"):
+        for migration_name in ("002_persistent_product_data.sql", "003_email_verification_and_hall_type.sql", "004_booking_history_archive.sql", "005_demo_card_payments.sql", "006_catalog_screening_links.sql", "007_password_reset.sql", "008_cinematica_hall_directory.sql", "009_ticket_checkin.sql", "010_booking_notifications.sql", "011_screening_waitlist.sql", "012_movie_watchlists.sql", "013_cinematica_movie_identity.sql", "014_promotions_and_parda_pass.sql", "015_cinematica_response_cache.sql", "016_user_profile_avatar.sql", "017_rate_limit_buckets.sql"):
             migration = migrations / migration_name
             for statement in migration.read_text(encoding="utf-8").split(";"):
                 if statement.strip():

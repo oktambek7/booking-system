@@ -334,3 +334,9 @@ class PaymentEmailChallenge(Base):
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+class RateLimitBucket(Base):
+    __tablename__ = "rate_limit_buckets"
+    key: Mapped[str] = mapped_column(String(160), primary_key=True)
+    window_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+    hits: Mapped[int] = mapped_column(Integer, default=0)

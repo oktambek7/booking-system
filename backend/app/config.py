@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     brevo_from: str = ""
     otp_secret: str = ""
     app_environment: str = "development"
+    rate_limit_enabled: bool = True
+    # Header carrying the real caller address behind a proxy (Render: cf-connecting-ip).
+    # Empty means use the socket peer; never trust a header the proxy does not overwrite.
+    client_ip_header: str = ""
     admin_email: str = ""
     admin_password: str = ""
     admin_nickname: str = "admin"

@@ -10,7 +10,8 @@ import sqlalchemy as sa
 from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
+from . import ratelimit
 from .database import get_db
 from .models import (Auditorium, Booking, BookingSeat, BookingStatus, EmailOtpChallenge, Movie,
                      PasswordResetChallenge, Payment, PaymentEmailChallenge, Promotion, PromotionRedemption, Role, Screening, Seat, User, WaitlistEntry, MovieWatchlist, BookingNotification, WaitlistNotification, MovieWatchlistNotification)
@@ -36,6 +37,17 @@ admin = Depends(require_roles(Role.ADMIN))
 ACTIVE_STATUSES = (BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.COMPLETED)
 HOLD_MINUTES = 10
 PAYMENT_CODE_MINUTES = 5
+# Abuse limits: (max events, window seconds). Per-IP limits are generous because
+# mobile carriers often share one address between many customers; the per-account
+# failure counters are what actually stop password and code guessing.
+LOGIN_IP_LIMIT = (60, 300)
+LOGIN_ACCOUNT_IP_FAILURES = (5, 900)     # one account guessed from one address
+LOGIN_ACCOUNT_FAILURES = (20, 3600)      # one account guessed from many addresses
+REGISTER_IP_LIMIT = (20, 3600)
+EMAIL_RESEND_IP_LIMIT = (20, 3600)
+CODE_IP_LIMIT = (60, 600)
+CODE_ACCOUNT_FAILURES = (10, 1800)
+RESET_REQUEST_IP_LIMIT = (20, 3600)
 PAYMENT_CODE_MAX_ATTEMPTS = 5
 PAYMENT_RESEND_LIMIT = 3
 EMAIL_RESEND_COOLDOWN_SECONDS = 120
@@ -226,7 +238,7 @@ def create_promotion(data: PromotionIn, db: Session = Depends(get_db), _: User =
     db.refresh(item)
     return item
 
-@router.post("/auth/register", status_code=201)
+@router.post("/auth/register", status_code=201, dependencies=[ratelimit.per_ip("register", *REGISTER_IP_LIMIT)])
 def register(data: UserCreate, db: Session = Depends(get_db)):
     nickname=data.nickname.strip().lower()
     email = str(data.email).lower()
@@ -273,7 +285,7 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
     return EmailChallengeOut(email=user.email, expires_at=challenge.expires_at,
         resend_available_at=_resend_available_at(), demo_mode=is_demo, demo_code=code if is_demo else None)
 
-@router.post("/auth/email/resend", response_model=EmailChallengeOut)
+@router.post("/auth/email/resend", response_model=EmailChallengeOut, dependencies=[ratelimit.per_ip("email-resend", *EMAIL_RESEND_IP_LIMIT)])
 def resend_email_code(data: EmailResend, db: Session = Depends(get_db)):
     email = str(data.email).lower()
     user = db.scalar(sa.select(User).where(User.email == email, User.active.is_(True)))
@@ -300,8 +312,10 @@ def resend_email_code(data: EmailResend, db: Session = Depends(get_db)):
     return EmailChallengeOut(email=user.email, expires_at=challenge.expires_at,
         resend_available_at=_resend_available_at(), demo_mode=is_demo, demo_code=code if is_demo else None)
 
-@router.post("/auth/email/verify")
+@router.post("/auth/email/verify", dependencies=[ratelimit.per_ip("email-verify", *CODE_IP_LIMIT)])
 def verify_email(data: EmailCodeVerify, db: Session = Depends(get_db)):
+    email_key = str(data.email).lower()
+    ratelimit.check("email-verify-fail", email_key, *CODE_ACCOUNT_FAILURES)
     user = db.scalar(sa.select(User).where(User.email == str(data.email).lower()).with_for_update())
     if not user or not user.active:
         raise HTTPException(404, "Account awaiting verification was not found")
@@ -318,6 +332,7 @@ def verify_email(data: EmailCodeVerify, db: Session = Depends(get_db)):
     if not email_code_matches(user.id, data.code, challenge.code_hash):
         challenge.attempts += 1
         db.commit()
+        ratelimit.record_failure("email-verify-fail", email_key, CODE_ACCOUNT_FAILURES[1])
         raise HTTPException(422, "Incorrect verification code")
     challenge.consumed_at = now
     user.email_verified = True
@@ -325,15 +340,23 @@ def verify_email(data: EmailCodeVerify, db: Session = Depends(get_db)):
     return {"access_token": make_token(user), "token_type": "bearer", "user": _user_payload(user)}
 
 @router.post("/auth/login", response_model=Token)
-def login(data: Login, db: Session = Depends(get_db)):
-    user = db.scalar(sa.select(User).where(User.email == data.email.lower()))
+def login(data: Login, request: Request, db: Session = Depends(get_db)):
+    email = data.email.lower()
+    ip = ratelimit.client_ip(request)
+    ratelimit.hit("login-ip", ip, *LOGIN_IP_LIMIT)
+    ratelimit.check("login-fail-ip", f"{email}|{ip}", *LOGIN_ACCOUNT_IP_FAILURES)
+    ratelimit.check("login-fail", email, *LOGIN_ACCOUNT_FAILURES)
+    user = db.scalar(sa.select(User).where(User.email == email))
     if not user or not verify_password(data.password, user.password_hash) or not user.active:
+        ratelimit.record_failure("login-fail-ip", f"{email}|{ip}", LOGIN_ACCOUNT_IP_FAILURES[1])
+        ratelimit.record_failure("login-fail", email, LOGIN_ACCOUNT_FAILURES[1])
         raise HTTPException(401, "Email or password is incorrect")
+    ratelimit.reset("login-fail-ip", f"{email}|{ip}")
     if not user.email_verified:
         raise HTTPException(403, "Verify your email before signing in")
     return Token(access_token=make_token(user))
 
-@router.post("/auth/password-reset/request", response_model=EmailChallengeOut)
+@router.post("/auth/password-reset/request", response_model=EmailChallengeOut, dependencies=[ratelimit.per_ip("reset-request", *RESET_REQUEST_IP_LIMIT)])
 def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get_db)):
     """Start a reset without revealing whether an address owns an account."""
     email = str(data.email).lower()
@@ -367,8 +390,10 @@ def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get
     return EmailChallengeOut(email=email, expires_at=challenge.expires_at,
                              resend_available_at=_resend_available_at(), demo_mode=is_demo, demo_code=code if is_demo else None)
 
-@router.post("/auth/password-reset/confirm")
+@router.post("/auth/password-reset/confirm", dependencies=[ratelimit.per_ip("reset-confirm", *CODE_IP_LIMIT)])
 def confirm_password_reset(data: PasswordResetConfirm, db: Session = Depends(get_db)):
+    email_key = str(data.email).lower()
+    ratelimit.check("reset-confirm-fail", email_key, *CODE_ACCOUNT_FAILURES)
     user = db.scalar(sa.select(User).where(User.email == str(data.email).lower(), User.active.is_(True)).with_for_update())
     if not user:
         raise HTTPException(422, "The code or email is not valid")
@@ -383,6 +408,7 @@ def confirm_password_reset(data: PasswordResetConfirm, db: Session = Depends(get
     if not email_code_matches(user.id, data.code, challenge.code_hash):
         challenge.attempts += 1
         db.commit()
+        ratelimit.record_failure("reset-confirm-fail", email_key, CODE_ACCOUNT_FAILURES[1])
         raise HTTPException(422, "The code or email is not valid")
     challenge.consumed_at = now
     user.password_hash = hash_password(data.password)

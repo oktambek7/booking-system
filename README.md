@@ -131,6 +131,7 @@ Set `VITE_API_URL` to the API origin and redeploy. Set the API `CORS_ORIGINS` to
 ## Booking and data safeguards
 
 - Passwords and email-code digests are HMAC-protected, expire, and have attempt limits.
+- Sign-in, registration, verification-code and password-reset endpoints are rate limited with PostgreSQL-backed counters (shared across API instances). Repeated wrong passwords lock an account/address pair for 15 minutes (HTTP 429 with `Retry-After`); code guessing is capped per account. Set `CLIENT_IP_HEADER` (Render: `cf-connecting-ip`) so limits use the real caller address; leave it empty when the API is not behind a proxy that overwrites that header.
 - API validates seat ownership and availability and calculates prices from current screening/seat data. A pending booking holds seats for ten minutes.
 - Row locks and a partial unique index on active `(screening_id, seat_id)` assignments prevent competing bookings from taking the same seat. Collisions return HTTP 409.
 - A PostgreSQL exclusion constraint prevents overlapping screenings in one hall. Cancelled and expired holds release seats while retaining booking history.
