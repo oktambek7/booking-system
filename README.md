@@ -128,6 +128,14 @@ public users cannot self-assign roles.
 
 Set `VITE_API_URL` to the API origin and redeploy. Set the API `CORS_ORIGINS` to the exact Vercel site origin.
 
+## Operations: health, logs, headers
+
+- `GET /health` is readiness: it answers 200 only while the database responds and 503 within three seconds otherwise (it uses its own one-connection pool, so a stuck database cannot hang it or starve requests). Point hosting health checks here. `GET /health/live` is liveness only and never touches the database; the Docker `HEALTHCHECK` uses it so a database outage does not get a healthy process killed.
+- Every response carries `X-Request-ID` (a valid incoming one is kept, otherwise one is generated). The same id is on every log line written while the request runs and in the body of unexpected 500 errors, so a customer's report can be matched to the logs. Logs are JSON in production (`LOG_FORMAT=json|text`, `LOG_LEVEL`), one `parda.access` line per request with method, path, status and duration; health probes log at DEBUG.
+- All API responses send `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` and a restrictive `Permissions-Policy`; responses to authenticated requests are `Cache-Control: no-store`; production adds HSTS.
+- The container runs as an unprivileged user.
+- **Client addresses and rate limits.** In production the browser talks to Vercel, which rewrites `/api/*` to Render, so the API sees Vercel's address unless a header carries the customer's. `CLIENT_IP_HEADER` names that header (`x-forwarded-for`, first entry, by default in `render.yaml`). Check it after each deploy: sign in as an operator and open `/api/admin/diagnostics/client-ip` on the live site. `resolved_ip` must be your own address; if it is a Vercel/Render address, every customer shares one rate-limit bucket and the header setting needs to change.
+
 ## Background jobs and scaling
 
 Booking and waitlist e-mails, reminders and the Cinematica/TMDB refreshes run as scheduled jobs (`backend/app/jobs.py`).

@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     brevo_from: str = ""
     otp_secret: str = ""
     app_environment: str = "development"
+    log_level: str = "INFO"
+    # "json" for log search in production, "text" for a terminal. Empty = json in production, text otherwise.
+    log_format: str = ""
     rate_limit_enabled: bool = True
     # Scheduled catalogue refreshes and notification delivery. Tests turn this off; a
     # dedicated worker deployment can turn it off on web instances.

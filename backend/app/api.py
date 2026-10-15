@@ -439,6 +439,17 @@ def logout_all_devices(db: Session = Depends(get_db), user: User = Depends(curre
     db.execute(update(User).where(User.id == user.id).values(token_version=User.token_version + 1))
     db.commit()
 
+@router.get("/admin/diagnostics/client-ip")
+def client_ip_diagnostics(request: Request, _: User = admin):
+    """Show which proxy header carries the caller's real address, so CLIENT_IP_HEADER can be set correctly.
+
+    Per-address rate limits are only as good as this value: behind a proxy that does not forward
+    the customer's address, every customer would share one limit bucket."""
+    names = ("x-forwarded-for", "x-real-ip", "x-vercel-forwarded-for", "cf-connecting-ip", "true-client-ip")
+    return {"resolved_ip": ratelimit.client_ip(request), "configured_header": settings.client_ip_header or None,
+            "socket_peer": request.client.host if request.client else None,
+            "headers": {name: request.headers.get(name) for name in names}}
+
 @router.get("/auth/me")
 def me(user: User = Depends(current_user)):
     return _user_payload(user)

@@ -41,7 +41,7 @@ services:
       - key: CORS_ORIGINS
         sync: false
       - key: CLIENT_IP_HEADER
-        value: cf-connecting-ip
+        value: x-forwarded-for
 # To scale out, set RUN_BACKGROUND_JOBS=false on the API above and add a paid Background Worker
 # that runs the same image with the same environment variables:
 #

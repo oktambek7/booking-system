@@ -1,19 +1,23 @@
 from contextlib import asynccontextmanager
+import asyncio
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select
+from fastapi.responses import JSONResponse
+from sqlalchemy import select, text
 from . import models  # noqa: F401  (registers every table on Base.metadata)
 from . import jobs
 from .api import router
 from .cinematica import router as cinematica_router
 from .config import settings
-from .database import SessionLocal
+from .database import SessionLocal, health_engine
 from .migrate import assert_schema_current, upgrade_to_head
 from .models import Role, User
+from .observability import RequestContextMiddleware, configure_logging
 from .security import hash_password
 from .seed_demo import ensure_current_demo_schedule
 
+configure_logging()
 logger = logging.getLogger(__name__)
 
 @asynccontextmanager
@@ -92,10 +96,35 @@ def _ensure_operator_bootstrap() -> None:
 
 app = FastAPI(title="Booking System API", version="0.1.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=[x.strip() for x in settings.cors_origins.split(",") if x.strip()],
-                   allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+                   allow_credentials=True, allow_methods=["*"], allow_headers=["*"], expose_headers=["X-Request-ID"])
+app.add_middleware(RequestContextMiddleware)    # added last = outermost: request ids and headers cover every response
 app.include_router(router)
 app.include_router(cinematica_router)
 
-@app.get("/health")
-def health():
+HEALTH_TIMEOUT_SECONDS = 3.0
+
+def _ping_database() -> None:
+    with health_engine.connect() as conn:
+        conn.execute(text("SELECT 1"))
+
+async def _database_reachable() -> bool:
+    # A database that stops answering without closing the socket would block the ping forever,
+    # so the answer is bounded here rather than relying on driver timeouts.
+    try:
+        await asyncio.wait_for(asyncio.to_thread(_ping_database), HEALTH_TIMEOUT_SECONDS)
+        return True
+    except Exception:
+        logger.warning("Health check: database unreachable", exc_info=True)
+        return False
+
+@app.get("/health/live")
+def health_live():
+    """Liveness: the process is up and serving. Never touches the database."""
     return {"status": "ok"}
+
+@app.get("/health")
+async def health():
+    """Readiness: the API can reach its database. This is the path hosting health checks should use."""
+    if await _database_reachable():
+        return {"status": "ok", "database": "ok"}
+    return JSONResponse(status_code=503, content={"status": "unavailable", "database": "unreachable"})

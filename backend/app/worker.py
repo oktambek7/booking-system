@@ -13,6 +13,7 @@ import sys
 from . import jobs
 from .config import settings
 from .migrate import assert_schema_current, upgrade_to_head
+from .observability import configure_logging
 
 logger = logging.getLogger("parda.worker")
 
@@ -55,7 +56,7 @@ async def run_forever() -> None:
         logger.info("Parda worker stopped")
 
 def main(argv: list[str]) -> int:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    configure_logging()
     prepare()
     if "--once" in argv:
         results, failed = run_once()
