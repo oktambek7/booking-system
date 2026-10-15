@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { apiFetch } from './session'
 import { Armchair, CalendarDays, CheckCircle2, CircleDollarSign, Clapperboard, DoorOpen, Film, LayoutDashboard, LoaderCircle, Plus, RefreshCw, ScanLine, Ticket, Users, X } from 'lucide-react'
 import { calendarDate, formatDateTime, isoDateInTashkent } from './dateFormat'
 import Modal from './ui/Modal'
@@ -35,10 +36,10 @@ export default function OperatorDashboard({ api, token, onClose }: { api:string;
     setLoading(true); setError('')
     try {
       const [dashboardResult, moviesResult, hallsResult, promotionsResult] = await Promise.all([
-        fetch(`${api}/api/admin/dashboard?date=${day}`, { headers:headers(token) }),
-        fetch(`${api}/api/movies`, { headers:headers(token) }),
-        fetch(`${api}/api/admin/cinemas`, { headers:headers(token) }),
-        fetch(`${api}/api/admin/promotions`, { headers:headers(token) }),
+        apiFetch(`${api}/api/admin/dashboard?date=${day}`, { headers:headers(token) }),
+        apiFetch(`${api}/api/movies`, { headers:headers(token) }),
+        apiFetch(`${api}/api/admin/cinemas`, { headers:headers(token) }),
+        apiFetch(`${api}/api/admin/promotions`, { headers:headers(token) }),
       ])
       const payload = await dashboardResult.json()
       if (!dashboardResult.ok) throw new Error(payload.detail || 'Boshqaruv ma’lumotlari yuklanmadi.')
@@ -55,7 +56,7 @@ export default function OperatorDashboard({ api, token, onClose }: { api:string;
   async function submit(event:FormEvent<HTMLFormElement>, path:string, body:unknown, success:string) {
     event.preventDefault(); const form = event.currentTarget; setBusy(true); setNotice(''); setError('')
     try {
-      const result = await fetch(`${api}${path}`, { method:'POST', headers:headers(token), body:JSON.stringify(body) })
+      const result = await apiFetch(`${api}${path}`, { method:'POST', headers:headers(token), body:JSON.stringify(body) })
       const data = await result.json()
       if (!result.ok) throw new Error(data.detail || 'Saqlab bo‘lmadi.')
       setNotice(success); form.reset(); await load()
@@ -65,7 +66,7 @@ export default function OperatorDashboard({ api, token, onClose }: { api:string;
   async function updateBooking(booking:Booking, status:'cancelled'|'completed') {
     setBusy(true); setError(''); setNotice('')
     try {
-      const result = await fetch(`${api}/api/bookings/${booking.id}/status`, { method:'PATCH', headers:headers(token), body:JSON.stringify({ status }) })
+      const result = await apiFetch(`${api}/api/bookings/${booking.id}/status`, { method:'PATCH', headers:headers(token), body:JSON.stringify({ status }) })
       const data = await result.json()
       if (!result.ok) throw new Error(data.detail || 'Chipta holati yangilanmadi.')
       setNotice(status === 'completed' ? 'Seans yakunlangan deb belgilandi.' : 'Buyurtma bekor qilindi va joylar bo‘shatildi.')
@@ -78,7 +79,7 @@ export default function OperatorDashboard({ api, token, onClose }: { api:string;
     if (!ticketCode) return
     setBusy(true); setError(''); setNotice('')
     try {
-      const result = await fetch(`${api}/api/admin/tickets/check-in`, { method:'POST', headers:headers(token), body:JSON.stringify({ ticket_code:ticketCode }) })
+      const result = await apiFetch(`${api}/api/admin/tickets/check-in`, { method:'POST', headers:headers(token), body:JSON.stringify({ ticket_code:ticketCode }) })
       const data = await result.json()
       if (!result.ok) throw new Error(data.detail || 'Chipta tekshirilmadi.')
       setNotice(`${data.booking.movie_title} · ${data.booking.seats.join(', ')} uchun kirish tasdiqlandi.`)
@@ -89,7 +90,7 @@ export default function OperatorDashboard({ api, token, onClose }: { api:string;
   async function toggleHall(hall:Hall) {
     setBusy(true); setError(''); setNotice('')
     try {
-      const result = await fetch(`${api}/api/cinemas/${hall.id}`, { method:'PATCH', headers:headers(token), body:JSON.stringify({ active:hall.active === false }) })
+      const result = await apiFetch(`${api}/api/cinemas/${hall.id}`, { method:'PATCH', headers:headers(token), body:JSON.stringify({ active:hall.active === false }) })
       const data = await result.json()
       if (!result.ok) throw new Error(data.detail || 'Zal holati yangilanmadi.')
       setNotice(hall.active === false ? 'Zal qayta ochildi.' : 'Zal yangi seanslar uchun yopildi.')
@@ -100,7 +101,7 @@ export default function OperatorDashboard({ api, token, onClose }: { api:string;
   async function syncCatalog() {
     setBusy(true); setError(''); setNotice('')
     try {
-      const result = await fetch(`${api}/api/catalog/sync`, { method:'POST', headers:headers(token) })
+      const result = await apiFetch(`${api}/api/catalog/sync`, { method:'POST', headers:headers(token) })
       const data = await result.json()
       if (!result.ok) throw new Error(data.detail || 'TMDB katalogini yangilab bo‘lmadi.')
       setNotice(`${data.imported_now_playing} namoyishdagi va ${data.imported_upcoming} yaqin premyera yangilandi.`)

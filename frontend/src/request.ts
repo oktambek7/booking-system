@@ -1,3 +1,5 @@
+import { apiFetch } from './session'
+
 const pause = (milliseconds: number) => new Promise(resolve => window.setTimeout(resolve, milliseconds))
 
 /**
@@ -8,7 +10,7 @@ export async function requestWithRetry(url: string, init: RequestInit, retries =
   let lastError: unknown
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     try {
-      return await fetch(url, init)
+      return await apiFetch(url, init)
     } catch (error) {
       lastError = error
       if (attempt < retries) await pause(1000 * (attempt + 1))

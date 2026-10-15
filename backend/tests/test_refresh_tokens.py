@@ -172,6 +172,13 @@ class CrossSiteTests(SessionCase):
             self.assertEqual(resp.status_code, 403, path)
         self.assertEqual(self.refresh(token).status_code, 200, "the token must still be intact")
 
+    def test_the_browsers_same_origin_signal_is_trusted_but_cross_site_is_not(self):
+        _, _, token = self.sign_in()
+        foreign = {"Origin": "https://not-in-the-configured-list.example"}
+        self.assertEqual(self.refresh(token, **foreign, **{"Sec-Fetch-Site": "same-origin"}).status_code, 200)
+        _, _, token = self.sign_in()
+        self.assertEqual(self.refresh(token, **foreign, **{"Sec-Fetch-Site": "cross-site"}).status_code, 403)
+
     def test_the_configured_frontend_origin_is_accepted(self):
         _, _, token = self.sign_in()
         origin = settings.cors_origins.split(",")[0]

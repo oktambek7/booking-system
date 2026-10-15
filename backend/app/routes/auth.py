@@ -48,6 +48,8 @@ def _access_seconds() -> int:
 def require_trusted_origin(request: Request) -> None:
     """Cookie-authenticated calls must come from our own pages. SameSite=Strict already stops browsers sending
     the cookie cross-site; this is the second line of defence."""
+    if request.headers.get("sec-fetch-site") == "same-origin":
+        return          # set by the browser itself and not forgeable by page script
     origin = request.headers.get("origin")
     if not origin:
         return

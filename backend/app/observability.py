@@ -49,8 +49,18 @@ class JsonFormatter(logging.Formatter):
             entry["exception"] = self.formatException(record.exc_info)
         return json.dumps(entry, ensure_ascii=False, default=str)
 
+def make_stream_tolerant(stream) -> None:
+    """Never lose a log line to an encoding error: film titles and URLs here are Uzbek, Russian and English, and a
+    console or redirected file may use a legacy code page (cp1252 on Windows). Unencodable characters become escapes."""
+    try:
+        stream.reconfigure(errors="backslashreplace")
+    except (AttributeError, ValueError):
+        pass
+
 def configure_logging() -> None:
     """Idempotent: safe to call from the API and the worker, and again in tests."""
+    make_stream_tolerant(sys.stdout)
+    make_stream_tolerant(sys.stderr)
     logging.setLogRecordFactory(_record_factory)
     root = logging.getLogger()
     root.setLevel(settings.log_level.upper())

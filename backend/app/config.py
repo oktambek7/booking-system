@@ -7,7 +7,8 @@ EMAIL_MODES = {"mock", "smtp", "resend", "brevo"}
 class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://booking:booking@localhost:5432/booking"
     jwt_secret: str = DEFAULT_JWT_SECRET
-    jwt_expire_minutes: int = 1440
+    # Access tokens are short-lived; the browser renews them silently with its refresh cookie.
+    jwt_expire_minutes: int = 15
     # Browser sessions: the refresh token lives in an httpOnly cookie and rotates on every use.
     # A rotated token replayed after the grace period revokes the whole sign-in (it was copied).
     refresh_token_days: int = 30

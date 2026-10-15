@@ -184,6 +184,15 @@ class LoggingTests(unittest.TestCase):
             settings.log_format = original[0]
             configure_logging()
 
+    def test_logging_non_ascii_text_survives_a_legacy_console_encoding(self):
+        import io
+        stream = io.TextIOWrapper(io.BytesIO(), encoding="cp1252", errors="strict", write_through=True)
+        with self.assertRaises(UnicodeEncodeError):
+            stream.write("Руки Вверх 2!")                      # what used to happen to such a log line
+        observability.make_stream_tolerant(stream)
+        stream.write("Руки Вверх 2!\n")
+        self.assertIn(b"\\u0420", stream.buffer.getvalue())   # escaped instead of dropped
+
     def test_records_get_the_request_id_from_any_logger(self):
         token = request_id_var.set("req-from-context")
         try:

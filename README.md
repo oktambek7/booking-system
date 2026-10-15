@@ -129,7 +129,7 @@ public users cannot self-assign roles.
 
 Set `VITE_API_URL` to the API origin and redeploy. Set the API `CORS_ORIGINS` to the exact Vercel site origin.
 
-`frontend/vercel.json` also sets the browser security headers: a strict Content-Security-Policy (scripts only from the site itself, no inline script or `eval`, no framing, no plugins; images from any HTTPS host because film posters come from Cinematica and TMDB), HSTS, `nosniff`, `X-Frame-Options: DENY`, a referrer policy, a permissions policy that allows only geolocation (for "cinemas near me"), and long-lived caching for hashed `/assets`. `npm run check:headers` (run in CI after the build) fails if the policy is loosened or if the built page needs inline script. If a feature needs a new origin (an analytics host, an embedded player, a camera), add exactly that origin to the matching directive and re-test in a browser; the policy was verified against the catalogue, film page, sign-in dialog and seat map with no violations.
+`frontend/vercel.json` also sets the browser security headers: a strict Content-Security-Policy (scripts only from the site itself, no inline script or `eval`, no framing, no plugins; images from any HTTPS host because film posters come from Cinematica and TMDB), HSTS, `nosniff`, `X-Frame-Options: DENY`, a referrer policy, a permissions policy that allows only geolocation (for "cinemas near me"), and long-lived caching for hashed `/assets`. `npm test` runs the session unit tests (Vitest) and `npm run check:headers` (run in CI after the build) fails if the policy is loosened or if the built page needs inline script. If a feature needs a new origin (an analytics host, an embedded player, a camera), add exactly that origin to the matching directive and re-test in a browser; the policy was verified against the catalogue, film page, sign-in dialog and seat map with no violations.
 
 ## Operations: health, logs, headers
 
@@ -142,6 +142,10 @@ Set `VITE_API_URL` to the API origin and redeploy. Set the API `CORS_ORIGINS` to
 ## Sessions
 
 Signing in returns a short-lived access token (`expires_in` seconds, `JWT_EXPIRE_MINUTES`) and sets a **refresh token in an `httpOnly` cookie** (`parda_refresh`: `SameSite=Strict`, `Secure` in production, path `/api/auth`) that page scripts cannot read. `POST /api/auth/refresh` trades the cookie for a new access token and **rotates** the cookie; only a SHA-256 hash of each refresh token is stored. If a token that was already rotated is presented again after `REFRESH_REUSE_GRACE_SECONDS` (default 10, which covers two tabs refreshing at once), it was copied: the whole sign-in is revoked, an `auth.refresh_reuse_detected` audit entry is written, and the user must sign in again. Sessions last `REFRESH_TOKEN_DAYS` (30) from last use and at most `REFRESH_FAMILY_MAX_DAYS` (90) from sign-in. `POST /api/auth/logout` ends this browser's session; "sign out of all devices" and a password reset end every session. Refresh and logout also refuse requests from origins outside `CORS_ORIGINS`.
+
+### Browser session handling
+
+The access token is kept only in memory (`frontend/src/session.ts`), never in `localStorage`. On load the page asks `/api/auth/refresh` (using the httpOnly cookie) for a token, so a reload or a new tab stays signed in; the token is renewed in the background a minute before it expires, and a request that still gets a 401 triggers one shared refresh and a retry. If the session has really ended (signed out elsewhere, cookie revoked or expired) the app returns to the signed-out state with a message; a network failure never signs anyone out. Every API call goes through `apiFetch`. Visitors signed in with the old `localStorage` token before this change are signed out once.
 
 ## Audit log
 
