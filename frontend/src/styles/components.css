@@ -20,7 +20,7 @@
     box-shadow: var(--glass-highlight);
   }
   .glass-3,
-  .auth-dialog, .confirm-dialog, .ticket-dialog, .seat-dialog, .payment-dialog, .history-drawer, .notification-drawer, .profile-drawer, .operator-shell-panel {
+  .auth-dialog, .confirm-dialog, .ticket-dialog, .offline-tickets, .seat-dialog, .payment-dialog, .history-drawer, .notification-drawer, .profile-drawer, .operator-shell-panel {
     background: var(--glass-3-bg);
     -webkit-backdrop-filter: var(--glass-3-blur);
     backdrop-filter: var(--glass-3-blur);
@@ -210,7 +210,7 @@
   }
   .modal-scrim.profile-scrim, .modal-scrim:has(> .history-drawer), .modal-scrim:has(> .notification-drawer) { place-items: end stretch; padding: 0; }
 
-  .auth-dialog, .confirm-dialog, .ticket-dialog, .payment-dialog {
+  .auth-dialog, .confirm-dialog, .ticket-dialog, .offline-tickets, .payment-dialog {
     position: relative; width: min(100%, 440px); max-height: min(92dvh, 860px); overflow-y: auto;
     padding: var(--s-5) var(--s-4) var(--s-4);
     border-radius: var(--r-lg);

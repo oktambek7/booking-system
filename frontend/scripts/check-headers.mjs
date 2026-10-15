@@ -30,6 +30,24 @@ need(/geolocation=\(self\)/.test(header('Permissions-Policy') ?? ''), 'Permissio
 need(/camera=\(self\)/.test(header('Permissions-Policy') ?? ''), 'Permissions-Policy must allow the camera for our own pages only (ticket scanner)')
 need(/microphone=\(\)/.test(header('Permissions-Policy') ?? ''), 'Permissions-Policy must keep the microphone disabled')
 
+const worker = config.headers.find((rule) => rule.source === '/sw.js')
+need(/max-age=0|no-cache|no-store/.test(worker?.headers.find((h) => h.key.toLowerCase() === 'cache-control')?.value ?? ''), '/sw.js must be served with Cache-Control that forces revalidation')
+need(directives['worker-src']?.includes("'self'"), "worker-src must allow 'self' for the service worker")
+need(directives['manifest-src']?.includes("'self'"), "manifest-src must allow 'self'")
+
+const publicDir = new URL('../public/', import.meta.url)
+const manifestFile = new URL('manifest.webmanifest', publicDir)
+if (!fs.existsSync(manifestFile)) problems.push('public/manifest.webmanifest is missing')
+else {
+  const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'))
+  need(manifest.name && manifest.short_name && manifest.start_url === '/' && manifest.display === 'standalone', 'manifest needs name, short_name, start_url "/" and display "standalone"')
+  const sizes = (manifest.icons ?? []).map((icon) => icon.sizes)
+  need(sizes.includes('192x192') && sizes.includes('512x512'), 'manifest needs 192x192 and 512x512 icons')
+  need((manifest.icons ?? []).some((icon) => icon.purpose === 'maskable'), 'manifest needs a maskable icon')
+  for (const icon of manifest.icons ?? []) need(fs.existsSync(new URL('.' + icon.src, publicDir)), `manifest icon ${icon.src} does not exist in public/`)
+}
+need(fs.existsSync(new URL('sw.js', publicDir)), 'public/sw.js is missing')
+
 const dist = new URL('../dist/index.html', import.meta.url)
 if (fs.existsSync(dist)) {
   const html = fs.readFileSync(dist, 'utf8')

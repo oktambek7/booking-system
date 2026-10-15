@@ -121,6 +121,17 @@
   .profile-privacy-actions { display: flex; flex-wrap: wrap; gap: var(--s-2); }
   .profile-privacy-danger { justify-self: start; min-height: 40px; padding: 0 var(--s-4); border-radius: var(--r-pill); border: 1px solid color-mix(in srgb, var(--danger-text) 55%, transparent); background: transparent; color: var(--danger-text); font: inherit; font-weight: 600; cursor: pointer; }
   .profile-privacy-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger-text) 14%, transparent); }
+  .offline-banner { position: sticky; top: 0; z-index: 60; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: var(--s-2) var(--s-3); padding: var(--s-2) var(--s-4); background: color-mix(in srgb, var(--warning-text) 22%, var(--bg, #0a0a18)); color: var(--text); font-size: var(--fs-small); }
+  .offline-banner button { min-height: 32px; padding: 0 var(--s-3); border-radius: var(--r-pill); border: 1px solid color-mix(in srgb, var(--text) 40%, transparent); background: transparent; color: var(--text); font: inherit; font-weight: 600; cursor: pointer; }
+  .offline-tickets { width: min(32rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); overflow: auto; padding: var(--s-4); }
+  .offline-tickets-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); }
+  .offline-tickets-head h2 { margin: 0; }
+  .offline-tickets-note { margin: var(--s-2) 0 var(--s-3); font-size: var(--fs-small); color: var(--text-2); }
+  .offline-ticket-list { display: grid; gap: var(--s-3); margin: 0; padding: 0; list-style: none; }
+  .offline-ticket { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); padding: var(--s-3); border-radius: var(--r-md); border: 1px solid color-mix(in srgb, var(--text) 16%, transparent); }
+  .offline-ticket h3 { margin: 0 0 var(--s-1); font-size: var(--fs-body); }
+  .offline-ticket p { margin: 0; font-size: var(--fs-small); color: var(--text-2); }
+  .offline-ticket svg { flex: none; background: #fff; border-radius: var(--r-sm); }
   .profile-signout { width: 100%; margin-top: var(--s-5); }
 
   @media (min-width: 481px) {
