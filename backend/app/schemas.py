@@ -322,3 +322,21 @@ class CinemaDirectorySyncOut(BaseModel):
 
 class MovieDetailsOut(MovieOut):
     trailer_url: str | None = None
+
+
+class AuditLogOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    created_at: datetime
+    actor_id: int | None
+    actor_email: str | None
+    action: str
+    target_type: str | None
+    target_id: str | None
+    details: dict
+    request_id: str | None
+    ip: str | None
+
+class AuditLogPage(BaseModel):
+    items: list[AuditLogOut]
+    next_before_id: int | None

@@ -7,6 +7,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 
+from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.runtime.migration import MigrationContext
 from sqlalchemy import create_engine, text
@@ -66,12 +67,30 @@ class MigrationTests(unittest.TestCase):
                 conn.execute(text("DROP TABLE alembic_version"))
                 conn.execute(text("DROP TABLE rate_limit_buckets"))
                 conn.execute(text("ALTER TABLE users DROP COLUMN token_version"))
+                conn.execute(text("DROP TABLE audit_log"))                    # created by a revision after the baseline
+                conn.execute(text("DROP FUNCTION audit_log_guard()"))
             self.assertFalse(migrate.is_current(engine))
             migrate.upgrade_to_head(engine)
             self.assertTrue(migrate.is_current(engine))
             self.assertEqual(scalar(engine, "SELECT parda_points FROM users WHERE email = 'old@example.com'"), 120)
             self.assertEqual(scalar(engine, "SELECT token_version FROM users WHERE email = 'old@example.com'"), 0)
             self.assertIsNotNone(scalar(engine, "SELECT to_regclass('public.rate_limit_buckets')"))
+
+    def test_the_latest_revision_can_be_rolled_back_and_applied_again(self):
+        with scratch_engine() as engine:
+            migrate.upgrade_to_head(engine)
+            config = migrate.alembic_config()
+            with engine.connect() as conn:
+                config.attributes["connection"] = conn
+                command.downgrade(config, "-1")
+                conn.commit()
+            self.assertEqual(migrate.current_revision(engine), "0001")
+            self.assertIsNone(scalar(engine, "SELECT to_regclass('public.audit_log')"))
+            self.assertEqual(scalar(engine, "SELECT count(*) FROM pg_proc WHERE proname = 'audit_log_guard'"), 0)
+            migrate.upgrade_to_head(engine)
+            self.assertTrue(migrate.is_current(engine))
+            self.assertIsNotNone(scalar(engine, "SELECT to_regclass('public.audit_log')"))
+            self.assertEqual(scalar(engine, "SELECT count(*) FROM pg_trigger WHERE tgname = 'audit_log_guard'"), 1)
 
     def test_models_and_migrations_have_not_drifted(self):
         """Adding a model or column without a migration must fail here, not in production."""

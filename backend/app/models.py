@@ -3,6 +3,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from sqlalchemy import (BigInteger, Boolean, CheckConstraint, Date, DateTime, Enum, ForeignKey, Index, JSON,
                         Integer, Numeric, String, Text, UniqueConstraint, func, text)
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .database import Base
 
@@ -342,3 +343,18 @@ class RateLimitBucket(Base):
     key: Mapped[str] = mapped_column(String(160), primary_key=True)
     window_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
     hits: Mapped[int] = mapped_column(Integer, default=0)
+
+class AuditLog(Base):
+    """Who did what. Append-only (a trigger enforces it); see alembic revision 0002."""
+    __tablename__ = "audit_log"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+    actor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
+    actor_email: Mapped[str | None] = mapped_column(String(320))
+    action: Mapped[str] = mapped_column(String(60), index=True)
+    target_type: Mapped[str | None] = mapped_column(String(30))
+    target_id: Mapped[str | None] = mapped_column(String(64))
+    details: Mapped[dict] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    request_id: Mapped[str | None] = mapped_column(String(64))
+    ip: Mapped[str | None] = mapped_column(String(45))
+    __table_args__ = (Index("ix_audit_log_target", "target_type", "target_id"),)

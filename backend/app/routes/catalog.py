@@ -12,6 +12,7 @@ from ..schemas import (AuditoriumIn, AuditoriumOut, AuditoriumUpdate, NearbyAudi
                       ScreeningSeatsOut, SeatOut, WaitlistIn, WaitlistOut)
 from ..security import current_user, require_roles
 from ..services import ACTIVE_STATUSES, auditorium_out, expire_holds, screening_out
+from ..audit import record
 
 router = APIRouter()
 admin = Depends(require_roles(Role.ADMIN))
@@ -38,24 +39,30 @@ def movie_details(movie_id: int, db: Session = Depends(get_db)):
     return movie
 
 @router.post("/movies", response_model=MovieOut, status_code=201)
-def create_movie(data: MovieIn, db: Session = Depends(get_db), _: User = admin):
+def create_movie(data: MovieIn, db: Session = Depends(get_db), actor: User = admin):
     movie = Movie(**data.model_dump())
-    db.add(movie); db.commit(); db.refresh(movie)
+    db.add(movie); db.flush()
+    record(db, actor, "movie.created", "movie", movie.id, title=movie.title)
+    db.commit(); db.refresh(movie)
     return movie
 
 @router.patch("/movies/{movie_id}", response_model=MovieOut)
-def update_movie(movie_id: int, data: MovieIn, db: Session = Depends(get_db), _: User = admin):
+def update_movie(movie_id: int, data: MovieIn, db: Session = Depends(get_db), actor: User = admin):
     movie = db.get(Movie, movie_id)
     if not movie: raise HTTPException(404, "Movie not found")
+    changed = [key for key, value in data.model_dump().items() if getattr(movie, key) != value]
     for key, value in data.model_dump().items(): setattr(movie, key, value)
+    record(db, actor, "movie.updated", "movie", movie.id, fields=changed)
     db.commit(); db.refresh(movie)
     return movie
 
 @router.delete("/movies/{movie_id}", status_code=204)
-def archive_movie(movie_id: int, db: Session = Depends(get_db), _: User = admin):
+def archive_movie(movie_id: int, db: Session = Depends(get_db), actor: User = admin):
     movie = db.get(Movie, movie_id)
     if not movie: raise HTTPException(404, "Movie not found")
-    movie.active = False; db.commit()
+    movie.active = False
+    record(db, actor, "movie.archived", "movie", movie.id, title=movie.title)
+    db.commit()
 
 @router.get("/cinemas/nearby", response_model=list[NearbyAuditoriumOut])
 def nearby_cinemas(lat: float = Query(ge=-90, le=90), lng: float = Query(ge=-180, le=180),
@@ -78,7 +85,7 @@ def cinemas(city: str | None = None, db: Session = Depends(get_db)):
     return [auditorium_out(a) for a in db.scalars(q.order_by(Auditorium.cinema_name, Auditorium.name)).all()]
 
 @router.post("/cinemas", response_model=AuditoriumOut, status_code=201)
-def create_cinema(data: AuditoriumIn, db: Session = Depends(get_db), _: User = admin):
+def create_cinema(data: AuditoriumIn, db: Session = Depends(get_db), actor: User = admin):
     try: ZoneInfo(data.timezone)
     except ZoneInfoNotFoundError: raise HTTPException(422, "Unknown timezone")
     auditorium = Auditorium(name=data.name.strip(), cinema_name=data.cinema_name.strip(), city=data.city,
@@ -88,11 +95,13 @@ def create_cinema(data: AuditoriumIn, db: Session = Depends(get_db), _: User = a
     auditorium.seats=[Seat(row_label=alphabet[row], seat_number=n,
                             seat_type="premium" if row < 2 else "standard")
                        for row in range(data.row_count) for n in range(1,data.seats_per_row+1)]
-    db.add(auditorium); db.commit(); db.refresh(auditorium)
+    db.add(auditorium); db.flush()
+    record(db, actor, "cinema.created", "auditorium", auditorium.id, name=auditorium.name, seats=len(auditorium.seats))
+    db.commit(); db.refresh(auditorium)
     return auditorium_out(auditorium)
 
 @router.patch("/cinemas/{auditorium_id}", response_model=AuditoriumOut)
-def update_cinema(auditorium_id: int, data: AuditoriumUpdate, db: Session = Depends(get_db), _: User = admin):
+def update_cinema(auditorium_id: int, data: AuditoriumUpdate, db: Session = Depends(get_db), actor: User = admin):
     auditorium = db.get(Auditorium, auditorium_id)
     if not auditorium:
         raise HTTPException(404, "Cinema hall not found")
@@ -101,6 +110,7 @@ def update_cinema(auditorium_id: int, data: AuditoriumUpdate, db: Session = Depe
         raise HTTPException(422, "Set latitude and longitude together")
     for key, value in values.items():
         setattr(auditorium, key, list(dict.fromkeys(value)) if key == "formats" and value else value)
+    record(db, actor, "cinema.updated", "auditorium", auditorium.id, fields=sorted(values))
     db.commit(); db.refresh(auditorium)
     return auditorium_out(auditorium)
 
@@ -127,7 +137,7 @@ def screenings(day: date = Query(alias="date"), movie_id: int | None = None,
     return rows
 
 @router.post("/screenings", response_model=ScreeningOut, status_code=201)
-def create_screening(data: ScreeningIn, db: Session = Depends(get_db), _: User = admin):
+def create_screening(data: ScreeningIn, db: Session = Depends(get_db), actor: User = admin):
     movie, room=db.get(Movie,data.movie_id),db.get(Auditorium,data.auditorium_id)
     if not movie or not movie.active or not room or not room.active:
         raise HTTPException(404,"Active movie or cinema hall not found")
@@ -144,7 +154,11 @@ def create_screening(data: ScreeningIn, db: Session = Depends(get_db), _: User =
     item=Screening(movie_id=movie.id,auditorium_id=room.id,starts_at=start,ends_at=end,
                    base_price=data.base_price,premium_surcharge=data.premium_surcharge,format_type=data.format_type)
     db.add(item)
-    try: db.commit()
+    try:
+        db.flush()
+        record(db, actor, "screening.created", "screening", item.id, movie_id=movie.id, auditorium_id=room.id,
+               starts_at=start.isoformat(), base_price=data.base_price)
+        db.commit()
     except IntegrityError:
         db.rollback(); raise HTTPException(409,"This cinema hall was just scheduled for that time")
     db.refresh(item)

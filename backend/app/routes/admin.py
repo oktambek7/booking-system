@@ -6,8 +6,8 @@ from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from .. import ratelimit
 from ..database import get_db
-from ..models import (Auditorium, Booking, BookingStatus, Promotion, Role, Screening, User)
-from ..schemas import (AuditoriumOut, CatalogSyncOut, CinemaDirectorySyncOut, OperatorBookingOut,
+from ..models import (AuditLog, Auditorium, Booking, BookingStatus, Promotion, Role, Screening, User)
+from ..schemas import (AuditLogPage, AuditoriumOut, CatalogSyncOut, CinemaDirectorySyncOut, OperatorBookingOut,
                       OperatorDashboardOut, OperatorMetricsOut, OperatorScreeningOut,
                       TicketCheckInIn, TicketCheckInOut, PromotionIn, PromotionOut)
 from ..security import require_roles
@@ -15,6 +15,7 @@ from ..config import settings
 from ..tmdb import TMDBUnavailable, sync_catalog
 from ..cinematica import sync_active_cinematica_halls
 from ..services import ACTIVE_STATUSES, auditorium_out, booking_out, expire_holds, screening_out
+from ..audit import record
 
 router = APIRouter()
 admin = Depends(require_roles(Role.ADMIN))
@@ -28,7 +29,7 @@ def list_promotions(db: Session = Depends(get_db), _: User = admin):
     return db.scalars(sa.select(Promotion).order_by(Promotion.created_at.desc())).all()
 
 @router.post("/admin/promotions", response_model=PromotionOut, status_code=201)
-def create_promotion(data: PromotionIn, db: Session = Depends(get_db), _: User = admin):
+def create_promotion(data: PromotionIn, db: Session = Depends(get_db), actor: User = admin):
     if data.ends_at and data.starts_at and data.ends_at <= data.starts_at:
         raise HTTPException(422, "Promotion end time must be after its start time")
     item = Promotion(code=data.code.strip().upper(), label=data.label.strip(), percent_off=data.percent_off,
@@ -36,12 +37,31 @@ def create_promotion(data: PromotionIn, db: Session = Depends(get_db), _: User =
         usage_limit=data.usage_limit, starts_at=data.starts_at, ends_at=data.ends_at)
     db.add(item)
     try:
+        db.flush()
+        record(db, actor, "promotion.created", "promotion", item.id, code=item.code, percent_off=item.percent_off,
+               usage_limit=item.usage_limit)
         db.commit()
     except IntegrityError:
         db.rollback()
         raise HTTPException(409, "A promotion with this code already exists")
     db.refresh(item)
     return item
+
+@router.get("/admin/audit-log", response_model=AuditLogPage)
+def audit_log(limit: int = Query(50, ge=1, le=200), before_id: int | None = Query(None, ge=1),
+              action: str | None = Query(None, max_length=60), actor_id: int | None = Query(None, ge=1),
+              db: Session = Depends(get_db), _: User = admin):
+    """Newest first. Pass the previous page's next_before_id as before_id to continue."""
+    query = sa.select(AuditLog).order_by(AuditLog.id.desc()).limit(limit + 1)
+    if before_id:
+        query = query.where(AuditLog.id < before_id)
+    if action:
+        query = query.where(AuditLog.action == action)
+    if actor_id:
+        query = query.where(AuditLog.actor_id == actor_id)
+    rows = db.scalars(query).all()
+    page = rows[:limit]
+    return AuditLogPage(items=page, next_before_id=page[-1].id if len(rows) > limit else None)
 
 @router.get("/admin/diagnostics/client-ip")
 def client_ip_diagnostics(request: Request, _: User = admin):
@@ -55,16 +75,21 @@ def client_ip_diagnostics(request: Request, _: User = admin):
             "headers": {name: request.headers.get(name) for name in names}}
 
 @router.post("/catalog/sync", response_model=CatalogSyncOut)
-def sync_movie_catalog(db: Session = Depends(get_db), _: User = admin):
+def sync_movie_catalog(db: Session = Depends(get_db), actor: User = admin):
     try:
         current, upcoming = sync_catalog(db)
     except TMDBUnavailable as exc:
         raise HTTPException(503, str(exc)) from exc
+    record(db, actor, "catalog.tmdb_sync", imported_now_playing=current, imported_upcoming=upcoming)
+    db.commit()
     return CatalogSyncOut(imported_now_playing=current, imported_upcoming=upcoming)
 
 @router.post("/admin/catalog-sync", response_model=CinemaDirectorySyncOut)
-def sync_cinematica_catalog(db: Session = Depends(get_db), _: User = admin):
-    return sync_active_cinematica_halls(db)
+def sync_cinematica_catalog(db: Session = Depends(get_db), actor: User = admin):
+    result = sync_active_cinematica_halls(db)
+    record(db, actor, "catalog.cinematica_sync")
+    db.commit()
+    return result
 
 @router.get("/admin/catalog-sync/status")
 def catalog_sync_status(db: Session = Depends(get_db), _: User = admin):
@@ -128,7 +153,7 @@ def operator_dashboard(day: date = Query(alias="date"), db: Session = Depends(ge
                                 bookings=[_operator_booking_out(item) for item in booking_rows])
 
 @router.post("/admin/tickets/check-in", response_model=TicketCheckInOut)
-def check_in_ticket(data: TicketCheckInIn, db: Session = Depends(get_db), _: User = admin):
+def check_in_ticket(data: TicketCheckInIn, db: Session = Depends(get_db), actor: User = admin):
     """Admit one paid ticket once, within a bounded screening-entry window."""
     ticket_code = data.ticket_code.strip().upper()
     item = db.scalar(sa.select(Booking).where(Booking.ticket_code == ticket_code).with_for_update())
@@ -144,6 +169,7 @@ def check_in_ticket(data: TicketCheckInIn, db: Session = Depends(get_db), _: Use
     if now > item.screening.ends_at:
         raise HTTPException(410, "This screening has already ended")
     item.checked_in_at = now
+    record(db, actor, "ticket.checked_in", "booking", item.id, ticket_code=ticket_code)
     db.commit()
     db.refresh(item)
     return TicketCheckInOut(booking=booking_out(item), checked_in_at=item.checked_in_at)

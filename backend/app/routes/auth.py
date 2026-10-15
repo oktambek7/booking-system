@@ -16,6 +16,7 @@ from ..otp import new_code
 from ..mail import (EmailDeliveryError, email_code_hash, email_code_matches, send_email_code,
                    send_password_reset_email)
 from ..services import enforce_resend_cooldown, resend_available_at
+from ..audit import record
 
 router = APIRouter()
 
@@ -243,6 +244,7 @@ def confirm_password_reset(data: PasswordResetConfirm, db: Session = Depends(get
     user.password_hash = hash_password(data.password)
     user.email_verified = True
     user.token_version = (user.token_version or 0) + 1   # a reset signs the account out everywhere
+    record(db, user, "auth.password_reset", "user", user.id)
     db.commit()
     return {"message": "Password reset complete"}
 
@@ -250,6 +252,7 @@ def confirm_password_reset(data: PasswordResetConfirm, db: Session = Depends(get
 def logout_all_devices(db: Session = Depends(get_db), user: User = Depends(current_user)):
     """Revoke every access token issued to this account, including the caller's own."""
     db.execute(update(User).where(User.id == user.id).values(token_version=User.token_version + 1))
+    record(db, user, "auth.sessions_revoked", "user", user.id)
     db.commit()
 
 @router.get("/auth/me")

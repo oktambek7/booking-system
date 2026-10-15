@@ -13,10 +13,13 @@ import time
 import uuid
 from contextvars import ContextVar
 from starlette.datastructures import MutableHeaders
+from starlette.requests import Request
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from .config import settings
+from .ratelimit import client_ip
 
 request_id_var: ContextVar[str] = ContextVar("request_id", default="-")
+client_ip_var: ContextVar[str | None] = ContextVar("client_ip", default=None)
 logger = logging.getLogger("parda.access")
 
 _VALID_REQUEST_ID = re.compile(r"[A-Za-z0-9._-]{8,64}")
@@ -92,6 +95,10 @@ class RequestContextMiddleware:
         incoming = raw.get(b"x-request-id", b"").decode("latin-1")
         request_id = incoming if _VALID_REQUEST_ID.fullmatch(incoming) else uuid.uuid4().hex
         token = request_id_var.set(request_id)
+        try:
+            ip_token = client_ip_var.set(client_ip(Request(scope)))
+        except Exception:
+            ip_token = client_ip_var.set(None)
         has_authorization = b"authorization" in raw
         started = time.perf_counter()
         state = {"status": 500, "started": False}
@@ -122,3 +129,4 @@ class RequestContextMiddleware:
                 "method": scope["method"], "path": path, "status": state["status"],
                 "duration_ms": round((time.perf_counter() - started) * 1000, 1)})
             request_id_var.reset(token)
+            client_ip_var.reset(ip_token)

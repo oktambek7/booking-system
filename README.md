@@ -139,6 +139,10 @@ Set `VITE_API_URL` to the API origin and redeploy. Set the API `CORS_ORIGINS` to
 - The container runs as an unprivileged user.
 - **Client addresses and rate limits.** In production the browser talks to Vercel, which rewrites `/api/*` to Render, so the API sees Vercel's address unless a header carries the customer's. `CLIENT_IP_HEADER` names that header (`x-forwarded-for`, first entry, by default in `render.yaml`). Check it after each deploy: sign in as an operator and open `/api/admin/diagnostics/client-ip` on the live site. `resolved_ip` must be your own address; if it is a Vercel/Render address, every customer shares one rate-limit bucket and the header setting needs to change.
 
+## Audit log
+
+Operator and security-relevant actions are recorded in `audit_log`: film, hall, screening and promotion changes, catalogue syncs, operator booking-status changes, ticket check-ins, password resets and "sign out of all devices". Each entry has the actor, action, target, a small details object (never secrets or card data), the request id (so it ties to the server logs) and the caller's address. Entries are written in the same transaction as the action, so a failed action leaves no entry, and the table is append-only: a database trigger rejects every `UPDATE` and `DELETE` except clearing the actor link when an account is deleted (the actor's email stays on the entry). Operators read it with `GET /api/admin/audit-log?limit=&before_id=&action=&actor_id=` (newest first; pass `next_before_id` as `before_id` for the next page). There is no automatic deletion; archive old rows with a scheduled job if the table grows large.
+
 ## Background jobs and scaling
 
 Booking and waitlist e-mails, reminders and the Cinematica/TMDB refreshes run as scheduled jobs (`backend/app/jobs.py`).

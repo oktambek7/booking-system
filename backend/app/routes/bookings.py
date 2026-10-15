@@ -16,6 +16,7 @@ from ..notifications import (deliver_due_waitlist_notifications,
 from ..services import (
     ACTIVE_STATUSES, POINT_VALUE_UZS, booking_out, calculate_promotion_discount, expire_holds,
     lock_user, new_ticket_code, owned_pending_booking, release_pending_points)
+from ..audit import record
 
 router = APIRouter()
 
@@ -155,6 +156,8 @@ def update_booking_status(booking_id:int,data:BookingStatusIn,background_tasks:B
     if data.status==BookingStatus.CANCELLED and item.checked_in_at:
         raise HTTPException(409,"A checked-in ticket cannot be cancelled")
     item.status=data.status
+    if user.role==Role.ADMIN:
+        record(db, user, "booking.status_changed", "booking", item.id, from_status=previous_status.value, to_status=data.status.value)
     if data.status==BookingStatus.CANCELLED:
         if previous_status == BookingStatus.PENDING:
             release_pending_points(db, item)
