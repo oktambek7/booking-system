@@ -97,30 +97,22 @@ async def lifespan(app: FastAPI):
         logger.info("Created %s rolling Parda demo screenings", created)
     # Discovery source failures must never prevent the booking API from
     # starting. Refresh catalogue data in the background instead.
-    directory_task = asyncio.create_task(_cinematica_refresh_loop())
-    refresh_task = None
-    notification_task = asyncio.create_task(_booking_notification_loop())
-    if settings.tmdb_read_token:
-        refresh_task = asyncio.create_task(_tmdb_refresh_loop())
+    tasks: list[asyncio.Task] = []
+    if settings.run_background_jobs:
+        tasks.append(asyncio.create_task(_cinematica_refresh_loop()))
+        tasks.append(asyncio.create_task(_booking_notification_loop()))
+        if settings.tmdb_read_token:
+            tasks.append(asyncio.create_task(_tmdb_refresh_loop()))
     try:
         yield
     finally:
-        directory_task.cancel()
-        try:
-            await directory_task
-        except asyncio.CancelledError:
-            pass
-        if refresh_task:
-            refresh_task.cancel()
+        for task in tasks:
+            task.cancel()
+        for task in tasks:
             try:
-                await refresh_task
+                await task
             except asyncio.CancelledError:
                 pass
-        notification_task.cancel()
-        try:
-            await notification_task
-        except asyncio.CancelledError:
-            pass
 
 def _ensure_initial_admin() -> None:
     if not settings.admin_email and not settings.admin_password:

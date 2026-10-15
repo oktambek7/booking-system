@@ -206,7 +206,9 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `main` and eve
 ```sh
 cd backend && pip install -r requirements-dev.txt
 ruff check .
-DATABASE_URL=postgresql+psycopg://booking:booking@localhost:5432/booking pytest -q   # database tests skip if PostgreSQL is unreachable
+DATABASE_URL=postgresql+psycopg://booking:booking@localhost:5432/booking pytest -q
+# the suite creates and drops its own throwaway database on that server (needs CREATEDB);
+# database-backed tests skip if PostgreSQL is unreachable
 cd ../frontend && npm ci && npm run build
 ```
 
