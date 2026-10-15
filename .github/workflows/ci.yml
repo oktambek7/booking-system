@@ -66,6 +66,8 @@ jobs:
       - run: npm ci
       - name: Type-check and build
         run: npm run build
+      - name: Security headers and CSP
+        run: npm run check:headers
 
   docker:
     name: API image builds

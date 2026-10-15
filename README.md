@@ -129,6 +129,8 @@ public users cannot self-assign roles.
 
 Set `VITE_API_URL` to the API origin and redeploy. Set the API `CORS_ORIGINS` to the exact Vercel site origin.
 
+`frontend/vercel.json` also sets the browser security headers: a strict Content-Security-Policy (scripts only from the site itself, no inline script or `eval`, no framing, no plugins; images from any HTTPS host because film posters come from Cinematica and TMDB), HSTS, `nosniff`, `X-Frame-Options: DENY`, a referrer policy, a permissions policy that allows only geolocation (for "cinemas near me"), and long-lived caching for hashed `/assets`. `npm run check:headers` (run in CI after the build) fails if the policy is loosened or if the built page needs inline script. If a feature needs a new origin (an analytics host, an embedded player, a camera), add exactly that origin to the matching directive and re-test in a browser; the policy was verified against the catalogue, film page, sign-in dialog and seat map with no violations.
+
 ## Operations: health, logs, headers
 
 - `GET /health` is readiness: it answers 200 only while the database responds and 503 within three seconds otherwise (it uses its own one-connection pool, so a stuck database cannot hang it or starve requests). Point hosting health checks here. `GET /health/live` is liveness only and never touches the database; the Docker `HEALTHCHECK` uses it so a database outage does not get a healthy process killed.
