@@ -272,7 +272,9 @@ class OperatorScreeningOut(ScreeningOut):
 
 class OperatorBookingOut(BookingOut):
     customer_nickname: str
-    customer_email: EmailStr
+    # A plain string: this is stored data being displayed, and a deleted customer's tombstone address
+    # (deleted-user-<id>@deleted.invalid) is deliberately not a deliverable e-mail address.
+    customer_email: str
 
 class OperatorDashboardOut(BaseModel):
     metrics: OperatorMetricsOut

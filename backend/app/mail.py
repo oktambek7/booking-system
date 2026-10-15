@@ -146,6 +146,12 @@ def send_refund_email(address: str, *, movie: str, cinema: str, starts_at: str, 
     lines += ["", "This was a demo payment, so no money moved."]
     return _send_email(address, "Your Parda Cinema refund", "\n".join(lines), tag="parda-refund")
 
+def send_account_deleted_email(address: str) -> bool:
+    return _send_email(address, "Your Parda Cinema account was deleted", (
+        "Your Parda Cinema account was deleted at your request. Your personal details were erased; records of "
+        "past payments are kept without your name or e-mail, as the law requires.\n\n"
+        "If this was not you, contact support right away."), tag="parda-account-deleted")
+
 def send_screening_reminder_email(address: str, *, movie: str, cinema: str, starts_at: str,
                                   seats: str, ticket_code: str, when: str) -> bool:
     return _send_email(address, f"Reminder: {movie} starts {when}", (

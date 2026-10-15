@@ -2,6 +2,7 @@ import { Camera, LogOut, Save, X } from 'lucide-react'
 import { useState, type ChangeEvent, type FormEvent } from 'react'
 import Modal from './ui/Modal'
 import TelegramConnect from './TelegramConnect'
+import PrivacySection from './PrivacySection'
 
 type Lang = 'uz' | 'en' | 'ru'
 export type ProfileUser = {id:number;nickname:string;email:string;role:string;created_at?:string;avatar_data?:string|null}
@@ -30,7 +31,7 @@ function resizeAvatar(file:File):Promise<string>{
   })
 }
 
-export default function ProfileDrawer({user,lang,api,token,onClose,onSave,onSignOut,onSignOutAll,onAvatarPreview}:{user:ProfileUser;lang:Lang;api:string;token:string;onClose:()=>void;onSave:(nickname:string,avatarData:string|null)=>Promise<void>;onSignOut:()=>void;onSignOutAll:()=>Promise<void>;onAvatarPreview:(avatar:string|null)=>void}){
+export default function ProfileDrawer({user,lang,api,token,onClose,onSave,onSignOut,onSignOutAll,onAccountDeleted,onAvatarPreview}:{user:ProfileUser;lang:Lang;api:string;token:string;onAccountDeleted:()=>void;onClose:()=>void;onSave:(nickname:string,avatarData:string|null)=>Promise<void>;onSignOut:()=>void;onSignOutAll:()=>Promise<void>;onAvatarPreview:(avatar:string|null)=>void}){
   const t=(key:keyof typeof text.en)=>text[lang][key]
   const [nickname,setNickname]=useState(user.nickname),[avatar,setAvatar]=useState(user.avatar_data||null),[busy,setBusy]=useState(false),[error,setError]=useState('')
   const initial=(user.nickname.trim().charAt(0)||'P').toUpperCase()
@@ -59,6 +60,7 @@ export default function ProfileDrawer({user,lang,api,token,onClose,onSave,onSign
         <button className="button-primary profile-save" disabled={busy}>{busy?t('saving'):<><Save size={16}/>{t('save')}</>}</button>
       </form>
       <TelegramConnect api={api} token={token} lang={lang}/>
+      <PrivacySection api={api} token={token} lang={lang} onDeleted={onAccountDeleted}/>
       <button className="profile-signout" onClick={()=>{if(confirm(t('signOutConfirm')))onSignOut()}}><LogOut size={16}/>{t('signOut')}</button>
       <button className="profile-signout" disabled={busy} onClick={async()=>{if(!confirm(t('signOutAllConfirm')))return;setBusy(true);setError('');try{await onSignOutAll()}catch(e){setError(e instanceof Error?e.message:t('signOutAll'));setBusy(false)}}}><LogOut size={16}/>{t('signOutAll')}</button>
   </Modal>
