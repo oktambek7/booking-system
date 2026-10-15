@@ -22,7 +22,7 @@ class Crash(BaseException):
 class NotificationTestCase(ApiTestCase):
     def setUp(self):
         sql("UPDATE booking_notifications SET sent_at = now() WHERE sent_at IS NULL")    # isolate from other tests
-        patcher = mock.patch("app.api.deliver_due_notifications")                         # no post-payment delivery
+        patcher = mock.patch("app.routes.payments.deliver_due_notifications")                         # no post-payment delivery
         patcher.start()
         self.addCleanup(patcher.stop)
 

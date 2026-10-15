@@ -108,7 +108,7 @@ def captured_payment_codes():
     def fake(address, code, **kwargs):
         codes.append(code)
         return True
-    with mock.patch("app.api.send_payment_verification_email", side_effect=fake):
+    with mock.patch("app.routes.payments.send_payment_verification_email", side_effect=fake):
         yield codes
 
 class Shop:

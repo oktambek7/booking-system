@@ -177,6 +177,10 @@ alembic revision -m "add thing"  # new revision: write explicit, tested SQL/ops 
 - Demo payment attempts are bound to the authenticated booking and server-calculated total. A production payment provider must verify signed callbacks and transaction amount/order before a booking can be confirmed.
 - Customer history clearing archives only cancelled and completed rows. Upcoming active holds/tickets remain visible; users cancel eligible bookings first.
 
+## Backend layout
+
+`backend/app/api.py` mounts the HTTP routes under `/api`; they live in `backend/app/routes/` grouped by domain: `auth` (registration, verification, sign-in, password reset, profile), `account` (loyalty balance, saved films, notifications), `catalog` (films, cinemas, screenings, seat maps, waitlist), `bookings` (holds, pricing, history, status changes), `payments` (demo checkout) and `admin` (operator dashboard, promotions, catalogue sync, ticket check-in, diagnostics). Logic used by more than one of them (seat-hold expiry, account locking, promo maths, serializers) is in `backend/app/services.py`. Background work is in `jobs.py`/`worker.py`, schema history in `alembic/`.
+
 ## Cinema catalogue architecture
 
 ```mermaid
