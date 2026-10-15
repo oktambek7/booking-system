@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from ..database import get_db
 from ..models import (Booking, BookingSeat, BookingStatus, Payment, Role, Screening, Seat, User, WaitlistEntry)
-from ..schemas import (BookingIn, BookingOut, BookingStatusIn,
+from ..schemas import (CancellationQuoteOut, RefundPolicyStep, BookingIn, BookingOut, BookingStatusIn,
                       BookingPriceIn)
 from ..security import current_user
 from ..config import settings
@@ -17,6 +17,7 @@ from ..services import (
     ACTIVE_STATUSES, POINT_VALUE_UZS, booking_out, calculate_promotion_discount, expire_holds,
     lock_user, new_ticket_code, owned_pending_booking, release_pending_points)
 from ..audit import record
+from ..refunds import CUSTOMER, OPERATOR, issue_refund, paid_payment, policy, quote_refund
 
 router = APIRouter()
 
@@ -133,6 +134,24 @@ def clear_booking_history(db:Session=Depends(get_db),user:User=Depends(current_u
     db.commit()
     return {"archived_count":len(items)}
 
+@router.get("/refund-policy", response_model=list[RefundPolicyStep])
+def refund_policy():
+    """The cancellation policy for paid tickets, as published to customers."""
+    return policy()
+
+@router.get("/bookings/{booking_id}/cancellation-quote", response_model=CancellationQuoteOut)
+def cancellation_quote(booking_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """Preview what cancelling would refund, before the customer confirms."""
+    item = db.get(Booking, booking_id)
+    if not item or (user.role != Role.ADMIN and item.customer_id != user.id):
+        raise HTTPException(404, "Booking not found")
+    paid = item.status == BookingStatus.CONFIRMED and paid_payment(db, item.id) is not None
+    quote = quote_refund(item, datetime.now(timezone.utc), OPERATOR if user.role == Role.ADMIN else CUSTOMER)
+    return CancellationQuoteOut(booking_id=item.id, status=item.status, paid=paid,
+        refund_percent=quote.percent if paid else 0, refund_amount=quote.amount if paid else 0,
+        points_restored=quote.points_restored if paid else 0, points_clawed_back=quote.points_clawed_back if paid else 0,
+        hours_until_start=round(quote.hours_until_start, 2), policy=policy())
+
 @router.patch("/bookings/{booking_id}/status",response_model=BookingOut)
 def update_booking_status(booking_id:int,data:BookingStatusIn,background_tasks:BackgroundTasks,db:Session=Depends(get_db),user:User=Depends(current_user)):
     item=db.scalar(sa.select(Booking).where(Booking.id==booking_id).with_for_update())
@@ -161,6 +180,8 @@ def update_booking_status(booking_id:int,data:BookingStatusIn,background_tasks:B
     if data.status==BookingStatus.CANCELLED:
         if previous_status == BookingStatus.PENDING:
             release_pending_points(db, item)
+        if previous_status == BookingStatus.CONFIRMED:
+            issue_refund(db, item, user, OPERATOR if user.role==Role.ADMIN else CUSTOMER)
         for assignment in item.seat_assignments: assignment.active=False
         if user.role==Role.CUSTOMER and item.screening.ends_at <= datetime.now(timezone.utc):
             item.archived_by_customer=True

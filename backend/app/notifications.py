@@ -9,9 +9,9 @@ from sqlalchemy.exc import IntegrityError
 
 from .config import settings
 from .database import SessionLocal
-from .mail import (EmailDeliveryError, send_booking_confirmation_email, send_screening_reminder_email,
+from .mail import (EmailDeliveryError, send_booking_confirmation_email, send_refund_email, send_screening_reminder_email,
                    send_waitlist_available_email, send_saved_movie_showtime_email)
-from .models import (Booking, BookingNotification, BookingSeat, BookingStatus, Seat,
+from .models import (Booking, BookingNotification, BookingSeat, BookingStatus, Refund, Seat,
                      WaitlistEntry, WaitlistNotification, MovieWatchlist, MovieWatchlistNotification, Screening)
 
 logger = logging.getLogger(__name__)
@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 CONFIRMATION = "confirmation"
 REMINDER_24H = "reminder_24h"
 REMINDER_2H = "reminder_2h"
+REFUND = "refund"
 
 
 def schedule_booking_notifications(db, booking: Booking, *, include_confirmation: bool = True,
@@ -118,7 +119,8 @@ def _deliver_booking_notice(db, notice_id: int, now: datetime) -> bool:
     if not notice or notice.sent_at or notice.due_at > now:
         return False
     booking = db.scalar(sa.select(Booking).where(Booking.id == notice.booking_id).with_for_update())
-    if not booking or booking.status != BookingStatus.CONFIRMED:
+    wanted = BookingStatus.CANCELLED if notice.event_type == REFUND else BookingStatus.CONFIRMED
+    if not booking or booking.status != wanted:
         notice.sent_at = now
         notice.last_error = "Skipped because the ticket is no longer confirmed"
         return False
@@ -130,6 +132,11 @@ def _deliver_booking_notice(db, notice_id: int, now: datetime) -> bool:
             send_screening_reminder_email(booking.customer.email, when="in about 24 hours", **details)
         elif notice.event_type == REMINDER_2H:
             send_screening_reminder_email(booking.customer.email, when="in about 2 hours", **details)
+        elif notice.event_type == REFUND:
+            refund = db.scalar(sa.select(Refund).where(Refund.booking_id == booking.id))
+            send_refund_email(booking.customer.email, movie=details["movie"], cinema=details["cinema"],
+                              starts_at=details["starts_at"], amount=f"{booking.refund_amount:,.0f} UZS",
+                              percent=booking.refund_percent or 0, points_restored=refund.points_restored if refund else 0)
         else:
             notice.sent_at = now
             notice.last_error = "Skipped unknown notification type"

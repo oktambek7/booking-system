@@ -98,6 +98,7 @@ def booking_out(item: Booking) -> BookingOut:
         hold_expires_at=item.hold_expires_at, hold_seconds_remaining=hold_seconds_remaining, created_at=item.created_at,
         ends_at=item.screening.ends_at,
         ticket_code=item.ticket_code, checked_in_at=item.checked_in_at,
+        refund_amount=item.refund_amount or 0, refund_percent=item.refund_percent, refunded_at=item.refunded_at,
         movie_title=item.screening.movie.title, starts_at=item.screening.starts_at,
         cinema_name=item.screening.auditorium.cinema_name,
         auditorium_name=item.screening.auditorium.name,

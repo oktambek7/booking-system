@@ -147,7 +147,8 @@ def operator_dashboard(day: date = Query(alias="date"), db: Session = Depends(ge
         confirmed_bookings=sum(1 for row in booking_rows if row.status == BookingStatus.CONFIRMED),
         pending_bookings=sum(1 for row in booking_rows if row.status == BookingStatus.PENDING),
         seats_sold=seats_sold, seats_available=seats_available,
-        confirmed_revenue=confirmed_revenue)
+        confirmed_revenue=confirmed_revenue,
+        refunded_amount=sum((row.refund_amount or 0 for row in booking_rows), start=0))
     db.commit()
     return OperatorDashboardOut(metrics=metrics, screenings=dashboard_screenings,
                                 bookings=[_operator_booking_out(item) for item in booking_rows])

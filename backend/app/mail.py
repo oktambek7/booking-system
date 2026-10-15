@@ -137,6 +137,15 @@ def send_booking_confirmation_email(address: str, *, movie: str, cinema: str, st
         "We will send reminders before the screening."
     ), tag="parda-booking-confirmation")
 
+def send_refund_email(address: str, *, movie: str, cinema: str, starts_at: str, amount: str, percent: int,
+                      points_restored: int) -> bool:
+    lines = [f"Your ticket was cancelled and {percent}% of the price was refunded.", "",
+             f"Movie: {movie}", f"Cinema: {cinema}", f"Date / time: {starts_at}", f"Refund: {amount}"]
+    if points_restored:
+        lines.append(f"Parda Points returned: {points_restored}")
+    lines += ["", "This was a demo payment, so no money moved."]
+    return _send_email(address, "Your Parda Cinema refund", "\n".join(lines), tag="parda-refund")
+
 def send_screening_reminder_email(address: str, *, movie: str, cinema: str, starts_at: str,
                                   seats: str, ticket_code: str, when: str) -> bool:
     return _send_email(address, f"Reminder: {movie} starts {when}", (

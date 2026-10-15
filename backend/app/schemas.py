@@ -234,6 +234,9 @@ class BookingOut(BaseModel):
     ends_at: datetime
     ticket_code: str | None = None
     checked_in_at: datetime | None = None
+    refund_amount: Decimal = 0
+    refund_percent: int | None = None
+    refunded_at: datetime | None = None
     movie_title: str
     starts_at: datetime
     cinema_name: str
@@ -260,6 +263,7 @@ class OperatorMetricsOut(BaseModel):
     seats_sold: int
     seats_available: int
     confirmed_revenue: Decimal
+    refunded_amount: Decimal = 0
 
 class OperatorScreeningOut(ScreeningOut):
     booking_count: int
@@ -341,3 +345,20 @@ class AuditLogOut(BaseModel):
 class AuditLogPage(BaseModel):
     items: list[AuditLogOut]
     next_before_id: int | None
+
+
+class RefundPolicyStep(BaseModel):
+    hours_before_start: int
+    percent: int
+
+class CancellationQuoteOut(BaseModel):
+    """What cancelling a booking would do, shown to the customer before they confirm."""
+    booking_id: int
+    status: BookingStatus
+    paid: bool
+    refund_percent: int
+    refund_amount: Decimal
+    points_restored: int
+    points_clawed_back: int
+    hours_until_start: float
+    policy: list[RefundPolicyStep]

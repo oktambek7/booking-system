@@ -160,7 +160,9 @@ class PaymentRaceTests(ApiTestCase):
         self.assertEqual(cancel_resp.status_code, 200, cancel_resp.text)   # confirmed tickets may still be cancelled
         balance, reserved = shop.points()
         self.assertEqual(reserved, 50, "the other booking's reservation must survive")
-        self.assertEqual(balance, 1000 - 100 + 20)                      # spent 100, earned 20 on 20 000 UZS
+        # spent 100 and earned 20 on 20 000 UZS; the cancel then refunds 50% (screening is 5 h away):
+        # 50 of the 100 spent points come back and 10 of the 20 earned points are taken back
+        self.assertEqual(balance, 1000 - 100 + 20 + 50 - 10)
         self.assertEqual(sql("SELECT status FROM bookings WHERE id = :i", i=paid["id"])[0][0], "CANCELLED")
 
     @staticmethod

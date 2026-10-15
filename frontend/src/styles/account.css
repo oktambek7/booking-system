@@ -75,6 +75,7 @@
   .status-cancelled { background: var(--danger); }
   .status-completed { background: var(--aurora-cyan); }
   .history-details { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-1) var(--s-3); font-size: var(--fs-small); color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .history-refund { margin: var(--s-1) 0 0; font-size: var(--fs-small); color: var(--success-text); font-variant-numeric: tabular-nums; }
   .history-details b { margin-left: auto; color: var(--text); font-family: var(--font-display); font-size: 1rem; }
   .history-card-actions { display: flex; flex-wrap: wrap; gap: var(--s-2); justify-content: space-between; padding-top: var(--s-2); border-top: 1px solid var(--line); }
 

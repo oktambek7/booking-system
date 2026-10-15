@@ -157,6 +157,10 @@ class Booking(Base):
     # customer-facing QR ticket and never contains personal information.
     ticket_code: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
     checked_in_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Set when a paid ticket is cancelled; the ledger row lives in `refunds`.
+    refund_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0, server_default="0", nullable=False)
+    refund_percent: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    refunded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     customer: Mapped[User] = relationship()
     screening: Mapped[Screening] = relationship()
     seat_assignments: Mapped[list["BookingSeat"]] = relationship(back_populates="booking", cascade="all, delete-orphan")
@@ -373,3 +377,19 @@ class RefreshToken(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     user_agent: Mapped[str | None] = mapped_column(String(200))
     ip: Mapped[str | None] = mapped_column(String(45))
+
+class Refund(Base):
+    """Money returned for a cancelled paid booking. One row per payment, ever (unique index)."""
+    __tablename__ = "refunds"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    payment_id: Mapped[int] = mapped_column(ForeignKey("payments.id", ondelete="CASCADE"), unique=True, index=True)
+    booking_id: Mapped[int] = mapped_column(ForeignKey("bookings.id", ondelete="CASCADE"), index=True)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    percent: Mapped[int] = mapped_column(Integer)
+    points_restored: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    points_clawed_back: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    status: Mapped[str] = mapped_column(String(24))
+    initiated_by: Mapped[str] = mapped_column(String(12))
+    provider_reference: Mapped[str | None] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    __table_args__ = (CheckConstraint("amount > 0 AND percent BETWEEN 1 AND 100", name="ck_refund_positive"),)

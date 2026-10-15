@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     # Seat-hoarding limits: unpaid holds one customer may have at once, and how many seats of
     # one screening they may hold unpaid. Paid tickets are not counted.
     max_pending_holds_per_user: int = 3
+    # Cancellation policy for paid tickets: share of the price returned to a customer who cancels this many
+    # hours before the screening starts (operators always refund in full).
+    refund_full_hours: int = 24
+    refund_partial_hours: int = 2
+    refund_partial_percent: int = 50
     max_pending_seats_per_screening: int = 8
     notification_poll_seconds: int = 60
     notification_retry_minutes: int = 10
