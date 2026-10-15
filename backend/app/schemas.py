@@ -43,6 +43,7 @@ class ProfileUpdate(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    expires_in: int | None = None     # seconds until the access token expires
 
 class MovieIn(BaseModel):
     title: str = Field(min_length=1, max_length=180)

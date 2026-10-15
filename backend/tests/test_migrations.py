@@ -59,37 +59,52 @@ class MigrationTests(unittest.TestCase):
     def test_database_built_before_alembic_is_upgraded_without_losing_data(self):
         with scratch_engine() as engine:
             migrate.upgrade_to_head(engine)
+            # Put it back into the state an earlier release left it in: the baseline schema (every later
+            # revision rolled back by its own downgrade), no Alembic bookkeeping table, and none of the
+            # objects the baseline itself replaced since (the rate-limit table and token column).
+            config = migrate.alembic_config()
+            with engine.connect() as conn:
+                config.attributes["connection"] = conn
+                command.downgrade(config, "0001")
+                conn.commit()
             with engine.begin() as conn:
                 conn.execute(text("INSERT INTO users (email, name, nickname, password_hash, role, active, email_verified, "
                                   "phone_verified, parda_points, reserved_points) VALUES ('old@example.com', 'old', 'old', 'x', "
                                   "'CUSTOMER', true, true, false, 120, 0)"))
-                # Put it back into the state an earlier release left it in: no Alembic table, none of the newer objects.
                 conn.execute(text("DROP TABLE alembic_version"))
                 conn.execute(text("DROP TABLE rate_limit_buckets"))
                 conn.execute(text("ALTER TABLE users DROP COLUMN token_version"))
-                conn.execute(text("DROP TABLE audit_log"))                    # created by a revision after the baseline
-                conn.execute(text("DROP FUNCTION audit_log_guard()"))
             self.assertFalse(migrate.is_current(engine))
             migrate.upgrade_to_head(engine)
             self.assertTrue(migrate.is_current(engine))
             self.assertEqual(scalar(engine, "SELECT parda_points FROM users WHERE email = 'old@example.com'"), 120)
             self.assertEqual(scalar(engine, "SELECT token_version FROM users WHERE email = 'old@example.com'"), 0)
             self.assertIsNotNone(scalar(engine, "SELECT to_regclass('public.rate_limit_buckets')"))
+            self.assertIsNotNone(scalar(engine, "SELECT to_regclass('public.audit_log')"))
+            self.assertIsNotNone(scalar(engine, "SELECT to_regclass('public.refresh_tokens')"))
 
-    def test_the_latest_revision_can_be_rolled_back_and_applied_again(self):
+    def test_every_revision_can_be_rolled_back_and_applied_again(self):
         with scratch_engine() as engine:
             migrate.upgrade_to_head(engine)
             config = migrate.alembic_config()
-            with engine.connect() as conn:
-                config.attributes["connection"] = conn
-                command.downgrade(config, "-1")
-                conn.commit()
+
+            def downgrade(target):
+                with engine.connect() as conn:
+                    config.attributes["connection"] = conn
+                    command.downgrade(config, target)
+                    conn.commit()
+
+            downgrade("0002")
+            self.assertEqual(migrate.current_revision(engine), "0002")
+            self.assertIsNone(scalar(engine, "SELECT to_regclass('public.refresh_tokens')"))
+            self.assertIsNotNone(scalar(engine, "SELECT to_regclass('public.audit_log')"))
+            downgrade("0001")
             self.assertEqual(migrate.current_revision(engine), "0001")
             self.assertIsNone(scalar(engine, "SELECT to_regclass('public.audit_log')"))
             self.assertEqual(scalar(engine, "SELECT count(*) FROM pg_proc WHERE proname = 'audit_log_guard'"), 0)
             migrate.upgrade_to_head(engine)
             self.assertTrue(migrate.is_current(engine))
-            self.assertIsNotNone(scalar(engine, "SELECT to_regclass('public.audit_log')"))
+            self.assertIsNotNone(scalar(engine, "SELECT to_regclass('public.refresh_tokens')"))
             self.assertEqual(scalar(engine, "SELECT count(*) FROM pg_trigger WHERE tgname = 'audit_log_guard'"), 1)
 
     def test_models_and_migrations_have_not_drifted(self):

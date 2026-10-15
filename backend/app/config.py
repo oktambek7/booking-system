@@ -8,6 +8,11 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://booking:booking@localhost:5432/booking"
     jwt_secret: str = DEFAULT_JWT_SECRET
     jwt_expire_minutes: int = 1440
+    # Browser sessions: the refresh token lives in an httpOnly cookie and rotates on every use.
+    # A rotated token replayed after the grace period revokes the whole sign-in (it was copied).
+    refresh_token_days: int = 30
+    refresh_family_max_days: int = 90
+    refresh_reuse_grace_seconds: int = 10
     business_timezone: str = "Asia/Tashkent"
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     tmdb_read_token: str = ""

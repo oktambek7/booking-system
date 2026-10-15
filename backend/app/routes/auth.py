@@ -6,8 +6,10 @@ import sqlalchemy as sa
 from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from fastapi import APIRouter, Depends, HTTPException, Request
-from .. import ratelimit
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.responses import JSONResponse
+from .. import ratelimit, sessions
+from ..config import settings
 from ..database import get_db
 from ..models import (EmailOtpChallenge, PasswordResetChallenge, Role, User)
 from ..schemas import (EmailChallengeOut, EmailCodeVerify, EmailResend, Login, PasswordResetConfirm, PasswordResetRequest, ProfileUpdate, Token, UserCreate)
@@ -38,6 +40,21 @@ CODE_IP_LIMIT = (60, 600)
 CODE_ACCOUNT_FAILURES = (10, 1800)
 
 RESET_REQUEST_IP_LIMIT = (20, 3600)
+REFRESH_IP_LIMIT = (120, 600)
+
+def _access_seconds() -> int:
+    return settings.jwt_expire_minutes * 60
+
+def require_trusted_origin(request: Request) -> None:
+    """Cookie-authenticated calls must come from our own pages. SameSite=Strict already stops browsers sending
+    the cookie cross-site; this is the second line of defence."""
+    origin = request.headers.get("origin")
+    if not origin:
+        return
+    allowed = {o.strip().rstrip("/") for o in settings.cors_origins.split(",") if o.strip()}
+    allowed.add(str(request.base_url).rstrip("/"))
+    if origin.rstrip("/") not in allowed:
+        raise HTTPException(403, "Cross-site request refused")
 
 PASSWORD_RESET_CODE_MINUTES = 10
 
@@ -143,14 +160,16 @@ def resend_email_code(data: EmailResend, db: Session = Depends(get_db)):
         resend_available_at=resend_available_at(), demo_mode=is_demo, demo_code=code if is_demo else None)
 
 @router.post("/auth/email/verify", dependencies=[ratelimit.per_ip("email-verify", *CODE_IP_LIMIT)])
-def verify_email(data: EmailCodeVerify, db: Session = Depends(get_db)):
+def verify_email(data: EmailCodeVerify, request: Request, response: Response, db: Session = Depends(get_db)):
     email_key = str(data.email).lower()
     ratelimit.check("email-verify-fail", email_key, *CODE_ACCOUNT_FAILURES)
     user = db.scalar(sa.select(User).where(User.email == str(data.email).lower()).with_for_update())
     if not user or not user.active:
         raise HTTPException(404, "Account awaiting verification was not found")
     if user.email_verified:
-        return {"access_token": make_token(user), "token_type": "bearer"}
+        sessions.start_session(db, user, request, response)
+        db.commit()
+        return {"access_token": make_token(user), "token_type": "bearer", "expires_in": _access_seconds()}
     challenge = db.scalar(sa.select(EmailOtpChallenge).where(
         EmailOtpChallenge.user_id == user.id, EmailOtpChallenge.consumed_at.is_(None)
     ).order_by(EmailOtpChallenge.created_at.desc()).with_for_update())
@@ -166,11 +185,13 @@ def verify_email(data: EmailCodeVerify, db: Session = Depends(get_db)):
         raise HTTPException(422, "Incorrect verification code")
     challenge.consumed_at = now
     user.email_verified = True
+    sessions.start_session(db, user, request, response)
     db.commit()
-    return {"access_token": make_token(user), "token_type": "bearer", "user": _user_payload(user)}
+    return {"access_token": make_token(user), "token_type": "bearer", "expires_in": _access_seconds(),
+            "user": _user_payload(user)}
 
 @router.post("/auth/login", response_model=Token)
-def login(data: Login, request: Request, db: Session = Depends(get_db)):
+def login(data: Login, request: Request, response: Response, db: Session = Depends(get_db)):
     email = data.email.lower()
     ip = ratelimit.client_ip(request)
     ratelimit.hit("login-ip", ip, *LOGIN_IP_LIMIT)
@@ -184,7 +205,29 @@ def login(data: Login, request: Request, db: Session = Depends(get_db)):
     ratelimit.reset("login-fail-ip", f"{email}|{ip}")
     if not user.email_verified:
         raise HTTPException(403, "Verify your email before signing in")
-    return Token(access_token=make_token(user))
+    sessions.start_session(db, user, request, response)
+    db.commit()
+    return Token(access_token=make_token(user), expires_in=_access_seconds())
+
+@router.post("/auth/refresh", response_model=Token, dependencies=[ratelimit.per_ip("refresh", *REFRESH_IP_LIMIT)])
+def refresh_session(request: Request, response: Response, db: Session = Depends(get_db)):
+    """Trade the httpOnly refresh cookie for a new access token (and a new cookie)."""
+    require_trusted_origin(request)
+    try:
+        user = sessions.rotate_session(db, request, response)
+    except sessions.SessionError as exc:
+        rejected = JSONResponse(status_code=401, content={"detail": str(exc)})
+        sessions.clear_cookie(rejected)
+        return rejected
+    db.commit()
+    return Token(access_token=make_token(user), expires_in=_access_seconds())
+
+@router.post("/auth/logout", status_code=204)
+def logout(request: Request, response: Response, db: Session = Depends(get_db)):
+    """Sign this browser out. Needs only the cookie, so it works even after the access token expired."""
+    require_trusted_origin(request)
+    sessions.end_session(db, request, response)
+    db.commit()
 
 @router.post("/auth/password-reset/request", response_model=EmailChallengeOut, dependencies=[ratelimit.per_ip("reset-request", *RESET_REQUEST_IP_LIMIT)])
 def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get_db)):
@@ -244,14 +287,17 @@ def confirm_password_reset(data: PasswordResetConfirm, db: Session = Depends(get
     user.password_hash = hash_password(data.password)
     user.email_verified = True
     user.token_version = (user.token_version or 0) + 1   # a reset signs the account out everywhere
+    sessions.revoke_user_sessions(db, user.id)
     record(db, user, "auth.password_reset", "user", user.id)
     db.commit()
     return {"message": "Password reset complete"}
 
 @router.post("/auth/logout-all", status_code=204)
-def logout_all_devices(db: Session = Depends(get_db), user: User = Depends(current_user)):
+def logout_all_devices(response: Response, db: Session = Depends(get_db), user: User = Depends(current_user)):
     """Revoke every access token issued to this account, including the caller's own."""
     db.execute(update(User).where(User.id == user.id).values(token_version=User.token_version + 1))
+    sessions.revoke_user_sessions(db, user.id)
+    sessions.clear_cookie(response)
     record(db, user, "auth.sessions_revoked", "user", user.id)
     db.commit()
 

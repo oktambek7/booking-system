@@ -17,6 +17,7 @@ from .notifications import (deliver_due_notifications, deliver_due_saved_movie_n
                             deliver_due_waitlist_notifications, queue_saved_movie_notifications,
                             queue_waitlist_notifications, schedule_missing_reminders)
 from .ratelimit import purge_expired as purge_expired_rate_limits
+from .sessions import purge_expired_refresh_tokens
 from .tmdb import TMDBUnavailable, sync_catalog
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ def notification_cycle() -> dict | None:
             return None
         schedule_missing_reminders()
         purge_expired_rate_limits()
+        purge_expired_refresh_tokens()
         result = {
             "waitlist_queued": queue_waitlist_notifications(),
             "saved_movie_queued": queue_saved_movie_notifications(),
