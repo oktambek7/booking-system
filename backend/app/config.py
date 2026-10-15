@@ -77,6 +77,17 @@ class Settings(BaseSettings):
     totp_encryption_key: str = ""
     # When true, operator powers need a sign-in that included the second step; operators must enrol first.
     require_operator_2fa: bool = False
+    # Optional error reporting (see app/monitoring.py). Empty = off.
+    sentry_dsn: str = ""
+    sentry_release: str = ""
+    sentry_traces_sample_rate: float = 0.0
+    # Database connection pool. Total connections = pool size + overflow, per API process; keep that (times the
+    # number of processes) under the database plan's connection limit. A statement timeout of 0 means none.
+    db_pool_size: int = 5
+    db_max_overflow: int = 10
+    db_pool_timeout_seconds: int = 30
+    db_pool_recycle_seconds: int = 1800
+    db_statement_timeout_ms: int = 0
     app_environment: str = "development"
     log_level: str = "INFO"
     # "json" for log search in production, "text" for a terminal. Empty = json in production, text otherwise.
@@ -127,6 +138,10 @@ class Settings(BaseSettings):
             problems.append("PAYMENT_PROVIDER=sandbox lets anyone approve their own payment; it is for development only")
         if provider != "demo" and len(self.payment_webhook_secret) < MIN_SECRET_LENGTH:
             problems.append(f"PAYMENT_WEBHOOK_SECRET must be at least {MIN_SECRET_LENGTH} characters when a payment provider is used")
+        if self.sentry_dsn and not self.sentry_dsn.startswith("https://"):
+            problems.append("SENTRY_DSN must be an https:// URL")
+        if self.db_pool_size < 1 or self.db_max_overflow < 0:
+            problems.append("DB_POOL_SIZE must be at least 1 and DB_MAX_OVERFLOW at least 0")
         if "booking:booking@" in self.database_url:
             problems.append("DATABASE_URL still uses the default development credentials")
         return problems

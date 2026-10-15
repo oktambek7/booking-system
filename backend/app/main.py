@@ -14,11 +14,13 @@ from .database import SessionLocal, health_engine
 from .live import start_live_updates, stop_live_updates
 from .migrate import assert_schema_current, upgrade_to_head
 from .models import Role, User
+from .monitoring import init_sentry
 from .observability import RequestContextMiddleware, configure_logging
 from .security import hash_password
 from .seed_demo import ensure_current_demo_schedule
 
 configure_logging()
+init_sentry()
 logger = logging.getLogger(__name__)
 
 @asynccontextmanager

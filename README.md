@@ -141,6 +141,11 @@ Set `VITE_API_URL` to the API origin and redeploy. Set the API `CORS_ORIGINS` to
 - The container runs as an unprivileged user.
 - **Client addresses and rate limits.** In production the browser talks to Vercel, which rewrites `/api/*` to Render, so the API sees Vercel's address unless a header carries the customer's. `CLIENT_IP_HEADER` names that header (`x-forwarded-for`, first entry, by default in `render.yaml`). Check it after each deploy: sign in as an operator and open `/api/admin/diagnostics/client-ip` on the live site. `resolved_ip` must be your own address; if it is a Vercel/Render address, every customer shares one rate-limit bucket and the header setting needs to change.
 
+### Error reporting and the database pool
+
+- **Sentry (optional).** Set `SENTRY_DSN` (an `https://` URL; `SENTRY_RELEASE` and `SENTRY_TRACES_SAMPLE_RATE` are optional) and unhandled errors are reported. Nothing personal leaves the server: default PII is off and `app/monitoring.py` removes cookies, authorization and client-address headers, request bodies, query strings and the user from every event. Without a DSN nothing is sent, and a failure to start Sentry never stops the API. Match a report with the logs by the `X-Request-ID` shown in the 500 response.
+- **Connection pool.** Each API process opens at most `DB_POOL_SIZE + DB_MAX_OVERFLOW` connections (5 + 10 by default), recycled after `DB_POOL_RECYCLE_SECONDS`. Keep that total, times the number of processes (the web service and the worker each count), below the database plan's connection limit; a free Render Postgres allows few connections, so lower the values there before adding a worker. `DB_STATEMENT_TIMEOUT_MS` (0 = off) stops a runaway query; do not set it below the time a CSV export of a long date range needs.
+
 ## Operator reports (CSV)
 
 The operator panel's **Hisobotlar** tab downloads two CSV files for a date range of at most 366 days, by screening date in the business time zone (`GET /api/admin/reports/bookings.csv?from=&to=` and `revenue.csv`): the **bookings** list (one row per booking with film, hall, seats, totals, promo, refund, ticket code and check-in time) and the **revenue** report (per day, hall and film: paid tickets, seats, money paid, refunded and net, counting cancelled and refunded tickets correctly). Files are UTF-8 with a byte-order mark so Excel reads Uzbek and Russian text, are streamed row by row (a large range cannot exhaust memory), are limited to 30 exports per operator per hour, and every export is written to the audit log. Because customer nicknames and film titles can start with `=`, `+`, `-` or `@` and a spreadsheet would run them as formulas, every text cell that starts that way is prefixed with an apostrophe (CSV injection); a test plants such values in every text column and checks that no cell can start a formula.
@@ -328,6 +333,34 @@ cd ../frontend && npm ci && npm run build
 ```
 
 The unit checks cover source-showtime normalization, source IDs, disabled/malformed rejection, and Asia/Tashkent-to-UTC conversion. PostgreSQL is responsible for active-seat uniqueness and hall-time exclusion; run concurrent booking checks against the configured PostgreSQL staging database before a commercial release.
+
+## Production checklist and backups
+
+Before taking real customers, in this order:
+
+1. **Secrets and config.** `JWT_SECRET`, `OTP_SECRET` (different), `EMAIL_MODE` other than `mock`, exact `CORS_ORIGINS`, real `DATABASE_URL`: the API refuses to start in production otherwise (`app/config.py`, tested). Set `TOTP_ENCRYPTION_KEY` once and never change it.
+2. **Client addresses.** Deploy, then open `GET /api/admin/diagnostics/client-ip` as an owner and confirm `resolved_ip` is your own address, not the proxy's; adjust `CLIENT_IP_HEADER` if not. Rate limits depend on it.
+3. **Two-step verification.** Have every operator enrol in the profile panel, then set `REQUIRE_OPERATOR_2FA=true`. Keep the recovery codes somewhere safe.
+4. **Operators.** Give each cinema's staff a limited operator account from the Operatorlar tab; keep owners to the people who run the whole business.
+5. **Payments.** The demo checkout moves no money. A real gateway needs an adapter in `app/payment_providers.py` (see **Payment providers**) and `PAYMENT_PROVIDER` plus `PAYMENT_WEBHOOK_SECRET`; do not enable `sandbox`.
+6. **Monitoring.** Point the host's health check at `/health`, set `SENTRY_DSN`, and look at the JSON logs once after deploy.
+7. **Backups (below), and a restore test.**
+
+**Backups.** The database is the only state that matters (tickets, payments, accounts, the audit log); the app and frontend are rebuilt from the repository. Use the host's automated backups with point-in-time recovery if the plan has them (Render's paid Postgres plans do; the free plan does not keep backups and expires), and additionally take a logical dump on a schedule you control:
+
+```
+pg_dump --format=custom --no-owner --file=parda-$(date +%F).dump "$DATABASE_URL"
+```
+
+Store dumps outside the database host, encrypted, and delete them on the retention you promise customers: they contain e-mail addresses and booking history, and deleted accounts reappear in old dumps. **A backup that was never restored is a hope, not a backup**: periodically restore the latest dump into a scratch database and check that the app starts against it:
+
+```
+createdb parda_restore_check
+pg_restore --no-owner --dbname=parda_restore_check parda-YYYY-MM-DD.dump
+DATABASE_URL=postgresql+psycopg://.../parda_restore_check python -m app.migrate     # reports the revision, applies anything newer
+```
+
+`python -m app.migrate` is also how a restored (older) dump is brought up to the current schema. The audit log is append-only by trigger, so a restore keeps it intact; the e-mail of a deleted account in it is already a tombstone.
 
 ## Known source limits
 
