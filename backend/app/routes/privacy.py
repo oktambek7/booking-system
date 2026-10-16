@@ -22,7 +22,7 @@ def export_my_data(db: Session = Depends(get_db), user: User = Depends(current_u
     """Everything held about the signed-in customer, as a JSON download. Secrets and other people's data are never included."""
     ratelimit.hit("account-export", str(user.id), 5, 3600)
     return JSONResponse(privacy.export_account(db, user), headers={
-        "Content-Disposition": f'attachment; filename="parda-data-{date.today().isoformat()}.json"', "Cache-Control": "no-store"})
+        "Content-Disposition": f'attachment; filename="phantora-data-{date.today().isoformat()}.json"', "Cache-Control": "no-store"})
 
 @router.delete("/account", status_code=204)
 def delete_my_account(data: AccountDeleteIn, response: Response, db: Session = Depends(get_db), user: User = Depends(current_user)):

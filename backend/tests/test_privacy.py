@@ -73,7 +73,7 @@ class ExportTests(PrivacyCase):
     def test_arrives_as_a_private_download(self):
         shop = self.shop()
         resp = self.export(shop)
-        self.assertRegex(resp.headers["Content-Disposition"], r'^attachment; filename="parda-data-\d{4}-\d{2}-\d{2}\.json"$')
+        self.assertRegex(resp.headers["Content-Disposition"], r'^attachment; filename="phantora-data-\d{4}-\d{2}-\d{2}\.json"$')
         self.assertEqual(resp.headers["Cache-Control"], "no-store")
 
     def test_is_rate_limited(self):

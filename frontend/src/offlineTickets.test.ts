@@ -75,7 +75,7 @@ describe('wallet storage', () => {
 
   it('survives corrupt or hostile stored data', () => {
     for (const junk of ['not json', '{"tickets":"nope"}', 'null', '{"tickets":[null,{"ticket_code":5}]}']) {
-      store.parda_offline_tickets = junk
+      store.phantora_offline_tickets = junk
       expect(loadTickets(NOW)).toBeNull()
     }
   })

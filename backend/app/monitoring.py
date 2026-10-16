@@ -1,6 +1,6 @@
 """Optional error reporting to Sentry. Off unless SENTRY_DSN is set.
 
-Parda handles tickets, e-mail addresses and sign-in tokens, so nothing personal is sent: no default PII, and every
+Phantora handles tickets, e-mail addresses and sign-in tokens, so nothing personal is sent: no default PII, and every
 event is scrubbed of cookies, authorization headers, request bodies and query strings before it leaves the server.
 """
 import logging

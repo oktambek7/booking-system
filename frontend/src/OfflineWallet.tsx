@@ -43,7 +43,7 @@ export default function OfflineTickets({ tickets, lang, onClose }: { tickets: Of
               <p>{t('seats')}: <b>{ticket.seats.join(', ')}</b></p>
               <p>{t('code')}: <b>{ticket.ticket_code}</b></p>
             </div>
-            <QRCodeSVG value={ticket.ticket_code} size={132} level="M" includeMargin />
+            <QRCodeSVG value={ticket.ticket_code} size={132} level="M" includeMargin title={`QR ${ticket.ticket_code}`} />
           </li>
         ))}
       </ul>

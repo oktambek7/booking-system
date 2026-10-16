@@ -50,7 +50,7 @@ def verify(secret: str, code: str, last_step: int | None = None, now: float | No
             return step
     return None
 
-def otpauth_uri(secret: str, email: str, issuer: str = "Parda") -> str:
+def otpauth_uri(secret: str, email: str, issuer: str = "Phantora") -> str:
     label = quote(f"{issuer}:{email}")
     return f"otpauth://totp/{label}?secret={secret}&issuer={quote(issuer)}&algorithm=SHA1&digits={DIGITS}&period={STEP_SECONDS}"
 

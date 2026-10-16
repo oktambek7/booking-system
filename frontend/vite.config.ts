@@ -1,7 +1,7 @@
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 
-// Dev only: forward /api to the deployed API so the UI can run locally without CORS setup.
+// Dev only: forward /api to the deployed API (the Render service keeps its original name until it is renamed) so the UI can run locally without CORS setup.
 // Set VITE_API_URL=http://localhost:5173 in .env.local to use it.
 export default defineConfig({
   plugins: [react()],

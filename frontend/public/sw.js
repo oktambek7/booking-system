@@ -1,14 +1,14 @@
 /*
- * Parda service worker: keeps the app shell and its build assets available without a connection.
+ * Phantora service worker: keeps the app shell and its build assets available without a connection.
  *
  * What it never touches: /api (personal data stays out of the browser cache; saved tickets are kept by the app
  * itself and wiped on sign-out), non-GET requests, and other origins (film posters). Pages are network-first so an
  * online visitor always gets the newest build; build assets are hashed and immutable, so they are cache-first.
  */
-const SHELL_CACHE = 'parda-shell-v1'
-const ASSET_CACHE = 'parda-assets-v1'
+const SHELL_CACHE = 'phantora-shell-v1'
+const ASSET_CACHE = 'phantora-assets-v1'
 const ASSET_LIMIT = 80
-const STATIC_FILES = ['/manifest.webmanifest', '/parda-logo-mark.jpg', '/icon-192.png', '/icon-512.png', '/icon-maskable-512.png', '/apple-touch-icon.png']
+const STATIC_FILES = ['/manifest.webmanifest', '/favicon.svg', '/favicon.ico', '/icon-192.png', '/icon-512.png', '/icon-maskable-512.png', '/apple-touch-icon.png']
 
 function routeFor(request, url, origin) {
   if (request.method !== 'GET' || url.origin !== origin) return 'bypass'
@@ -34,7 +34,7 @@ async function shellResponse(request) {
   } catch (error) {
     const saved = await cache.match('/')
     if (saved) return saved
-    return new Response('<!doctype html><meta charset="utf-8"><title>Parda</title><p>Internet aloqasi yo‘q. Qayta urinib ko‘ring.</p>',
+    return new Response('<!doctype html><meta charset="utf-8"><title>Phantora</title><p>Internet aloqasi yo‘q. Qayta urinib ko‘ring.</p>',
       { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } })
   }
 }

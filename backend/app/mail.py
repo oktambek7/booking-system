@@ -23,8 +23,8 @@ def email_code_matches(user_id: int, code: str, saved_hash: str) -> bool:
 
 def send_email_code(address: str, code: str) -> bool:
     """Send verification code; only development mock returns a code to the caller."""
-    return _send_email(address, "Parda Cinema email verification", (
-        f"Your Parda Cinema verification code is {code}. It expires in 10 minutes. "
+    return _send_email(address, "Phantora Cinema email verification", (
+        f"Your Phantora Cinema verification code is {code}. It expires in 10 minutes. "
         "If you did not create this account, you can ignore this message."
     ))
 
@@ -42,12 +42,12 @@ def _email_html(content: str) -> str:
         '<!doctype html><html><body style="margin:0;padding:24px;background:#f3f5f9;">'
         '<main style="max-width:520px;margin:auto;padding:32px;border-radius:18px;background:#fff;'
         'color:#172033;font:16px/1.6 Arial,sans-serif;">'
-        '<h1 style="margin:0 0 18px;font-size:24px;">Parda Cinema</h1>'
+        '<h1 style="margin:0 0 18px;font-size:24px;">Phantora Cinema</h1>'
         f'{code_block}<p style="margin:0;">{text}</p>'
         '</main></body></html>'
     )
 
-def _send_email(address: str, subject: str, content: str, *, tag: str = "parda-transactional") -> bool:
+def _send_email(address: str, subject: str, content: str, *, tag: str = "phantora-transactional") -> bool:
     """Return True only for a local-development mock delivery."""
     email_mode = settings.email_mode.strip().lower()
     if email_mode == "mock" and settings.app_environment.lower() != "production":
@@ -75,7 +75,7 @@ def _send_email(address: str, subject: str, content: str, *, tag: str = "parda-t
                 "https://api.brevo.com/v3/smtp/email",
                 headers={"api-key": settings.brevo_api_key, "accept": "application/json"},
                 json={
-                    "sender": {"name": "Parda Cinema", "email": settings.brevo_from},
+                    "sender": {"name": "Phantora Cinema", "email": settings.brevo_from},
                     "to": [{"email": address}],
                     "subject": subject,
                     "htmlContent": _email_html(content),
@@ -123,59 +123,59 @@ def send_payment_verification_email(address: str, code: str, *, movie: str, cine
     ))
 
 def send_password_reset_email(address: str, code: str) -> bool:
-    return _send_email(address, "Reset your Parda Cinema password", (
+    return _send_email(address, "Reset your Phantora Cinema password", (
         f"Your password reset code is: {code}\n\n"
         "It expires in 10 minutes. If you did not request a password reset, you can ignore this email."
     ))
 
 def send_booking_confirmation_email(address: str, *, movie: str, cinema: str, starts_at: str,
                                     seats: str, ticket_code: str, amount: str) -> bool:
-    return _send_email(address, "Your Parda Cinema ticket is confirmed", (
+    return _send_email(address, "Your Phantora Cinema ticket is confirmed", (
         "Your ticket is confirmed. Keep this email and present the QR ticket or ticket code at entry.\n\n"
         f"Movie: {movie}\nCinema: {cinema}\nDate / time: {starts_at}\n"
         f"Seats: {seats}\nTicket code: {ticket_code}\nAmount: {amount}\n\n"
         "We will send reminders before the screening."
-    ), tag="parda-booking-confirmation")
+    ), tag="phantora-booking-confirmation")
 
 def send_refund_email(address: str, *, movie: str, cinema: str, starts_at: str, amount: str, percent: int,
                       points_restored: int) -> bool:
     lines = [f"Your ticket was cancelled and {percent}% of the price was refunded.", "",
              f"Movie: {movie}", f"Cinema: {cinema}", f"Date / time: {starts_at}", f"Refund: {amount}"]
     if points_restored:
-        lines.append(f"Parda Points returned: {points_restored}")
+        lines.append(f"Phantora Points returned: {points_restored}")
     lines += ["", "This was a demo payment, so no money moved."]
-    return _send_email(address, "Your Parda Cinema refund", "\n".join(lines), tag="parda-refund")
+    return _send_email(address, "Your Phantora Cinema refund", "\n".join(lines), tag="phantora-refund")
 
 def send_account_deleted_email(address: str) -> bool:
-    return _send_email(address, "Your Parda Cinema account was deleted", (
-        "Your Parda Cinema account was deleted at your request. Your personal details were erased; records of "
+    return _send_email(address, "Your Phantora Cinema account was deleted", (
+        "Your Phantora Cinema account was deleted at your request. Your personal details were erased; records of "
         "past payments are kept without your name or e-mail, as the law requires.\n\n"
-        "If this was not you, contact support right away."), tag="parda-account-deleted")
+        "If this was not you, contact support right away."), tag="phantora-account-deleted")
 
 def send_screening_reminder_email(address: str, *, movie: str, cinema: str, starts_at: str,
                                   seats: str, ticket_code: str, when: str) -> bool:
     return _send_email(address, f"Reminder: {movie} starts {when}", (
-        f"Your Parda Cinema screening starts {when}.\n\n"
+        f"Your Phantora Cinema screening starts {when}.\n\n"
         f"Movie: {movie}\nCinema: {cinema}\nDate / time: {starts_at}\n"
         f"Seats: {seats}\nTicket code: {ticket_code}\n\n"
         "Please arrive early and show your QR ticket or ticket code at entry."
-    ), tag="parda-screening-reminder")
+    ), tag="phantora-screening-reminder")
 
 
 def send_waitlist_available_email(address: str, *, movie: str, cinema: str, starts_at: str, seat_count: int) -> bool:
     seats = "seat" if seat_count == 1 else "seats"
     return _send_email(address, f"Seats may be available: {movie}", (
-        "A previously full Parda Cinema screening may have seats available again. "+
-        "Availability is live and is not reserved, so return to Parda to select your seats.\n\n"+
+        "A previously full Phantora Cinema screening may have seats available again. "+
+        "Availability is live and is not reserved, so return to Phantora to select your seats.\n\n"+
         f"Movie: {movie}\nCinema: {cinema}\nDate / time: {starts_at}\n"+
         f"Requested: {seat_count} {seats}\n\n"+
         "This availability alert is sent once for this waitlist request."
-    ), tag="parda-waitlist-availability")
+    ), tag="phantora-waitlist-availability")
 
 
 def send_saved_movie_showtime_email(address: str, *, movie: str, cinema: str, starts_at: str) -> bool:
     return _send_email(address, f"Showtimes available: {movie}", (
-        f"A Parda Cinema screening is now available for a movie you saved.\n\n"
+        f"A Phantora Cinema screening is now available for a movie you saved.\n\n"
         f"Movie: {movie}\nCinema: {cinema}\nDate / time: {starts_at}\n\n"
-        "Open Parda to view seats and book your ticket. This message does not reserve a seat."
-    ), tag="parda-saved-movie-showtime")
+        "Open Phantora to view seats and book your ticket. This message does not reserve a seat."
+    ), tag="phantora-saved-movie-showtime")

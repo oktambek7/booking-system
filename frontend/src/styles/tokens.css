@@ -1,5 +1,9 @@
-/* Parda design tokens. The only place colour, glass, type, space, radius, motion
+/* Phantora design tokens. The only place colour, surface, type, space, radius, motion
    and breakpoints are defined. Components read these; they never hard-code them.
+
+   Brand palette (from the Phantora brand kit):
+     Ink #0B0D17 · Ivory #F1ECE2 · Gold #C9A25B (#A8823D on light) · Dusk #8A8FA6
+   Gold is the single accent. Dusk carries secondary text, borders and the "available" seat.
 
    Breakpoints (media queries cannot read custom properties, so the literal values
    below are the only four used anywhere in the codebase):
@@ -13,79 +17,105 @@
   :root {
     color-scheme: dark;
 
-    /* ---- Aurora palette (identical in both themes) ---- */
-    --aurora-violet: #7c5cff;
-    --aurora-magenta: #ff3d8b;
-    --aurora-cyan: #22d3ee;
-    --aurora-amber: #ffb547;
+    /* ---- Brand palette (identical in both themes) ---- */
+    --ink: #0b0d17;
+    --ink-deep: #07080f;
+    --ink-raised: #2a2e45;
+    --ivory: #f1ece2;
+    --gold: #c9a25b;
+    --gold-deep: #a8823d;
+    --dusk: #8a8fa6;
 
-    /* ---- Semantic colours: always solid, never glass ---- */
-    --seat-available: #34d399;
-    --seat-available-ink: #04251a;
-    --seat-selected: #7653f8;
-    --seat-selected-ink: #ffffff;
-    --seat-premium: #ffb547;
-    --seat-premium-ink: #2b1a00;
-    --seat-taken: #5b5b78;
-    --seat-taken-ink: #f1f1fb;
-    --success: #22c55e;
-    --warning: #f59e0b;
-    --danger: #f43f5e;
+    /* ---- Ink (dark, default) ---- */
+    --bg: #0b0d17;
+    --bg-deep: #07080f;
+    --bg-elevated: #10131f;
+    --bg-solid-1: #121524;
+    --bg-solid-2: #171a2c;
+    --bg-solid-3: #1c2036;
+    --text: #f1ece2;
+    --text-2: #bdbab4;
+    --text-3: #9a9eb2;
+    --line: rgba(241, 236, 226, 0.12);
+    --line-strong: rgba(241, 236, 226, 0.26);
 
-    /* ---- Night Screen (default) ---- */
-    --bg: #0a0a18;
-    --bg-elevated: #12122a;
-    --bg-solid-1: #151530;
-    --bg-solid-2: #1a1a38;
-    --bg-solid-3: #1f1f42;
-    --text: #f5f5ff;
-    --text-2: #b4b4d0;
-    --text-3: #a0a0c0;
-    --line: rgba(255, 255, 255, 0.12);
-    --line-strong: rgba(255, 255, 255, 0.22);
-    --focus-ring: #a99bff;
-    --danger-text: #ff8fa6;
-    --success-text: #6ee7a0;
-    --warning-text: #ffcf70;
+    /* Accent: gold fills, hairlines and text. --accent-text is the AA-safe gold for type. */
+    --accent: #c9a25b;
+    --accent-text: #c9a25b;
+    --accent-soft: rgba(201, 162, 91, 0.16);
+    --accent-line: rgba(201, 162, 91, 0.55);
+    --focus-ring: #e0be7f;
 
-    --action-from: #7653f8;
-    --action-to: #d61f6e;
-    --action-ink: #ffffff;
-    --action-glow: rgba(214, 31, 110, 0.38);
-    --action-glow-hover: rgba(214, 31, 110, 0.55);
+    --action-from: #d3ad68;
+    --action-to: #bc9348;
+    --action-ink: #0b0d17;
+    --sheen: rgba(255, 248, 232, 0.4);
+    --qr-bg: #ffffff;
+    --action-glow: rgba(201, 162, 91, 0.26);
+    --action-glow-hover: rgba(201, 162, 91, 0.42);
 
-    /* Aurora blobs (alpha is capped so text on top keeps AA contrast) */
-    --blob-violet: rgba(124, 92, 255, 0.3);
-    --blob-magenta: rgba(255, 61, 139, 0.22);
-    --blob-cyan: rgba(34, 211, 238, 0.16);
-    --blob-amber: rgba(255, 181, 71, 0.1);
-    --blob-poster: rgba(124, 92, 255, 0.22);
+    /* ---- Semantic status colours: always solid, never glass ---- */
+    --success: #4fb58a;
+    --warning: #d9a441;
+    --danger: #e5645f;
+    --success-text: #7fd3a8;
+    --warning-text: #e6c27a;
+    --danger-text: #ff9a94;
+    --info-text: #b7bccf;
 
-    /* ---- Glass: exactly three levels ---- */
-    --glass-border: rgba(255, 255, 255, 0.12);
-    --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.15);
-    --glass-1-bg: rgba(255, 255, 255, 0.06);
-    --glass-1-blur: blur(10px) saturate(150%);
-    --glass-2-bg: rgba(22, 22, 48, 0.62);
-    --glass-2-blur: blur(16px) saturate(160%);
-    --glass-3-bg: rgba(24, 24, 52, 0.84);
-    --glass-3-blur: blur(20px) saturate(160%);
-    --scrim: rgba(5, 5, 15, 0.6);
+    /* ---- Seats: ink, ivory, gold and dusk only. State is never colour alone: selected shows a tick,
+            premium a gold marker, taken is hatched, and the legend names each one. ---- */
+    --seat-available: #8a8fa6;
+    --seat-available-ink: #0b0d17;
+    --seat-selected: #c9a25b;
+    --seat-selected-ink: #0b0d17;
+    --seat-selected-ring: #f1ece2;
+    --seat-premium: #f1ece2;
+    --seat-premium-ink: #0b0d17;
+    --seat-premium-mark: #a8823d;
+    --seat-taken: #2a2e45;
+    --seat-taken-ink: #9ea2b5;
+    --seat-edge: transparent;
+    --hatch: rgba(241, 236, 226, 0.22);
+
+    /* ---- Theatre backdrop: a still pool of warm light above the screen, falling off to deep ink ---- */
+    --theatre-glow: rgba(201, 162, 91, 0.1);
+    --theatre-glow-2: rgba(138, 143, 166, 0.09);
+    --theatre-base: #0b0d17;
+    --theatre-deep: #07080f;
+    --poster-scrim-top: rgba(7, 8, 15, 0.4);
+    --poster-scrim-bottom: rgba(7, 8, 15, 0.82);
+
+    /* ---- Surfaces: exactly three levels ---- */
+    --glass-border: rgba(241, 236, 226, 0.12);
+    --glass-highlight: inset 0 1px 0 rgba(241, 236, 226, 0.07);
+    --glass-1-bg: rgba(241, 236, 226, 0.04);
+    --glass-1-blur: blur(10px) saturate(130%);
+    --glass-2-bg: rgba(16, 19, 33, 0.74);
+    --glass-2-blur: blur(16px) saturate(140%);
+    --glass-3-bg: rgba(20, 23, 40, 0.93);
+    --glass-3-blur: blur(20px) saturate(140%);
+    --scrim: rgba(4, 5, 11, 0.66);
     --scrim-blur: blur(6px);
-    --shadow-1: 0 8px 24px rgba(2, 2, 12, 0.35);
-    --shadow-2: 0 20px 56px rgba(2, 2, 12, 0.5);
+    --shadow-1: 0 8px 24px rgba(2, 3, 9, 0.4);
+    --shadow-2: 0 20px 56px rgba(2, 3, 9, 0.55);
+    --on-media: #f1ece2;
+    --on-media-bg: rgba(7, 8, 15, 0.74);
+    --on-media-line: rgba(241, 236, 226, 0.26);
 
     /* ---- Typography ---- */
-    --font-display: 'Unbounded Variable', 'Unbounded', 'Manrope Variable', system-ui, sans-serif;
-    --font-body: 'Manrope Variable', 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-display: 'Syne Variable', 'Syne', 'Manrope Variable', system-ui, sans-serif;
+    --font-body: 'Outfit Variable', 'Outfit', 'Manrope Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    /* Numerals (prices, times, codes, counts) use the body face: Syne draws its zero as a round "o". */
+    --font-num: 'Outfit Variable', 'Outfit', 'Manrope Variable', system-ui, sans-serif;
     --fs-display: clamp(2.5rem, 1.6rem + 3.6vw, 4.5rem);
     --fs-hero: clamp(1.75rem, 1.1rem + 3vw, 3.5rem);
     --fs-h2: clamp(1.75rem, 1.4rem + 1.5vw, 2.75rem);
     --fs-h3: clamp(1.25rem, 1.1rem + 0.6vw, 1.5rem);
-    --fs-body: 0.9375rem;
-    --fs-small: 0.8125rem;
+    --fs-body: 1rem;
+    --fs-small: 0.875rem;
     --fs-label: 0.75rem;
-    --tracking-label: 0.08em;
+    --tracking-label: 0.1em;
 
     /* ---- Space (8px grid, 4px for tight groups) ---- */
     --s-1: 4px;
@@ -100,10 +130,10 @@
     --container: 1280px;
     --header-h: 64px;
 
-    /* ---- Radius ---- */
-    --r-sm: 10px;
-    --r-md: 16px;
-    --r-lg: 24px;
+    /* ---- Radius: ticket-like, a little squarer than a pill-and-bubble system ---- */
+    --r-sm: 8px;
+    --r-md: 14px;
+    --r-lg: 20px;
     --r-pill: 999px;
 
     /* ---- Motion ---- */
@@ -119,52 +149,78 @@
     :root { --gutter: 24px; }
   }
   @media (min-width: 769px) {
-    /* Full-strength glass from tablet up; phones keep smaller blur radii and no blur on scrolling lists. */
+    /* Full-strength blur from tablet up; phones keep smaller blur radii and no blur on scrolling lists. */
     :root {
-      --gutter: 32px; --header-h: 72px; --fs-body: 1rem;
-      --glass-1-blur: blur(16px) saturate(160%);
-      --glass-2-blur: blur(24px) saturate(170%);
-      --glass-3-blur: blur(32px) saturate(170%);
+      --gutter: 32px; --header-h: 72px;
+      --glass-1-blur: blur(14px) saturate(140%);
+      --glass-2-blur: blur(22px) saturate(150%);
+      --glass-3-blur: blur(30px) saturate(150%);
     }
   }
 
-  /* ---- Matinee (light) ---- */
+  /* ---- Ivory (light): the same tokens on warm paper, ink type, deeper gold for contrast ---- */
   :root[data-theme='light'] {
     color-scheme: light;
-    --bg: #f6f5ff;
-    --bg-elevated: #ffffff;
-    --bg-solid-1: #ffffff;
-    --bg-solid-2: #f0eeff;
-    --bg-solid-3: #ffffff;
-    --text: #14142b;
-    --text-2: #4a4a68;
-    --text-3: #61617f;
-    --line: rgba(20, 20, 43, 0.14);
-    --line-strong: rgba(20, 20, 43, 0.28);
-    --focus-ring: #5b3fe0;
-    --danger-text: #b4163f;
-    --success-text: #0f7a3a;
-    --warning-text: #8a5200;
+    --bg: #f1ece2;
+    --bg-deep: #e8e2d4;
+    --bg-elevated: #f8f5ee;
+    --bg-solid-1: #faf7f1;
+    --bg-solid-2: #ece6d9;
+    --bg-solid-3: #fbf9f4;
+    --text: #0b0d17;
+    --text-2: #3f4258;
+    --text-3: #5e6178;
+    --line: rgba(11, 13, 23, 0.14);
+    --line-strong: rgba(11, 13, 23, 0.34);
 
-    --action-from: #6a45f5;
-    --action-to: #c21a64;
-    --action-glow: rgba(194, 26, 100, 0.28);
-    --action-glow-hover: rgba(194, 26, 100, 0.42);
+    --accent: #a8823d;
+    --accent-text: #7a5a1c;
+    --accent-soft: rgba(168, 130, 61, 0.16);
+    --accent-line: rgba(138, 106, 43, 0.6);
+    --focus-ring: #8a6a2b;
 
-    --blob-violet: rgba(124, 92, 255, 0.2);
-    --blob-magenta: rgba(255, 61, 139, 0.18);
-    --blob-cyan: rgba(34, 211, 238, 0.16);
-    --blob-amber: rgba(255, 181, 71, 0.14);
-    --blob-poster: rgba(124, 92, 255, 0.16);
+    --action-from: #d0ab66;
+    --action-to: #b98f45;
+    --action-ink: #0b0d17;
+    --action-glow: rgba(138, 106, 43, 0.26);
+    --action-glow-hover: rgba(138, 106, 43, 0.4);
 
-    --glass-border: rgba(255, 255, 255, 0.7);
-    --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.9);
-    --glass-1-bg: rgba(255, 255, 255, 0.55);
-    --glass-2-bg: rgba(255, 255, 255, 0.72);
-    --glass-3-bg: rgba(255, 255, 255, 0.9);
-    --scrim: rgba(20, 20, 43, 0.45);
-    --shadow-1: 0 8px 24px rgba(60, 40, 140, 0.12);
-    --shadow-2: 0 20px 56px rgba(60, 40, 140, 0.2);
+    --success: #1e7a4e;
+    --warning: #8f6212;
+    --danger: #b3261e;
+    --success-text: #17603a;
+    --warning-text: #7a5200;
+    --danger-text: #b3261e;
+    --info-text: #3f4258;
+
+    --seat-available: #dcd7ca;
+    --seat-available-ink: #0b0d17;
+    --seat-selected: #a8823d;
+    --seat-selected-ink: #0b0d17;
+    --seat-selected-ring: #0b0d17;
+    --seat-premium: #0b0d17;
+    --seat-premium-ink: #f1ece2;
+    --seat-premium-mark: #c9a25b;
+    --seat-taken: #c4bfb1;
+    --seat-taken-ink: #5a5e75;
+    --seat-edge: #6f7490;
+    --hatch: rgba(11, 13, 23, 0.26);
+
+    --theatre-glow: rgba(168, 130, 61, 0.14);
+    --theatre-glow-2: rgba(138, 143, 166, 0.16);
+    --theatre-base: #f1ece2;
+    --theatre-deep: #e6dfd0;
+    --poster-scrim-top: rgba(241, 236, 226, 0.45);
+    --poster-scrim-bottom: rgba(241, 236, 226, 0.82);
+
+    --glass-border: rgba(11, 13, 23, 0.12);
+    --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    --glass-1-bg: rgba(255, 255, 255, 0.5);
+    --glass-2-bg: rgba(248, 245, 238, 0.8);
+    --glass-3-bg: rgba(251, 249, 244, 0.96);
+    --scrim: rgba(11, 13, 23, 0.48);
+    --shadow-1: 0 8px 24px rgba(60, 46, 18, 0.12);
+    --shadow-2: 0 20px 56px rgba(60, 46, 18, 0.2);
   }
 
   /* Fallbacks: no backdrop-filter, or the user asked for less transparency. */
@@ -173,7 +229,7 @@
       --glass-1-bg: var(--bg-solid-1);
       --glass-2-bg: var(--bg-solid-2);
       --glass-3-bg: var(--bg-solid-3);
-      --scrim: rgba(5, 5, 15, 0.8);
+      --scrim: rgba(4, 5, 11, 0.82);
     }
   }
   @media (prefers-reduced-transparency: reduce) {
@@ -185,7 +241,7 @@
       --glass-2-blur: none;
       --glass-3-blur: none;
       --scrim-blur: none;
-      --scrim: rgba(5, 5, 15, 0.82);
+      --scrim: rgba(4, 5, 11, 0.84);
     }
   }
 }

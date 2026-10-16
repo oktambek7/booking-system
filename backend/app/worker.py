@@ -48,12 +48,12 @@ async def run_forever() -> None:
         except NotImplementedError:      # Windows: Ctrl+C surfaces as KeyboardInterrupt instead
             pass
     tasks = jobs.start_all()
-    logger.info("Parda worker started with %s job loop(s)", len(tasks))
+    logger.info("Phantora worker started with %s job loop(s)", len(tasks))
     try:
         await stop.wait()
     finally:
         await jobs.stop_all(tasks)
-        logger.info("Parda worker stopped")
+        logger.info("Phantora worker stopped")
 
 def main(argv: list[str]) -> int:
     configure_logging()

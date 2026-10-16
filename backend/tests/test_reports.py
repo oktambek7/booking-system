@@ -46,7 +46,7 @@ class AccessTests(ReportCase):
     def test_downloads_are_private_csv_files(self):
         resp = self.get("bookings")
         self.assertEqual(resp.headers["Content-Type"], "text/csv; charset=utf-8")
-        self.assertRegex(resp.headers["Content-Disposition"], r'^attachment; filename="parda-bookings-2031-03-14_2031-03-14\.csv"$')
+        self.assertRegex(resp.headers["Content-Disposition"], r'^attachment; filename="phantora-bookings-2031-03-14_2031-03-14\.csv"$')
         self.assertEqual(resp.headers["Cache-Control"], "no-store")
 
     def test_each_export_is_audited(self):

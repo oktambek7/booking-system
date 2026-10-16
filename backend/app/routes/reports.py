@@ -19,7 +19,7 @@ def _stream(kind: str, generator, start: date, end: date, db: Session, actor: Us
            cinemas=None if scope is None else sorted(scope))
     db.commit()
     return StreamingResponse(generator(start, end, scope), media_type="text/csv; charset=utf-8", headers={
-        "Content-Disposition": f'attachment; filename="parda-{kind}-{start.isoformat()}_{end.isoformat()}.csv"', "Cache-Control": "no-store"})
+        "Content-Disposition": f'attachment; filename="phantora-{kind}-{start.isoformat()}_{end.isoformat()}.csv"', "Cache-Control": "no-store"})
 
 def _checked(start: date, end: date) -> None:
     try:

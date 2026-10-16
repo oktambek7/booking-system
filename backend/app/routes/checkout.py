@@ -110,7 +110,7 @@ def _sandbox_payment(db: Session, reference: str) -> Payment:
 
 def _page(body: str) -> HTMLResponse:
     document = ("<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>"
-                "<title>Parda sandbox payment</title><style>body{font:16px system-ui;max-width:26rem;margin:12vh auto;padding:0 1rem;"
+                "<title>Phantora sandbox payment</title><style>body{font:16px system-ui;max-width:26rem;margin:12vh auto;padding:0 1rem;"
                 "background:#0a0a18;color:#eee}button{font:inherit;padding:.7rem 1.2rem;margin:.3rem .3rem 0 0;border-radius:.6rem;"
                 "border:0;cursor:pointer}.ok{background:#7c5cff;color:#fff}.no{background:#333;color:#eee}</style>" + body)
     return HTMLResponse(document, headers={"Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'",

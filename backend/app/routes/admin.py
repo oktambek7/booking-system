@@ -110,7 +110,7 @@ def admin_cinemas(db: Session = Depends(get_db), actor: User = admin):
 
 @router.get("/admin/dashboard", response_model=OperatorDashboardOut)
 def operator_dashboard(day: date = Query(alias="date"), db: Session = Depends(get_db), actor: User = admin):
-    """A date-scoped operator view. All metrics come from Parda's owned data."""
+    """A date-scoped operator view. All metrics come from Phantora's owned data."""
     expire_holds(db)
     try:
         business_zone = ZoneInfo(settings.business_timezone)

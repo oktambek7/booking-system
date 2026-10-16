@@ -11,8 +11,8 @@ describe('parseTicketCode', () => {
   })
 
   it('finds the code inside longer text or a link', () => {
-    expect(parseTicketCode('Parda ticket PRD-9XK4M2QP, row A')).toBe('PRD-9XK4M2QP')
-    expect(parseTicketCode('https://parda.example/t?code=PRD-9XK4M2QP&x=1')).toBe('PRD-9XK4M2QP')
+    expect(parseTicketCode('Phantora ticket PRD-9XK4M2QP, row A')).toBe('PRD-9XK4M2QP')
+    expect(parseTicketCode('https://phantora.example/t?code=PRD-9XK4M2QP&x=1')).toBe('PRD-9XK4M2QP')
   })
 
   it('refuses anything that is not a ticket code', () => {

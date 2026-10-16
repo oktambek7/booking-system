@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import SOURCE from '../public/sw.js?raw'
-const ORIGIN = 'https://parda.example'
+const ORIGIN = 'https://phantora.example'
 
 class FakeCache {
   entries = new Map<string, Response>()
@@ -55,7 +55,7 @@ describe('service worker', () => {
     network = () => html()
     const sw = boot()
     await sw.event('install')
-    expect(await (await sw.caches.get('parda-shell-v1')!.match('/'))!.text()).toBe('<html>shell</html>')
+    expect(await (await sw.caches.get('phantora-shell-v1')!.match('/'))!.text()).toBe('<html>shell</html>')
     expect(sw.calls.skipWaiting).toBe(1)
     await sw.event('activate')
     expect(sw.calls.claim).toBe(1)
@@ -67,7 +67,7 @@ describe('service worker', () => {
     await sw.event('install')
     network = () => html('<html>v2</html>')
     expect(await (await sw.event('fetch', navigate('/some/deep/link')))!.text()).toBe('<html>v2</html>')
-    expect(await (await sw.caches.get('parda-shell-v1')!.match('/'))!.text()).toBe('<html>v2</html>')
+    expect(await (await sw.caches.get('phantora-shell-v1')!.match('/'))!.text()).toBe('<html>v2</html>')
   })
 
   it('falls back to the saved page for any address when the network is gone', async () => {
@@ -147,15 +147,25 @@ describe('service worker', () => {
     network = () => new Response('x', { status: 200 })
     const sw = boot()
     for (let i = 0; i < 95; i += 1) await sw.event('fetch', get(`/assets/chunk-${i}.js`))
-    expect(sw.caches.get('parda-assets-v1')!.entries.size).toBe(80)
+    expect(sw.caches.get('phantora-assets-v1')!.entries.size).toBe(80)
   })
 
   it('deletes caches left by an older version when activated', async () => {
     network = () => html()
     const sw = boot()
-    await sw.caches.set('parda-shell-v0', new FakeCache())
+    await sw.caches.set('phantora-shell-v0', new FakeCache())
     await sw.event('install')
     await sw.event('activate')
-    expect([...sw.caches.keys()].sort()).toEqual(['parda-shell-v1'])
+    expect([...sw.caches.keys()].sort()).toEqual(['phantora-shell-v1'])
+  })
+
+  it('removes the caches the app used under its previous name', async () => {
+    network = () => html()
+    const sw = boot()
+    await sw.caches.set('parda-shell-v1', new FakeCache())
+    await sw.caches.set('parda-assets-v1', new FakeCache())
+    await sw.event('install')
+    await sw.event('activate')
+    expect([...sw.caches.keys()].sort()).toEqual(['phantora-shell-v1'])
   })
 })

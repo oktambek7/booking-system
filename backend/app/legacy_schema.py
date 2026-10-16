@@ -1,6 +1,6 @@
 """The schema as it stood before Alembic, applied idempotently.
 
-Parda used to build its schema at every start-up: `create_all()` for the tables, then
+Phantora used to build its schema at every start-up: `create_all()` for the tables, then
 additive SQL files. The Alembic baseline (revision 0001) runs the same thing, but with the
 tables frozen into alembic/baseline_tables.sql and baseline_indexes.sql instead of read from the live models, so one
 code path builds a brand-new database *and* upgrades a production database left by any

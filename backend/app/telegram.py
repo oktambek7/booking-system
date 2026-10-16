@@ -82,7 +82,7 @@ def unlink(db: Session, user_id: int) -> bool:
         db.delete(link)
     return link is not None
 
-HELP = ("Parda Cinema notifications.\n\nTo connect this chat, open your profile on the Parda website, choose "
+HELP = ("Phantora Cinema notifications.\n\nTo connect this chat, open your profile on the Phantora website, choose "
         "Telegram and press Connect. Send /stop to stop receiving messages here.")
 
 def handle_update(db: Session, update: dict) -> tuple[int, str] | None:
@@ -100,8 +100,8 @@ def handle_update(db: Session, update: dict) -> tuple[int, str] | None:
         link = db.scalar(sa.select(TelegramLink).where(TelegramLink.chat_id == chat_id))
         if link:
             db.delete(link)
-            return chat_id, "Notifications stopped. You can connect again from your Parda profile."
-        return chat_id, "This chat is not connected to a Parda account."
+            return chat_id, "Notifications stopped. You can connect again from your Phantora profile."
+        return chat_id, "This chat is not connected to a Phantora account."
     if command == "/start" and argument:
         return chat_id, _redeem(db, chat_id, argument)
     return chat_id, HELP
@@ -109,10 +109,10 @@ def handle_update(db: Session, update: dict) -> tuple[int, str] | None:
 def _redeem(db: Session, chat_id: int, token: str) -> str:
     record = db.scalar(sa.select(TelegramLinkToken).where(TelegramLinkToken.token_hash == _hash(token)).with_for_update())
     if record is None or record.used_at is not None or record.expires_at <= _now():
-        return "This link has expired or was already used. Create a new one in your Parda profile."
+        return "This link has expired or was already used. Create a new one in your Phantora profile."
     owner = db.scalar(sa.select(TelegramLink).where(TelegramLink.chat_id == chat_id))
     if owner is not None and owner.user_id != record.user_id:
-        return "This Telegram chat is already connected to another Parda account. Send /stop first to disconnect it."
+        return "This Telegram chat is already connected to another Phantora account. Send /stop first to disconnect it."
     record.used_at = _now()
     existing = db.scalar(sa.select(TelegramLink).where(TelegramLink.user_id == record.user_id))
     if existing:

@@ -48,13 +48,13 @@ describe('waitForPayment', () => {
 
 describe('takePaymentReference', () => {
   it('returns the reference and an address without it', () => {
-    expect(takePaymentReference('https://parda.example/?payment=abc_DEF-123&panel=bookings#top'))
+    expect(takePaymentReference('https://phantora.example/?payment=abc_DEF-123&panel=bookings#top'))
       .toEqual({ reference: 'abc_DEF-123', cleaned: '/?panel=bookings#top' })
   })
 
   it('ignores a missing or suspicious reference', () => {
-    expect(takePaymentReference('https://parda.example/').reference).toBeNull()
-    expect(takePaymentReference('https://parda.example/?payment=../../x').reference).toBeNull()
-    expect(takePaymentReference('https://parda.example/?payment=' + 'a'.repeat(81)).reference).toBeNull()
+    expect(takePaymentReference('https://phantora.example/').reference).toBeNull()
+    expect(takePaymentReference('https://phantora.example/?payment=../../x').reference).toBeNull()
+    expect(takePaymentReference('https://phantora.example/?payment=' + 'a'.repeat(81)).reference).toBeNull()
   })
 })

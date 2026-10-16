@@ -4,7 +4,7 @@ Two checkouts exist side by side, chosen by PAYMENT_PROVIDER:
 
 * ``demo``    the original card form + e-mailed code; no money moves and there is no provider object.
 * ``sandbox`` a hosted-page flow that behaves like a real gateway (redirect out, signed webhook back, refunds
-              through an API) but runs inside Parda, so the whole path is testable without merchant credentials.
+              through an API) but runs inside Phantora, so the whole path is testable without merchant credentials.
 
 A real gateway (Payme, Click, Uzum, Stripe ...) is one more class implementing ``PaymentProvider`` and one more
 entry in ``get_provider``. What the rest of the app relies on, and what each adapter must therefore guarantee:

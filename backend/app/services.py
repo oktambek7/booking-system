@@ -33,7 +33,7 @@ def lock_user(db: Session, user_id: int) -> User | None:
 
     The signed-in user is already in the session's identity map, and a plain
     `SELECT ... FOR UPDATE` would hand back that object with its stale in-memory
-    values, letting two parallel requests spend the same Parda Points. Sessions run
+    values, letting two parallel requests spend the same Phantora Points. Sessions run
     with autoflush off, so pending edits are flushed first or the refresh would drop them.
     """
     db.flush()

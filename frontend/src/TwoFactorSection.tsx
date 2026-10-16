@@ -85,7 +85,7 @@ export default function TwoFactorSection({ api, token, lang, onSignedOut }: { ap
 
       {step === 'scan' && setup && <form className="profile-privacy-delete" onSubmit={event => void confirm(event)}>
         <p>{t('scan')}</p>
-        <div className="twofactor-qr"><QRCodeSVG value={setup.otpauth_uri} size={168} level="M" includeMargin /></div>
+        <div className="twofactor-qr"><QRCodeSVG value={setup.otpauth_uri} size={168} level="M" includeMargin title="QR" /></div>
         <p className="twofactor-key">{t('key')}: <code>{setup.secret}</code></p>
         <label>{t('code')}<input name="code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9 ]{6,7}" required /></label>
         <div className="profile-privacy-actions"><button className="profile-telegram-button" disabled={busy}>{t('confirm')}</button><button type="button" className="profile-telegram-button" onClick={cancel}>{t('cancel')}</button></div>

@@ -24,7 +24,7 @@ export default function PrivacySection({ api, token, lang, onDeleted }: { api: s
     try {
       const response = await apiFetch(`${api}/api/account/export`, { headers })
       if (!response.ok) throw new Error((await response.json().catch(() => ({}))).detail || t('failed'))
-      await saveResponse(response, 'parda-data.json')
+      await saveResponse(response, 'phantora-data.json')
     } catch (cause) { setError(cause instanceof Error ? cause.message : t('failed')) }
     finally { setBusy(false) }
   }

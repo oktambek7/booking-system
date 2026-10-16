@@ -117,7 +117,7 @@ class LinkingTests(TelegramCase):
         self.webhook("/start", chat)
         self.webhook("/help", chat)
         self.assertEqual(len(self.messages(chat)), 2)
-        self.assertTrue(all("Parda Cinema notifications" in m for m in self.messages(chat)))
+        self.assertTrue(all("Phantora Cinema notifications" in m for m in self.messages(chat)))
         before = len(self.calls)
         self.webhook("hello there", chat)                                              # not a command
         self.webhook("/start x", chat, chat_type="group")                               # not a private chat
