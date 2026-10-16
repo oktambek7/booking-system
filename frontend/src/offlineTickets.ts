@@ -4,7 +4,7 @@
  * ticket code); no e-mail, name, payment or booking history. It is wiped on sign-out, when the session ends, and when
  * the account is deleted, and entries drop out once the screening is over.
  */
-const KEY = 'parda_offline_tickets'
+const KEY = 'phantora_offline_tickets'
 const MAX_TICKETS = 20
 const GRACE_MS = 3 * 60 * 60 * 1000          // a ticket stays useful until a few hours after the film ends
 

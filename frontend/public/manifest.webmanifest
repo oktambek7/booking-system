@@ -1,14 +1,14 @@
 {
-  "name": "Parda Cinema",
-  "short_name": "Parda",
+  "name": "Phantora",
+  "short_name": "Phantora",
   "description": "Toshkentdagi kinolar va seanslar: o‘rindiqni tanlang, chiptani telefonda saqlang.",
   "lang": "uz",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0a0a18",
-  "theme_color": "#0a0a18",
+  "background_color": "#0B0D17",
+  "theme_color": "#0B0D17",
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },

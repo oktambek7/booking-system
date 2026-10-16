@@ -1,5 +1,5 @@
 {
-  "name": "parda-cinema",
+  "name": "phantora-cinema",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.3.0",
-    "@fontsource-variable/unbounded": "^5.3.0",
+    "@fontsource-variable/outfit": "^5.3.0",
+    "@fontsource-variable/syne": "^5.3.0",
     "@vitejs/plugin-react": "^5.0.0",
     "jsqr": "1.4.0",
     "lucide-react": "^0.468.0",

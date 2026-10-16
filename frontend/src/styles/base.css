@@ -21,7 +21,7 @@
   button:disabled { cursor: not-allowed; }
   a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: 3px; }
   h1, h2, h3, h4, p { margin: 0; }
-  h1, h2, h3 { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; text-wrap: balance; }
+  h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing: -0.015em; line-height: 1.12; text-wrap: balance; }
   h2 { font-size: var(--fs-h2); }
   h3 { font-size: var(--fs-h3); }
   ol, ul { margin: 0; padding: 0; list-style: none; }
@@ -33,11 +33,11 @@
   small { font-size: var(--fs-small); }
 
   /* Browser surfaces that belong to the system, themed from the palette. */
-  ::selection { background: color-mix(in srgb, var(--aurora-violet) 55%, transparent); color: #fff; }
+  ::selection { background: color-mix(in srgb, var(--gold) 45%, transparent); color: var(--text); }
   :focus { outline: none; }
   [tabindex="-1"]:focus-visible { outline: none; }
   :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; border-radius: 4px; }
-  input, select, textarea { caret-color: var(--aurora-magenta); accent-color: var(--aurora-violet); }
+  input, select, textarea { caret-color: var(--accent); accent-color: var(--accent); }
   ::placeholder { color: var(--text-3); opacity: 1; }
   * { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--text) 30%, transparent) transparent; }
   ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -52,21 +52,14 @@
   .app-shell > main { flex: 1; }
   .container { width: 100%; max-width: var(--container); margin-inline: auto; padding-inline: var(--gutter); }
 
-  /* ---- Aurora: four soft light fields behind everything ---- */
-  .aurora { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: var(--bg); }
-  .aurora i {
-    position: absolute;
-    width: 70vmax; height: 70vmax;
-    border-radius: 50%;
-    will-change: transform;
-    animation: aurora-drift 56s ease-in-out infinite alternate;
+  /* ---- Theatre: a still pool of warm light above the screen, falling off to deep ink. No motion. ---- */
+  .theatre { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: linear-gradient(180deg, var(--theatre-base) 0%, var(--theatre-deep) 100%); }
+  .theatre::before {
+    content: ''; position: absolute; top: -32vmax; left: 50%; width: 120vmax; height: 80vmax; margin-left: -60vmax;
+    background: radial-gradient(closest-side, var(--theatre-glow), transparent);
   }
-  .aurora i:nth-child(1) { top: -28vmax; left: -22vmax; background: radial-gradient(closest-side, var(--blob-violet), transparent); }
-  .aurora i:nth-child(2) { top: 6vmax; right: -30vmax; background: radial-gradient(closest-side, var(--blob-magenta), transparent); animation-duration: 48s; animation-delay: -12s; }
-  .aurora i:nth-child(3) { bottom: -34vmax; left: 6vmax; background: radial-gradient(closest-side, var(--blob-cyan), transparent); animation-duration: 60s; animation-delay: -24s; }
-  .aurora i:nth-child(4) { top: 38vh; left: 30vw; width: 50vmax; height: 50vmax; background: radial-gradient(closest-side, var(--blob-poster), transparent); animation-duration: 44s; transition: background 1.2s var(--ease); }
-  @keyframes aurora-drift {
-    from { transform: translate3d(0, 0, 0) scale(1); }
-    to { transform: translate3d(6vmax, -4vmax, 0) scale(1.12); }
+  .theatre::after {
+    content: ''; position: absolute; bottom: -40vmax; right: -30vmax; width: 90vmax; height: 90vmax;
+    background: radial-gradient(closest-side, var(--theatre-glow-2), transparent);
   }
 }
