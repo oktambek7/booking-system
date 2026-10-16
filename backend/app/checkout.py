@@ -1,7 +1,7 @@
 """What happens to a booking when its payment succeeds, shared by every checkout, and the hosted-checkout flow.
 
 `finalize_payment` is the single place that turns a paid booking into a confirmed ticket: promotion redemption,
-Parda Points, ticket code, notifications. The demo checkout calls it after the e-mailed code is verified; the
+Phantora Points, ticket code, notifications. The demo checkout calls it after the e-mailed code is verified; the
 provider checkout calls it from `handle_webhook` once a signed callback proves the money arrived.
 """
 import logging
@@ -40,7 +40,7 @@ def ensure_payable(db: Session, booking: Booking, user: User) -> None:
     if booking.points_redeemed:
         wallet = lock_user(db, user.id)
         if wallet.reserved_points < booking.points_redeemed or wallet.parda_points < booking.points_redeemed:
-            raise HTTPException(409, "Your Parda Pass balance changed. Reapply your points")
+            raise HTTPException(409, "Your Phantora Pass balance changed. Reapply your points")
     if db.scalar(sa.select(sa.exists().where(Payment.booking_id == booking.id, Payment.status.in_(PAID)))):
         raise HTTPException(409, "This booking has already been paid")
 
@@ -66,7 +66,7 @@ def finalize_payment(db: Session, payment: Payment, booking: Booking, now: datet
             promotion = db.scalar(sa.select(Promotion).where(Promotion.code == booking.promotion_code.strip().upper()).with_for_update())
     if revalidate and booking.points_redeemed and (wallet.reserved_points < booking.points_redeemed
                                                    or wallet.parda_points < booking.points_redeemed):
-        raise FinalizeError("loyalty_unavailable", "Your Parda Pass balance changed. Reapply checkout pricing")
+        raise FinalizeError("loyalty_unavailable", "Your Phantora Pass balance changed. Reapply checkout pricing")
     # Everything that can fail has been checked; from here on the booking is confirmed.
     if promotion is not None:
         promotion.usage_count += 1

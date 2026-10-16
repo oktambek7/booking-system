@@ -77,4 +77,4 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t parda-api backend
+      - run: docker build -t phantora-api backend

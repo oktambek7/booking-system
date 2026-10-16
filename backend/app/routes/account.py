@@ -33,7 +33,7 @@ def movie_watchlist(db: Session = Depends(get_db), user: User = Depends(current_
     return [_watchlist_out(item) for item in items]
 
 def _watchlist_catalog_movie(movie_id: int, db: Session) -> Movie:
-    """Resolve Cinematica's public ID to Parda's durable movie record."""
+    """Resolve Cinematica's public ID to Phantora's durable movie record."""
     movie = db.scalar(sa.select(Movie).where(Movie.cinematica_id == movie_id))
     if movie:
         return movie

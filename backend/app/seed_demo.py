@@ -25,7 +25,7 @@ def main():
         for name,count in (("Katta zal",96),("Oila zali",72),("Premier zal",48)):
             cols=12 if count==96 else 12 if count==72 else 8
             rows=count//cols
-            room=Auditorium(name=name,cinema_name="Parda Cinema",city="Tashkent",
+            room=Auditorium(name=name,cinema_name="Phantora Cinema",city="Tashkent",
                 address="Amir Temur Avenue, Tashkent",timezone="Asia/Tashkent")
             room.seats=[Seat(row_label=chr(65+r),seat_number=n,
                 seat_type="premium" if r < 2 else "standard") for r in range(rows) for n in range(1,cols+1)]
@@ -51,7 +51,7 @@ if __name__=="__main__":main()
 
 
 def ensure_current_demo_schedule() -> int:
-    """Create a rolling Parda-owned schedule only when the managed calendar is empty.
+    """Create a rolling Phantora-owned schedule only when the managed calendar is empty.
 
     This keeps the public demo usable without altering an operator-managed schedule.
     It uses existing films and halls, so the same seat inventory and constraints are

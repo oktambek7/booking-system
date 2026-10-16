@@ -81,7 +81,7 @@ def _session_out(raw: dict, slug: str, now: datetime) -> dict | None:
     metadata = VENUE_METADATA.get(venue, {})
     return {
         # Negative values keep Ticketon's source IDs disjoint from Cinematica
-        # repertory IDs already used in Parda's database.
+        # repertory IDs already used in Phantora's database.
         "id": -raw_id,
         "date": starts_at.astimezone(timezone(timedelta(hours=5))).date().isoformat(),
         "time": starts_at.astimezone(timezone(timedelta(hours=5))).strftime("%H:%M"),
@@ -112,7 +112,7 @@ def _fetch_event(event_id: int, slug: str) -> list[dict]:
                            "city_id": TASHKENT_CITY_ID})
         request = Request(f"{EVENT_API}/{event_id}/sessions/movie?{query}", headers={
             "Accept": "application/json", "Accept-Language": "en",
-            "User-Agent": "PardaCinema/1.0 (+https://parda.uz)",
+            "User-Agent": "PhantoraCinema/1.0 (+https://parda.uz)",
         })
         try:
             with urlopen(request, timeout=10.0) as response:

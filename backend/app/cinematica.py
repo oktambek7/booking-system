@@ -1,7 +1,7 @@
 """Read-only adapter for Cinematica's public movie and repertory endpoints.
 
 This adapter is used only for discovery and schedule previews. It never hands a
-customer into an external checkout or treats the source's inventory as Parda's.
+customer into an external checkout or treats the source's inventory as Phantora's.
 """
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
@@ -105,7 +105,7 @@ def _get(path: str) -> dict:
             return fresh_payload
     try:
         response = httpx.get(f"{BASE}/{path.lstrip('/')}", timeout=8.0,
-                             headers={"Accept": "application/json", "User-Agent": "PardaCinema/1.0"})
+                             headers={"Accept": "application/json", "User-Agent": "PhantoraCinema/1.0"})
         response.raise_for_status()
         payload = response.json()
         if payload.get("result") != 0 or not isinstance(payload.get("list"), list):
@@ -215,7 +215,7 @@ def _catalog_hall(db: Session, show: dict, *, source_url: str | None = None,
     """Find a hall by source identity and optionally retain a verified directory row.
 
     No address or coordinates are inferred here: upstream does not publish
-    them in the feed Parda is allowed to read.
+    them in the feed Phantora is allowed to read.
     """
     room = db.scalar(sa.select(Auditorium).where(
         Auditorium.source_name == "cinematica", Auditorium.external_hall_id == show["hall_id"]
@@ -393,7 +393,7 @@ def _showtime_starts_at(show: dict) -> datetime:
 
 
 def _showtime_is_available(db: Session, show: dict, now: datetime | None = None) -> bool:
-    """Keep unavailable Parda inventory and conflicting legacy sessions out of the public programme."""
+    """Keep unavailable Phantora inventory and conflicting legacy sessions out of the public programme."""
     now = now or datetime.now(timezone.utc)
     starts_at = _showtime_starts_at(show)
     if starts_at <= now:
@@ -406,7 +406,7 @@ def _showtime_is_available(db: Session, show: dict, now: datetime | None = None)
     auditorium = _catalog_hall(db, show, create=False)
     if not auditorium:
         return True
-    # A previous Parda screening in the same imported hall would violate the
+    # A previous Phantora screening in the same imported hall would violate the
     # exclusion constraint. Do not present a slot that cannot be opened.
     ends_at = starts_at + timedelta(minutes=120)
     clash = db.scalar(sa.select(Screening.id).where(
@@ -416,7 +416,7 @@ def _showtime_is_available(db: Session, show: dict, now: datetime | None = None)
 
 
 def _ticketon_showtime_is_available(db: Session, show: dict, now: datetime | None = None) -> bool:
-    """Avoid exposing a source time whose owned Parda seat map is already full."""
+    """Avoid exposing a source time whose owned Phantora seat map is already full."""
     now = now or datetime.now(timezone.utc)
     if _showtime_starts_at(show) <= now:
         return False
@@ -490,7 +490,7 @@ def sync_cinema_directory(db: Session = Depends(get_db), _: User = owner):
 
 @router.post("/movies/{movie_id}/screenings/{repertory_id}/ticketing")
 def resolve_ticketing_screening(movie_id: int, repertory_id: int, db: Session = Depends(get_db)):
-    """Create or return Parda's seat inventory for one live catalog showtime.
+    """Create or return Phantora's seat inventory for one live catalog showtime.
 
     The source schedule is fetched again on the server, so a browser cannot
     invent a film, price, hall, or showtime.  The unique link makes resolving
@@ -512,7 +512,7 @@ def resolve_ticketing_screening(movie_id: int, repertory_id: int, db: Session = 
         raise HTTPException(422, "This showtime does not have a valid ticket price")
     movie = db.scalar(sa.select(Movie).where(Movie.title == source_movie["title"], Movie.poster_url == (source_movie["poster_url"] or "")).limit(1))
     if not movie:
-        movie = Movie(title=source_movie["title"], synopsis="Catalog showtime imported for Parda ticketing.",
+        movie = Movie(title=source_movie["title"], synopsis="Catalog showtime imported for Phantora ticketing.",
                       duration_minutes=120, genre="Cinema", age_rating=source_movie["age_rating"],
                       language=source_movie["language"], poster_url=source_movie["poster_url"] or "",
                       release_date=datetime.fromisoformat(source_movie["release_date"]).date() if source_movie["release_date"] else None,
@@ -549,7 +549,7 @@ def resolve_ticketing_screening(movie_id: int, repertory_id: int, db: Session = 
 
 @router.post("/movies/{movie_id}/ticketon/{session_id}/ticketing")
 def resolve_ticketon_ticketing_screening(movie_id: int, session_id: int, db: Session = Depends(get_db)):
-    """Create Parda's owned seat map for one currently on-sale Ticketon time.
+    """Create Phantora's owned seat map for one currently on-sale Ticketon time.
 
     The adapter re-reads the public source on every resolve. A client may not
     choose a price, hall, venue, or time, and a negative source ID keeps its
@@ -572,7 +572,7 @@ def resolve_ticketon_ticketing_screening(movie_id: int, session_id: int, db: Ses
     movie = db.scalar(sa.select(Movie).where(Movie.title == source_movie["title"],
         Movie.poster_url == (source_movie["poster_url"] or "")).limit(1))
     if not movie:
-        movie = Movie(title=source_movie["title"], synopsis="Catalog showtime imported for Parda ticketing.",
+        movie = Movie(title=source_movie["title"], synopsis="Catalog showtime imported for Phantora ticketing.",
             duration_minutes=120, genre="Cinema", age_rating=source_movie["age_rating"],
             language=source_movie["language"], poster_url=source_movie["poster_url"] or "",
             release_date=datetime.fromisoformat(source_movie["release_date"]).date() if source_movie["release_date"] else None,

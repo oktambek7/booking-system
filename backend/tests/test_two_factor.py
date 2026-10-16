@@ -62,7 +62,7 @@ class TotpMathTests(unittest.TestCase):
 
     def test_the_otpauth_uri_names_the_issuer_and_account(self):
         uri = totp.otpauth_uri("ABC", "me@example.com")
-        self.assertTrue(uri.startswith("otpauth://totp/Parda%3Ame%40example.com?secret=ABC&issuer=Parda"))
+        self.assertTrue(uri.startswith("otpauth://totp/Phantora%3Ame%40example.com?secret=ABC&issuer=Phantora"))
 
 class TwoFactorCase(ApiTestCase):
     def setUp(self):

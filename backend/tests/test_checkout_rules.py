@@ -1,4 +1,4 @@
-"""Business rules around seat holds, pricing, promo codes, Parda Pass points, payment and check-in."""
+"""Business rules around seat holds, pricing, promo codes, Phantora Pass points, payment and check-in."""
 import unittest
 from datetime import timedelta
 from decimal import Decimal

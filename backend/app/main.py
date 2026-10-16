@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI):
     _ensure_operator_bootstrap()
     created = ensure_current_demo_schedule()
     if created:
-        logger.info("Created %s rolling Parda demo screenings", created)
+        logger.info("Created %s rolling Phantora demo screenings", created)
     # Discovery source failures must never prevent the booking API from
     # starting. Refresh catalogue data in the background instead.
     tasks = jobs.start_all() if settings.run_background_jobs else []

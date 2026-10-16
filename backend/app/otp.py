@@ -35,7 +35,7 @@ def send_code(phone: str, code: str) -> bool:
             result = client.post(f"{settings.sms_api_url.rstrip('/')}/message/sms/send",
                 headers={"Authorization": f"Bearer {token}"},
                 data={"mobile_phone": phone.removeprefix("+"),
-                      "message": f"Parda Cinema: tasdiqlash kodi {code}. Kodni hech kimga bermang.",
+                      "message": f"Phantora Cinema: tasdiqlash kodi {code}. Kodni hech kimga bermang.",
                       "from": settings.sms_sender})
             result.raise_for_status()
     except (httpx.HTTPError, ValueError) as exc:

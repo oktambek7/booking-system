@@ -69,12 +69,12 @@ def _details(booking: Booking) -> dict[str, str]:
 def _booking_message(event: str, booking: Booking, details: dict[str, str]) -> str:
     where = f"Movie: {details['movie']}\nCinema: {details['cinema']}\nTime: {details['starts_at']}\nSeats: {details['seats']}"
     if event == CONFIRMATION:
-        return f"Parda Cinema: your ticket is confirmed.\n{where}\nTicket code: {details['ticket_code']}\nPaid: {booking.total_price:,.0f} UZS"
+        return f"Phantora Cinema: your ticket is confirmed.\n{where}\nTicket code: {details['ticket_code']}\nPaid: {booking.total_price:,.0f} UZS"
     if event == REFUND:
-        return (f"Parda Cinema: your ticket was cancelled and {booking.refund_percent or 0}% was refunded "
+        return (f"Phantora Cinema: your ticket was cancelled and {booking.refund_percent or 0}% was refunded "
                 f"({booking.refund_amount:,.0f} UZS).\n{where}")
     when = "in about 24 hours" if event == REMINDER_24H else "in about 2 hours"
-    return f"Parda Cinema: your screening starts {when}.\n{where}\nTicket code: {details['ticket_code']}"
+    return f"Phantora Cinema: your screening starts {when}.\n{where}\nTicket code: {details['ticket_code']}"
 
 
 def _claim(db, model, notice_id: int):
@@ -88,11 +88,11 @@ def _fail(notice, now: datetime, reason: str, label: str) -> None:
     if notice.attempts >= settings.notification_max_attempts:
         notice.sent_at = now
         notice.last_error = f"Gave up after {notice.attempts} attempts: {reason}"[:300]
-        logger.error("Parda %s abandoned after %s attempts: id=%s", label, notice.attempts, notice.id)
+        logger.error("Phantora %s abandoned after %s attempts: id=%s", label, notice.attempts, notice.id)
     else:
         notice.last_error = reason[:300]
         notice.due_at = now + timedelta(minutes=settings.notification_retry_minutes)
-        logger.warning("Parda %s retry scheduled: id=%s attempt=%s", label, notice.id, notice.attempts)
+        logger.warning("Phantora %s retry scheduled: id=%s attempt=%s", label, notice.id, notice.attempts)
 
 
 def _deliver_batch(model, handler, label: str, limit: int) -> int:
@@ -114,7 +114,7 @@ def _deliver_batch(model, handler, label: str, limit: int) -> int:
                 db.commit()
             except Exception as exc:
                 db.rollback()
-                logger.exception("Parda %s failed unexpectedly: id=%s", label, notice_id)
+                logger.exception("Phantora %s failed unexpectedly: id=%s", label, notice_id)
                 try:
                     notice = _claim(db, model, notice_id)
                     if notice and not notice.sent_at:
@@ -122,7 +122,7 @@ def _deliver_batch(model, handler, label: str, limit: int) -> int:
                     db.commit()
                 except Exception:
                     db.rollback()
-                    logger.exception("Parda %s failure could not be recorded: id=%s", label, notice_id)
+                    logger.exception("Phantora %s failure could not be recorded: id=%s", label, notice_id)
     return delivered
 
 
@@ -224,7 +224,7 @@ def _deliver_waitlist_notice(db, notice_id: int, now: datetime) -> bool:
     except EmailDeliveryError as exc:
         _fail(notice, now, str(exc), "waitlist notification")
         return False
-    telegram.notify_user(db, entry.user_id, f"Parda Cinema: seats are available again for {entry.screening.movie.title} at "
+    telegram.notify_user(db, entry.user_id, f"Phantora Cinema: seats are available again for {entry.screening.movie.title} at "
                          f"{entry.screening.auditorium.cinema_name}, {starts_at.strftime('%d %b %Y, %H:%M')}. Seats go to whoever books first.")
     notice.sent_at = now
     notice.last_error = None
@@ -237,7 +237,7 @@ def deliver_due_waitlist_notifications(limit: int = 50) -> int:
 
 
 def queue_saved_movie_notifications() -> int:
-    """Queue an email for each saved movie's first future Parda screening."""
+    """Queue an email for each saved movie's first future Phantora screening."""
     now = datetime.now(timezone.utc)
     queued = 0
     with SessionLocal() as db:
@@ -284,7 +284,7 @@ def _deliver_saved_movie_notice(db, notice_id: int, now: datetime) -> bool:
     except EmailDeliveryError as exc:
         _fail(notice, now, str(exc), "saved-movie notification")
         return False
-    telegram.notify_user(db, watch.user_id, f"Parda Cinema: {watch.movie.title} now has a showtime at "
+    telegram.notify_user(db, watch.user_id, f"Phantora Cinema: {watch.movie.title} now has a showtime at "
                          f"{screening.auditorium.cinema_name}, {starts_at.strftime('%d %b %Y, %H:%M')}.")
     watch.alert_sent_at = now
     notice.sent_at = now

@@ -53,9 +53,9 @@ def _quote_booking(db: Session, booking: Booking, customer: User, promo_code: st
     available_points = customer.parda_points - customer.reserved_points + booking.points_redeemed
     max_points = int(((subtotal - promotion_discount) / Decimal(2 * POINT_VALUE_UZS)).to_integral_value(rounding=ROUND_DOWN))
     if points_to_redeem > max_points:
-        raise HTTPException(422, f"You can use up to {max_points} Parda Points on this booking")
+        raise HTTPException(422, f"You can use up to {max_points} Phantora Points on this booking")
     if points_to_redeem > available_points:
-        raise HTTPException(422, "You do not have enough available Parda Points")
+        raise HTTPException(422, "You do not have enough available Phantora Points")
     customer.reserved_points = max(0, customer.reserved_points - booking.points_redeemed) + points_to_redeem
     booking.subtotal_price = subtotal
     booking.promotion_code = normalized

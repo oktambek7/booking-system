@@ -32,7 +32,7 @@ class User(Base):
     # A compact, client-resized data URL. This avoids exposing a filesystem
     # path while allowing an account picture without a separate media service.
     avatar_data: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Parda Pass is an internal rewards balance.  Points are never derived
+    # Phantora Pass is an internal rewards balance.  Points are never derived
     # from card details and are only changed inside the payment transaction.
     parda_points: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     reserved_points: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -116,7 +116,7 @@ class CatalogScreeningLink(Base):
     """One owned seat map for one source repertory item.
 
     The public schedule id is unique.  This lets concurrent visitors select
-    the same time without producing two independent Parda seat inventories.
+    the same time without producing two independent Phantora seat inventories.
     """
     __tablename__ = "catalog_screening_links"
     source_repertory_id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -129,7 +129,7 @@ class CatalogResponseCache(Base):
     """Durable read-through cache for public catalogue responses.
 
     It intentionally stores only Cinematica's public discovery payloads.
-    Availability and booking state remain owned by Parda's booking tables.
+    Availability and booking state remain owned by Phantora's booking tables.
     """
     __tablename__ = "catalog_response_cache"
     cache_key: Mapped[str] = mapped_column(String(500), primary_key=True)

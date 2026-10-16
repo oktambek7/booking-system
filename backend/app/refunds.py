@@ -2,7 +2,7 @@
 
 A customer who cancels a paid ticket gets back a share of the price that depends on how far away the
 screening is (REFUND_FULL_HOURS / REFUND_PARTIAL_HOURS / REFUND_PARTIAL_PERCENT); an operator cancelling a
-ticket always refunds in full. The Parda Points used on the booking are returned in the same proportion and
+ticket always refunds in full. The Phantora Points used on the booking are returned in the same proportion and
 the points the booking earned are taken back in the same proportion (never below zero).
 
 Refunds are written to a ledger with one row per payment (a unique index makes a second refund impossible),
