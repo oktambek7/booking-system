@@ -1,12 +1,12 @@
 <div align="center">
 
-# PARDA
+# PHANTORA
 
 **Book a cinema seat in a few taps, without the queue and without the stress.**
 
 [Open the live site](https://sana-booking.vercel.app/) · [Source code](https://github.com/oktambek7/parda-booking-system)
 
-<img src="docs/screenshots/01-home.png" alt="Parda home page with the featured film carousel" width="900">
+<img src="docs/screenshots/01-home.png" alt="Phantora home page with the featured film carousel" width="900">
 
 </div>
 
@@ -22,16 +22,22 @@
 | :---: | :---: |
 | <img src="docs/screenshots/04-seat-map.png" alt="Live seat map with free, selected, taken and premium seats" width="440"> | <img src="docs/screenshots/05-checkout.png" alt="Checkout with order summary, hold timer, promo code, points and card form" width="220"> |
 
+| Light theme | On a phone |
+| :---: | :---: |
+| <img src="docs/screenshots/06-home-light.png" alt="Phantora home page in the light Ivory theme" width="440"> | <img src="docs/screenshots/07-phone.png" alt="Phantora on a phone: home, showtimes and the seat map" width="440"> |
+
+Colours, type and the logo follow the Phantora brand kit; the design system is documented in [`DESIGN.md`](DESIGN.md).
+
 ---
 
-## 1. What is Parda?
+## 1. What is Phantora?
 
-Parda is a web app for booking cinema seats online. You find a film, pick a showtime, choose the exact seats on a live hall map, and confirm. Parda is built to make that path fast: fewer steps, less waiting, and less time spent on payment.
+Phantora is a web app for booking cinema seats online. You find a film, pick a showtime, choose the exact seats on a live hall map, and confirm. Phantora is built to make that path fast: fewer steps, less waiting, and less time spent on payment.
 
 ### Who it is for
 
 - **Moviegoers** who want to pick their seats from a phone or laptop instead of standing in line at the box office.
-- **Cinema companies** that want a modern, ready-to-run booking platform under their own name. Parda is built to be handed over to a cinema operator, and it includes a staff dashboard for halls, schedules, ticket check-in and daily revenue.
+- **Cinema companies** that want a modern, ready-to-run booking platform under their own name. Phantora is built to be handed over to a cinema operator, and it includes a staff dashboard for halls, schedules, ticket check-in and daily revenue.
 
 ### How it works for a visitor
 
@@ -39,12 +45,12 @@ Parda is a web app for booking cinema seats online. You find a film, pick a show
 2. **Find a film.** Browse what is showing now or coming soon, search by title, and save films you want to watch.
 3. **Pick a showtime.** Filter by date, cinema, hall type (Standard or VIP), format (2D, 3D, IMAX) and language, then sort by time or price.
 4. **Choose seats.** The hall map shows which seats are free, taken or premium. Once you continue, your seats are held for you for 10 minutes.
-5. **Pay.** Enter card details (Uzcard, Humo, Visa or Mastercard) and type in the 4-digit code Parda sends to your email.
-6. **Get reminded.** Parda emails you twice before the film: **24 hours** before it starts and again **2 hours** before.
+5. **Pay.** Enter card details (Uzcard, Humo, Visa or Mastercard) and type in the 4-digit code Phantora sends to your email.
+6. **Get reminded.** Phantora emails you twice before the film: **24 hours** before it starts and again **2 hours** before.
 
-> **About payments:** payment is currently a demonstration. No real money is charged. The card form and email code show how the real flow will work. A licensed payment provider will be connected once Parda is handed over to a cinema company.
+> **About payments:** payment is currently a demonstration. No real money is charged. The card form and email code show how the real flow will work. A licensed payment provider will be connected once Phantora is handed over to a cinema company.
 
-### Why choose Parda over other booking platforms
+### Why choose Phantora over other booking platforms
 
 | Advantage | What it means for you |
 | --- | --- |
@@ -53,7 +59,7 @@ Parda is a web app for booking cinema seats online. You find a film, pick a show
 | **Made for Uzbekistan** | Prices in UZS, times in Tashkent time, local cards (Uzcard, Humo) as well as Visa and Mastercard. The interface is available in Uzbek, Russian and English, in light or dark mode. |
 | **You never miss the film** | Automatic email reminders 24 hours and 2 hours before the screening, plus a calendar file you can add to Google, Apple or Outlook calendar. |
 | **Sold out? Get notified** | Join the waitlist for a full screening and receive an email if seats free up. Save a film and receive an email when its first showtime appears. |
-| **Rewards** | Promo codes and Parda Points (1 point = 100 UZS, up to 50% of an order) make returning visits cheaper. |
+| **Rewards** | Promo codes and Phantora Points (1 point = 100 UZS, up to 50% of an order) make returning visits cheaper. |
 | **Paperless entry** | Every ticket gets a QR e-ticket that staff scan once at the entrance. |
 | **Clear at a glance** | The seat map uses labels and icons, not only colors, so it is easy to read for everyone. The full order summary is shown before you confirm. |
 
@@ -61,7 +67,7 @@ Parda is a web app for booking cinema seats online. You find a film, pick a show
 
 ## 2. Technical tools
 
-Parda is split into three clear parts: a **frontend** the user sees, a **backend API** that makes every decision, and a **database** that is the single source of truth. Each part has one job, which keeps the system predictable and easy to maintain.
+Phantora is split into three clear parts: a **frontend** the user sees, a **backend API** that makes every decision, and a **database** that is the single source of truth. Each part has one job, which keeps the system predictable and easy to maintain.
 
 ### Frontend (what the user sees)
 
@@ -98,17 +104,17 @@ Parda is split into three clear parts: a **frontend** the user sees, a **backend
 
 ### Data sources
 
-| Source | What Parda takes from it |
+| Source | What Phantora takes from it |
 | --- | --- |
-| **Cinematica** | Films now showing and coming soon, posters, age ratings and showtimes. Read-only and cached, so a slow source never slows Parda down. |
-| **TMDB** | Extra film details and artwork. Parda uses the TMDB API but is not endorsed or certified by TMDB. |
+| **Cinematica** | Films now showing and coming soon, posters, age ratings and showtimes. Read-only and cached, so a slow source never slows Phantora down. |
+| **TMDB** | Extra film details and artwork. Phantora uses the TMDB API but is not endorsed or certified by TMDB. |
 
-### How Parda avoids chaos
+### How Phantora avoids chaos
 
 - **The server decides, not the browser.** Prices, seat availability and booking status are always calculated on the backend, so nobody can change a price or grab a taken seat from their browser.
 - **Short seat holds.** A seat is reserved for 10 minutes during checkout. If payment is not finished, the seat is released automatically for other people.
 - **No double booking.** The database itself blocks two active bookings for the same seat and the same screening.
-- **Caching external data.** Showtimes from Cinematica are cached and refreshed in the background. If the source is briefly unavailable, Parda keeps working from the last good copy.
+- **Caching external data.** Showtimes from Cinematica are cached and refreshed in the background. If the source is briefly unavailable, Phantora keeps working from the last good copy.
 - **Reliable emails.** Reminders are queued in the database and sent by a background worker, so they go out on time and only once.
 - **Card data is not kept.** Only the last four digits of the card are saved on the receipt. The full number, holder name, expiry and CVV are never stored, logged or emailed.
 
@@ -117,12 +123,12 @@ Parda is split into three clear parts: a **frontend** the user sees, a **backend
 ## 3. Architecture diagram
 
 <p align="center">
-  <img src="docs/architecture.svg" alt="Parda architecture: the moviegoer's browser talks to the React frontend on Vercel, which calls the FastAPI backend on Render. The backend reads films and showtimes from Cinematica and TMDB, stores everything in PostgreSQL, and sends emails through Brevo to the user's inbox." width="100%">
+  <img src="docs/architecture.svg" alt="Phantora architecture: the moviegoer's browser talks to the React frontend on Vercel, which calls the FastAPI backend on Render. The backend reads films and showtimes from Cinematica and TMDB, stores everything in PostgreSQL, and sends emails through Brevo to the user's inbox." width="100%">
 </p>
 
 **How to read it:**
 
-1. The **moviegoer** opens Parda in a browser. The **React frontend** on Vercel shows films, showtimes, the seat map and checkout.
+1. The **moviegoer** opens Phantora in a browser. The **React frontend** on Vercel shows films, showtimes, the seat map and checkout.
 2. Every action (sign in, hold seats, pay) is sent as a request to the **FastAPI backend** on Render.
 3. The backend reads films and showtimes from **Cinematica** and film details from **TMDB**, and keeps a cached copy.
 4. All accounts, seats, holds, bookings and reminders are stored in **PostgreSQL**, which prevents double booking.
@@ -135,13 +141,13 @@ Parda is split into three clear parts: a **frontend** the user sees, a **backend
 Everything below is the developer and operations documentation: behaviour guarantees, configuration, security, payments, and the production checklist.
 
 
-Parda is an Uzbek-first cinema discovery and seat-booking app. The React/Vite frontend uses a FastAPI backend and PostgreSQL. Prices are in UZS and showtimes use `Asia/Tashkent`.
+Phantora is an Uzbek-first cinema discovery and seat-booking app. The React/Vite frontend uses a FastAPI backend and PostgreSQL. Prices are in UZS and showtimes use `Asia/Tashkent`.
 
 - **Public demo:** https://parda-booking.vercel.app/
 - **API docs:** https://parda-cinema-api.onrender.com/docs
 - **Source:** https://github.com/oktambek7/booking-system
 
-> Parda reads Cinematica's public film and repertory feeds only for discovery and schedule previews. Parda never forwards customers to an external checkout. Its own managed sessions use Parda's PostgreSQL seats, holds, bookings, and demo payment flow.
+> Phantora reads Cinematica's public film and repertory feeds only for discovery and schedule previews. Phantora never forwards customers to an external checkout. Its own managed sessions use Phantora's PostgreSQL seats, holds, bookings, and demo payment flow.
 
 ## Delivery state
 
@@ -155,7 +161,7 @@ Parda is an Uzbek-first cinema discovery and seat-booking app. The React/Vite fr
 - [x] Seat selection, ten-minute pending holds, booking history, customer cancellation, and status transitions
 - [x] Customer history clearing for cancelled/completed bookings (soft-archived; audit rows and active bookings are retained)
 - [x] In-app card-form checkout: Uzcard, Humo, Visa, and Mastercard choices, booking summary, email code verification, current expiry validation, resend limits, and no real charge
-- [x] Rolling Parda-owned demo sessions when the managed calendar has no future schedule
+- [x] Rolling Phantora-owned demo sessions when the managed calendar has no future schedule
 - [x] PostgreSQL protection against concurrent double booking and overlapping hall schedules
 - [x] Uzbek/English/Russian UI, light/dark themes, accessible date chips, and responsive cinema artwork
 - [x] Brevo transactional email delivery for signup verification, payment codes, and password resets
@@ -164,7 +170,7 @@ Parda is an Uzbek-first cinema discovery and seat-booking app. The React/Vite fr
 - [x] Persistent saved-film list with one-time first-showtime email alerts
 - [x] In-app notification center for ticket confirmation, reminder, waitlist, and saved-film delivery state
 - [x] Operator-managed promo campaigns with expiry, spend rules, usage limits, and checkout revalidation
-- [x] Parda Pass points: balance, reservation during checkout, redemption, and confirmed-ticket rewards
+- [x] Phantora Pass points: balance, reservation during checkout, redemption, and confirmed-ticket rewards
 - [x] Live Cinematica programme discovery with five-minute refreshes and a bounded stale-cache fallback
 - [x] Self-contained card checkout flow for Uzcard, Humo, Visa, and Mastercard with email-code confirmation
 - [x] Customer cancellation, booking-history archival, expiring seat holds, and PostgreSQL protection against competing seat requests
@@ -179,9 +185,9 @@ Parda is an Uzbek-first cinema discovery and seat-booking app. The React/Vite fr
 
 ## Assignment requirement mapping
 
-The original assignment describes appointments. Parda applies the same booking model to a cinema: a **movie** is the service, an **auditorium/cinema operator** is the provider, and a **screening** is the dated availability window.
+The original assignment describes appointments. Phantora applies the same booking model to a cinema: a **movie** is the service, an **auditorium/cinema operator** is the provider, and a **screening** is the dated availability window.
 
-| Requirement | Parda implementation |
+| Requirement | Phantora implementation |
 | --- | --- |
 | Service name, description, duration, price | Admin can create films with title, synopsis, duration, genre, age mark, language, and poster. The screening form sets the server-owned ticket price. |
 | Provider / employee | Admin creates cinema auditoriums with seat plans, timezone, formats, and Standard/VIP category. A cinema operator manages the associated schedules. |
@@ -196,7 +202,7 @@ The original assignment describes appointments. Parda applies the same booking m
 
 - A seat hold expires after ten minutes; expiry releases its seat assignments while preserving the audit record.
 - A visitor can join a full screening’s waitlist for one to eight seats. A later release creates a durable one-time email alert, but never reserves seats or bypasses the normal first-come booking transaction.
-- Saved films are scoped to the signed-in account. Parda queues one durable email when the film first receives a future Parda-managed screening; removing the saved film deletes any unsent alert.
+- Saved films are scoped to the signed-in account. Phantora queues one durable email when the film first receives a future Phantora-managed screening; removing the saved film deletes any unsent alert.
 - To stop seat hoarding, one customer can have at most 3 unpaid holds at once and at most 8 unpaid seats for any one screening (`MAX_PENDING_HOLDS_PER_USER`, `MAX_PENDING_SEATS_PER_SCREENING`). Expired, cancelled and paid bookings do not count, and a customer's holds are admitted one at a time under an account row lock so parallel requests cannot exceed the cap. A refused request explains what to do and how long the oldest hold has left.
 - Two customers selecting the same seat are serialized by the database. One booking succeeds, and the other receives HTTP 409 with current availability on refresh.
 - A user cannot book a past screening, choose a seat outside that auditorium, submit duplicate or more than eight seats. Customers can cancel any unused ticket; expired tickets are automatically hidden from their history on cancellation while the audit record remains. Admins can release an unused future booking while preserving its audit record.
@@ -207,15 +213,15 @@ The original assignment describes appointments. Parda applies the same booking m
 
 ## Demo checkout
 
-The checkout is intentionally a **demo payment**. It accepts a syntactically valid card number, holder name, current or future expiry date, and CVV for Visa or Mastercard, then emails a four-digit confirmation code and marks the Parda booking as confirmed. No processor is contacted and no money moves.
+The checkout is intentionally a **demo payment**. It accepts a syntactically valid card number, holder name, current or future expiry date, and CVV for Visa or Mastercard, then emails a four-digit confirmation code and marks the Phantora booking as confirmed. No processor is contacted and no money moves.
 
 That is the default (`PAYMENT_PROVIDER=demo`). See **Payment providers** below for the hosted-checkout path that a real gateway plugs into.
 
-On startup, Parda fills the next seven days of missing managed demo slots from its existing active films and halls. Existing screenings and conflicting slots are preserved.
+On startup, Phantora fills the next seven days of missing managed demo slots from its existing active films and halls. Existing screenings and conflicting slots are preserved.
 
 The app accepts card details only to validate this one demo attempt. It stores only the last four card digits on the payment receipt. It never stores, logs, returns, or emails a card number, holder name, expiry, or CVV. Payment email codes are HMAC digests, expire after five minutes, allow five attempts, and have resend limits. A successful ticket queues one confirmation email and, when the showtime permits, reminders 24 hours and 2 hours before the screening. Each notification is recorded in PostgreSQL so a service restart cannot duplicate it.
 
-TMDB provides movie metadata, not theater schedules or seat inventory. Cinematica's public data is cached for discovery only. It does not give Parda authority to lock source seats, sell source tickets, or guarantee the source feed. A real release needs operator-owned halls/schedules and a licensed payment provider with hosted or tokenized card entry.
+TMDB provides movie metadata, not theater schedules or seat inventory. Cinematica's public data is cached for discovery only. It does not give Phantora authority to lock source seats, sell source tickets, or guarantee the source feed. A real release needs operator-owned halls/schedules and a licensed payment provider with hosted or tokenized card entry.
 
 ## Run locally
 
@@ -299,11 +305,11 @@ How it stays safe: the link token is single-use, expires in 15 minutes and only 
 
 ## Ticket scanner
 
-In the operator panel's **Chiptalar** tab, "Kamera bilan skanerlash" opens the camera and checks tickets in from their QR codes (the e-ticket QR carries the ticket code). Decoding uses [jsQR](https://github.com/cozmo/jsQR) (Apache-2.0), loaded only when the scanner opens, so it works on every browser including iOS Safari. A ticket is submitted once each time it comes into view and again only after it has left the frame, so a steady hand does not repeat the request; QR codes that are not Parda tickets are ignored; the page keeps scanning between guests, and if the camera is denied or missing the manual code field still works. Camera access needs `camera=(self)` in the Permissions-Policy header (set in `frontend/vercel.json` and enforced by `npm run check:headers`) and HTTPS.
+In the operator panel's **Chiptalar** tab, "Kamera bilan skanerlash" opens the camera and checks tickets in from their QR codes (the e-ticket QR carries the ticket code). Decoding uses [jsQR](https://github.com/cozmo/jsQR) (Apache-2.0), loaded only when the scanner opens, so it works on every browser including iOS Safari. A ticket is submitted once each time it comes into view and again only after it has left the frame, so a steady hand does not repeat the request; QR codes that are not Phantora tickets are ignored; the page keeps scanning between guests, and if the camera is denied or missing the manual code field still works. Camera access needs `camera=(self)` in the Permissions-Policy header (set in `frontend/vercel.json` and enforced by `npm run check:headers`) and HTTPS.
 
 ## Payment providers
 
-`app/payment_providers.py` defines what a gateway must do: create a hosted checkout, authenticate its own webhooks, and refund. Parda ships the `demo` checkout and a `sandbox` provider that behaves like a real gateway (redirect out, signed webhook back, refund API) without any merchant account, so the whole path is tested end to end. **No real gateway (Payme, Click, Uzum, Stripe ...) is implemented yet: that needs merchant credentials and the gateway's documentation; it is one more class in that file plus an entry in `get_provider`.**
+`app/payment_providers.py` defines what a gateway must do: create a hosted checkout, authenticate its own webhooks, and refund. Phantora ships the `demo` checkout and a `sandbox` provider that behaves like a real gateway (redirect out, signed webhook back, refund API) without any merchant account, so the whole path is tested end to end. **No real gateway (Payme, Click, Uzum, Stripe ...) is implemented yet: that needs merchant credentials and the gateway's documentation; it is one more class in that file plus an entry in `get_provider`.**
 
 Flow with a provider: `POST /api/payments/checkout {booking_id}` (optional `Idempotency-Key` header) creates a payment in `awaiting_provider` and returns the hosted page URL; the browser goes there; the provider calls `POST /api/payments/webhook/{provider}`; only that signed callback confirms the booking (`app/checkout.py`). The browser is sent back to `/?payment=<reference>` and the app polls `GET /api/payments/by-reference/{reference}` until the webhook has landed.
 
@@ -313,9 +319,9 @@ What the webhook handler guarantees: the signature (HMAC-SHA256 over `timestamp.
 
 ## Installable app and offline tickets
 
-Parda is a Progressive Web App: `manifest.webmanifest` plus 192/512/maskable icons make it installable ("Add to Home Screen"), and `public/sw.js` keeps the app shell and its hashed build assets available without a connection. Pages are network-first (an online visitor always gets the newest build), build assets are cache-first with an 80-entry cap, and the worker never touches `/api`, `/health`, non-GET requests or other origins (film posters), so no personal data enters the browser cache. The worker is registered in production builds only and is served with `Cache-Control: max-age=0, must-revalidate`.
+Phantora is a Progressive Web App: `manifest.webmanifest` plus 192/512/maskable icons make it installable ("Add to Home Screen"), and `public/sw.js` keeps the app shell and its hashed build assets available without a connection. Pages are network-first (an online visitor always gets the newest build), build assets are cache-first with an 80-entry cap, and the worker never touches `/api`, `/health`, non-GET requests or other origins (film posters), so no personal data enters the browser cache. The worker is registered in production builds only and is served with `Cache-Control: max-age=0, must-revalidate`.
 
-For the cinema door, the app keeps the customer's upcoming confirmed tickets in `localStorage` (`parda_offline_tickets`): film, hall, time, seats and ticket code only, with no e-mail, name or payment data, at most 20 tickets, dropped three hours after the film ends. If the app cannot reach the server at start-up it shows an offline banner whose button opens those tickets with their QR codes, drawn on the device; when the connection returns the page reloads and signs the customer back in. The wallet is wiped on sign-out and when the session ends. `npm run check:headers` also validates the manifest, its icons and the worker's cache header.
+For the cinema door, the app keeps the customer's upcoming confirmed tickets in `localStorage` (`phantora_offline_tickets`): film, hall, time, seats and ticket code only, with no e-mail, name or payment data, at most 20 tickets, dropped three hours after the film ends. If the app cannot reach the server at start-up it shows an offline banner whose button opens those tickets with their QR codes, drawn on the device; when the connection returns the page reloads and signs the customer back in. The wallet is wiped on sign-out and when the session ends. `npm run check:headers` also validates the manifest, its icons and the worker's cache header.
 
 ## Live seat map
 
@@ -323,7 +329,7 @@ An open seat map updates by itself when someone else takes or releases a seat, a
 
 ## Cancellations and refunds
 
-A customer who cancels a **paid** ticket is refunded a share of the price that depends on how far away the screening is: 100% from `REFUND_FULL_HOURS` (24) before it starts, `REFUND_PARTIAL_PERCENT` (50%) from `REFUND_PARTIAL_HOURS` (2) before, and nothing after that. An operator cancelling a ticket always refunds in full. The amount is rounded down to a whole sum. The Parda Points spent on the booking come back in the same proportion and the points it earned are taken back in the same proportion (never below zero). Unpaid holds have nothing to refund. Promo-code usage is not restored.
+A customer who cancels a **paid** ticket is refunded a share of the price that depends on how far away the screening is: 100% from `REFUND_FULL_HOURS` (24) before it starts, `REFUND_PARTIAL_PERCENT` (50%) from `REFUND_PARTIAL_HOURS` (2) before, and nothing after that. An operator cancelling a ticket always refunds in full. The amount is rounded down to a whole sum. The Phantora Points spent on the booking come back in the same proportion and the points it earned are taken back in the same proportion (never below zero). Unpaid holds have nothing to refund. Promo-code usage is not restored.
 
 `GET /api/bookings/{id}/cancellation-quote` previews the result (the app shows it before the customer confirms) and `GET /api/refund-policy` publishes the policy. Refunds are recorded in a ledger with one row per payment (a unique index makes a second refund impossible), in the same transaction as the cancellation; the payment becomes `refunded_demo` or `partially_refunded_demo`, the customer gets a refund email, the operator dashboard totals the money returned, and each refund is in the audit log. Demo payments move no money; a payment made through a payment provider is refunded through that provider (see **Payment providers**).
 
@@ -343,7 +349,7 @@ Owners manage operators from the **Operatorlar** tab or the API: `GET /api/admin
 
 ## Two-step verification
 
-Any account can turn on two-step verification from the profile panel: Parda shows a QR code (and the key) for an authenticator app, confirms the first 6-digit code, then shows ten single-use recovery codes once. After that, signing in with the right password answers with a short-lived challenge instead of a session, and the session starts only after `POST /api/auth/login/2fa` accepts a current code or a recovery code. Turning it on also ends every other sign-in of the account; turning it off (or replacing the recovery codes) needs the password and a current code.
+Any account can turn on two-step verification from the profile panel: Phantora shows a QR code (and the key) for an authenticator app, confirms the first 6-digit code, then shows ten single-use recovery codes once. After that, signing in with the right password answers with a short-lived challenge instead of a session, and the session starts only after `POST /api/auth/login/2fa` accepts a current code or a recovery code. Turning it on also ends every other sign-in of the account; turning it off (or replacing the recovery codes) needs the password and a current code.
 
 What it guarantees: codes are standard TOTP (RFC 6238, SHA-1, 30 s, one step of clock drift, checked against the RFC test vectors); an accepted code cannot be used again (the last accepted time step is stored); wrong codes are limited to five per account per 15 minutes, across sign-in, disabling and recovery-code changes together; the shared secret is encrypted at rest (Fernet, key from `TOTP_ENCRYPTION_KEY`, else `OTP_SECRET`) and recovery codes are stored only as keyed hashes; the sign-in challenge is a different kind of token and is refused as an access token; and every refresh of a session keeps the record of whether it passed the second step.
 
@@ -403,16 +409,16 @@ flowchart LR
   S -->|source IDs, URL, sync time| D[(PostgreSQL hall directory)]
   D --> A[Admin: verify address and coordinates]
   S --> F[Movie detail / showtime filters]
-  F --> B[Parda seat map and booking]
-  B --> D2[(Parda bookings, holds, receipts)]
+  F --> B[Phantora seat map and booking]
+  B --> D2[(Phantora bookings, holds, receipts)]
 ```
 
 ### Data policy and synchronization
 
-- Cinematica is used only as a public discovery source. Parda does not access source checkout, source customer data, or source seat inventory.
+- Cinematica is used only as a public discovery source. Phantora does not access source checkout, source customer data, or source seat inventory.
 - The sync reads current public movie repertory, rejects disabled, malformed, started, and expired rows, then upserts halls by `source_name + external_hall_id`. It stores the source cinema ID, hall ID, source URL, and `last_synced_at`.
-- A scheduled Parda session is hidden when its managed inventory is sold out. A source time that clashes with a managed session in the same imported hall is also hidden before a customer can enter the seat map.
-- Source payloads have a five-minute fresh cache and a 24-hour bounded stale fallback for read-only discovery. A source failure does not block Parda bookings that already exist.
+- A scheduled Phantora session is hidden when its managed inventory is sold out. A source time that clashes with a managed session in the same imported hall is also hidden before a customer can enter the seat map.
+- Source payloads have a five-minute fresh cache and a 24-hour bounded stale fallback for read-only discovery. A source failure does not block Phantora bookings that already exist.
 - Cinematica-imported locations are deliberately blank until a cinema operator supplies verified address and latitude/longitude through the protected hall update endpoint. The UI never estimates a distance.
 
 ### Tashkent cinema sources
@@ -441,8 +447,8 @@ The site asks for browser location only after the visitor presses **Find cinemas
 | Endpoint | Access | Purpose |
 | --- | --- | --- |
 | `GET /api/cinematica/movies/{id}/screenings` | Public | Current valid source showtimes for one movie |
-| `POST /api/cinematica/movies/{id}/ticketon/{session_id}/ticketing` | Public | Re-validates an on-sale Ticketon time then creates Parda's owned seat map |
-| `GET /api/cinemas?city=Tashkent` | Public | Active Parda and imported halls |
+| `POST /api/cinematica/movies/{id}/ticketon/{session_id}/ticketing` | Public | Re-validates an on-sale Ticketon time then creates Phantora's owned seat map |
+| `GET /api/cinemas?city=Tashkent` | Public | Active Phantora and imported halls |
 | `GET /api/cinemas/nearby?lat=&lng=` | Public | Halls with verified coordinates, ordered by distance |
 | `PATCH /api/cinemas/{id}` | Admin | Verify address, coordinates, formats, hall type, or disable a hall |
 | `GET /api/admin/dashboard?date=YYYY-MM-DD` | Admin | Date-scoped session occupancy, booking activity, and confirmed-revenue dashboard |
@@ -484,22 +490,22 @@ Before taking real customers, in this order:
 **Backups.** The database is the only state that matters (tickets, payments, accounts, the audit log); the app and frontend are rebuilt from the repository. Use the host's automated backups with point-in-time recovery if the plan has them (Render's paid Postgres plans do; the free plan does not keep backups and expires), and additionally take a logical dump on a schedule you control:
 
 ```
-pg_dump --format=custom --no-owner --file=parda-$(date +%F).dump "$DATABASE_URL"
+pg_dump --format=custom --no-owner --file=phantora-$(date +%F).dump "$DATABASE_URL"
 ```
 
 Store dumps outside the database host, encrypted, and delete them on the retention you promise customers: they contain e-mail addresses and booking history, and deleted accounts reappear in old dumps. **A backup that was never restored is a hope, not a backup**: periodically restore the latest dump into a scratch database and check that the app starts against it:
 
 ```
-createdb parda_restore_check
-pg_restore --no-owner --dbname=parda_restore_check parda-YYYY-MM-DD.dump
-DATABASE_URL=postgresql+psycopg://.../parda_restore_check python -m app.migrate     # reports the revision, applies anything newer
+createdb phantora_restore_check
+pg_restore --no-owner --dbname=phantora_restore_check phantora-YYYY-MM-DD.dump
+DATABASE_URL=postgresql+psycopg://.../phantora_restore_check python -m app.migrate     # reports the revision, applies anything newer
 ```
 
 `python -m app.migrate` is also how a restored (older) dump is brought up to the current schema. The audit log is append-only by trigger, so a restore keeps it intact; the e-mail of a deleted account in it is already a tombstone.
 
 ## Known source limits
 
-The public Cinematica feed currently provides cinema/hall labels, session time, price, and source identifiers. It does not provide verified street addresses, coordinates, physical capacities, cancellation state, or source seat counts. Parda therefore does not invent those fields. Complete operator verification and a licensed payment provider remain required before taking real money.
+The public Cinematica feed currently provides cinema/hall labels, session time, price, and source identifiers. It does not provide verified street addresses, coordinates, physical capacities, cancellation state, or source seat counts. Phantora therefore does not invent those fields. Complete operator verification and a licensed payment provider remain required before taking real money.
 
 ## TMDB attribution
 
@@ -507,6 +513,6 @@ Movie metadata and artwork are provided by TMDB. This product uses the TMDB API 
 
 ## Architecture and AI use
 
-The React client presents a read-only public catalog alongside Parda-managed sessions. FastAPI proxies and caches discovery routes for five minutes. Parda's PostgreSQL models are the source of truth for Parda accounts, seats, holds, bookings, payments, and payment email challenges. TMDB remains a metadata/import source for the admin-managed catalog.
+The React client presents a read-only public catalog alongside Phantora-managed sessions. FastAPI proxies and caches discovery routes for five minutes. Phantora's PostgreSQL models are the source of truth for Phantora accounts, seats, holds, bookings, payments, and payment email challenges. TMDB remains a metadata/import source for the admin-managed catalog.
 
 AI tools helped draft and revise UI, API/data-model scaffolding, and edge-case documentation. Review the implementation and provider behavior before production; verify real callbacks and concurrent seat reservations against staging data.

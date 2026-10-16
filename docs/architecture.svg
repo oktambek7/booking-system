@@ -1,141 +1,141 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="840" viewBox="0 0 1200 840" font-family="Segoe UI, Helvetica Neue, Helvetica, Arial, sans-serif">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#120d2b"/>
-      <stop offset="1" stop-color="#1d1036"/>
+      <stop offset="0" stop-color="#0B0D17"/>
+      <stop offset="1" stop-color="#07080F"/>
     </linearGradient>
     <linearGradient id="brand" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#8b5cf6"/>
-      <stop offset="1" stop-color="#ec4899"/>
+      <stop offset="0" stop-color="#D3AD68"/>
+      <stop offset="1" stop-color="#BC9348"/>
     </linearGradient>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="#c4b5fd"/>
+      <path d="M0,0 L10,5 L0,10 z" fill="#BDBAB4"/>
     </marker>
     <marker id="arrowCyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="#22d3ee"/>
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A8FA6"/>
     </marker>
     <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="#34d399"/>
+      <path d="M0,0 L10,5 L0,10 z" fill="#BDBAB4"/>
     </marker>
     <marker id="arrowAmber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="#fbbf24"/>
+      <path d="M0,0 L10,5 L0,10 z" fill="#C9A25B"/>
     </marker>
   </defs>
 
   <rect width="1200" height="840" rx="24" fill="url(#bg)"/>
 
   <!-- Title -->
-  <text x="40" y="58" font-size="28" font-weight="800" fill="#ffffff">How Parda works</text>
+  <text x="40" y="58" font-size="28" font-weight="800" fill="#F1ECE2">How Phantora works</text>
   <rect x="40" y="72" width="64" height="4" rx="2" fill="url(#brand)"/>
-  <text x="40" y="104" font-size="15" fill="#a5a0c8">Where every request goes, and where the data comes from</text>
+  <text x="40" y="104" font-size="15" fill="#9A9EB2">Where every request goes, and where the data comes from</text>
 
   <!-- ============ Arrows (drawn first so boxes sit on top) ============ -->
 
   <!-- User -> Frontend -->
-  <line x1="212" y1="360" x2="266" y2="360" stroke="#c4b5fd" stroke-width="2.5" marker-end="url(#arrow)"/>
-  <text x="239" y="348" font-size="12" fill="#c4b5fd" text-anchor="middle">HTTPS</text>
+  <line x1="212" y1="360" x2="266" y2="360" stroke="#BDBAB4" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <text x="239" y="348" font-size="12" fill="#BDBAB4" text-anchor="middle">HTTPS</text>
 
   <!-- Frontend <-> API -->
-  <line x1="504" y1="360" x2="566" y2="360" stroke="#c4b5fd" stroke-width="2.5" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
-  <text x="535" y="340" font-size="12" fill="#c4b5fd" text-anchor="middle">REST</text>
-  <text x="535" y="384" font-size="12" fill="#c4b5fd" text-anchor="middle">JSON</text>
+  <line x1="504" y1="360" x2="566" y2="360" stroke="#BDBAB4" stroke-width="2.5" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+  <text x="535" y="340" font-size="12" fill="#BDBAB4" text-anchor="middle">REST</text>
+  <text x="535" y="384" font-size="12" fill="#BDBAB4" text-anchor="middle">JSON</text>
 
   <!-- Cinematica -> API -->
-  <path d="M946,215 L910,215 L910,250 L876,250" fill="none" stroke="#22d3ee" stroke-width="2.5" marker-end="url(#arrowCyan)"/>
+  <path d="M946,215 L910,215 L910,250 L876,250" fill="none" stroke="#8A8FA6" stroke-width="2.5" marker-end="url(#arrowCyan)"/>
   <!-- TMDB -> API -->
-  <line x1="946" y1="330" x2="876" y2="330" stroke="#22d3ee" stroke-width="2.5" marker-end="url(#arrowCyan)"/>
-  <text x="911" y="292" font-size="12" fill="#22d3ee" text-anchor="middle">read-only</text>
-  <text x="911" y="308" font-size="12" fill="#22d3ee" text-anchor="middle">cached</text>
+  <line x1="946" y1="330" x2="876" y2="330" stroke="#8A8FA6" stroke-width="2.5" marker-end="url(#arrowCyan)"/>
+  <text x="911" y="292" font-size="12" fill="#8A8FA6" text-anchor="middle">read-only</text>
+  <text x="911" y="308" font-size="12" fill="#8A8FA6" text-anchor="middle">cached</text>
 
   <!-- API -> Email provider -->
-  <line x1="876" y1="520" x2="946" y2="520" stroke="#fbbf24" stroke-width="2.5" marker-end="url(#arrowAmber)"/>
-  <text x="911" y="508" font-size="12" fill="#fbbf24" text-anchor="middle">emails</text>
+  <line x1="876" y1="520" x2="946" y2="520" stroke="#C9A25B" stroke-width="2.5" marker-end="url(#arrowAmber)"/>
+  <text x="911" y="508" font-size="12" fill="#C9A25B" text-anchor="middle">emails</text>
 
   <!-- Email provider -> User inbox (routed underneath) -->
-  <path d="M1055,606 L1055,800 L125,800 L125,484" fill="none" stroke="#fbbf24" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#arrowAmber)"/>
-  <text x="600" y="790" font-size="13" fill="#fbbf24" text-anchor="middle">4-digit codes · ticket confirmation · reminders 24 h and 2 h before the film</text>
+  <path d="M1055,606 L1055,800 L125,800 L125,484" fill="none" stroke="#C9A25B" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#arrowAmber)"/>
+  <text x="600" y="790" font-size="13" fill="#C9A25B" text-anchor="middle">4-digit codes · ticket confirmation · reminders 24 h and 2 h before the film</text>
 
   <!-- API <-> PostgreSQL -->
-  <line x1="725" y1="604" x2="725" y2="650" stroke="#34d399" stroke-width="2.5" marker-start="url(#arrowGreen)" marker-end="url(#arrowGreen)"/>
-  <text x="740" y="633" font-size="12" fill="#34d399">SQL · row locks</text>
+  <line x1="725" y1="604" x2="725" y2="650" stroke="#BDBAB4" stroke-width="2.5" marker-start="url(#arrowGreen)" marker-end="url(#arrowGreen)"/>
+  <text x="740" y="633" font-size="12" fill="#BDBAB4">SQL · row locks</text>
 
   <!-- ============ Nodes ============ -->
 
   <!-- User -->
-  <rect x="40" y="250" width="172" height="232" rx="18" fill="#1c1638" stroke="#4c3d85" stroke-width="1.5"/>
-  <text x="126" y="290" font-size="17" font-weight="700" fill="#ffffff" text-anchor="middle">Moviegoer</text>
-  <text x="126" y="312" font-size="12.5" fill="#a5a0c8" text-anchor="middle">phone or desktop</text>
-  <rect x="58" y="338" width="136" height="44" rx="10" fill="#2a2150"/>
-  <text x="126" y="365" font-size="13.5" fill="#e9e5ff" text-anchor="middle">Web browser</text>
-  <rect x="58" y="398" width="136" height="44" rx="10" fill="#3a2d16"/>
-  <text x="126" y="425" font-size="13.5" fill="#fde68a" text-anchor="middle">Email inbox</text>
+  <rect x="40" y="250" width="172" height="232" rx="18" fill="#10131F" stroke="#2A2E45" stroke-width="1.5"/>
+  <text x="126" y="290" font-size="17" font-weight="700" fill="#F1ECE2" text-anchor="middle">Moviegoer</text>
+  <text x="126" y="312" font-size="12.5" fill="#9A9EB2" text-anchor="middle">phone or desktop</text>
+  <rect x="58" y="338" width="136" height="44" rx="10" fill="#1C2036"/>
+  <text x="126" y="365" font-size="13.5" fill="#F1ECE2" text-anchor="middle">Web browser</text>
+  <rect x="58" y="398" width="136" height="44" rx="10" fill="#2A2418"/>
+  <text x="126" y="425" font-size="13.5" fill="#E0BE7F" text-anchor="middle">Email inbox</text>
 
   <!-- Frontend -->
-  <rect x="268" y="180" width="236" height="360" rx="18" fill="#1c1638" stroke="url(#brand)" stroke-width="2"/>
-  <text x="386" y="216" font-size="12" font-weight="700" letter-spacing="1.5" fill="#f0abfc" text-anchor="middle">FRONTEND · VERCEL</text>
-  <text x="386" y="246" font-size="18" font-weight="700" fill="#ffffff" text-anchor="middle">React 19 + TypeScript</text>
-  <text x="386" y="268" font-size="13" fill="#a5a0c8" text-anchor="middle">built with Vite</text>
-  <g font-size="13.5" fill="#e9e5ff">
-    <rect x="286" y="290" width="200" height="38" rx="10" fill="#2a2150"/>
+  <rect x="268" y="180" width="236" height="360" rx="18" fill="#10131F" stroke="url(#brand)" stroke-width="2"/>
+  <text x="386" y="216" font-size="12" font-weight="700" letter-spacing="1.5" fill="#C9A25B" text-anchor="middle">FRONTEND · VERCEL</text>
+  <text x="386" y="246" font-size="18" font-weight="700" fill="#F1ECE2" text-anchor="middle">React 19 + TypeScript</text>
+  <text x="386" y="268" font-size="13" fill="#9A9EB2" text-anchor="middle">built with Vite</text>
+  <g font-size="13.5" fill="#F1ECE2">
+    <rect x="286" y="290" width="200" height="38" rx="10" fill="#1C2036"/>
     <text x="386" y="314" text-anchor="middle">Film catalogue &amp; search</text>
-    <rect x="286" y="338" width="200" height="38" rx="10" fill="#2a2150"/>
+    <rect x="286" y="338" width="200" height="38" rx="10" fill="#1C2036"/>
     <text x="386" y="362" text-anchor="middle">Showtimes &amp; filters</text>
-    <rect x="286" y="386" width="200" height="38" rx="10" fill="#2a2150"/>
+    <rect x="286" y="386" width="200" height="38" rx="10" fill="#1C2036"/>
     <text x="386" y="410" text-anchor="middle">Live seat map</text>
-    <rect x="286" y="434" width="200" height="38" rx="10" fill="#2a2150"/>
+    <rect x="286" y="434" width="200" height="38" rx="10" fill="#1C2036"/>
     <text x="386" y="458" text-anchor="middle">Checkout &amp; QR tickets</text>
-    <rect x="286" y="482" width="200" height="38" rx="10" fill="#2a2150"/>
+    <rect x="286" y="482" width="200" height="38" rx="10" fill="#1C2036"/>
     <text x="386" y="506" text-anchor="middle">UZ · RU · EN, light/dark</text>
   </g>
 
   <!-- API -->
-  <rect x="570" y="140" width="306" height="464" rx="18" fill="#1c1638" stroke="url(#brand)" stroke-width="2"/>
-  <text x="723" y="176" font-size="12" font-weight="700" letter-spacing="1.5" fill="#f0abfc" text-anchor="middle">BACKEND API · RENDER (DOCKER)</text>
-  <text x="723" y="206" font-size="18" font-weight="700" fill="#ffffff" text-anchor="middle">FastAPI · Python 3.12</text>
-  <text x="723" y="228" font-size="13" fill="#a5a0c8" text-anchor="middle">Pydantic validation · SQLAlchemy</text>
-  <g font-size="13.5" fill="#e9e5ff">
-    <rect x="590" y="248" width="266" height="50" rx="10" fill="#2a2150"/>
+  <rect x="570" y="140" width="306" height="464" rx="18" fill="#10131F" stroke="url(#brand)" stroke-width="2"/>
+  <text x="723" y="176" font-size="12" font-weight="700" letter-spacing="1.5" fill="#C9A25B" text-anchor="middle">BACKEND API · RENDER (DOCKER)</text>
+  <text x="723" y="206" font-size="18" font-weight="700" fill="#F1ECE2" text-anchor="middle">FastAPI · Python 3.12</text>
+  <text x="723" y="228" font-size="13" fill="#9A9EB2" text-anchor="middle">Pydantic validation · SQLAlchemy</text>
+  <g font-size="13.5" fill="#F1ECE2">
+    <rect x="590" y="248" width="266" height="50" rx="10" fill="#1C2036"/>
     <text x="723" y="269" text-anchor="middle" font-weight="600">Accounts &amp; sign-in</text>
-    <text x="723" y="288" text-anchor="middle" font-size="12" fill="#a5a0c8">JWT · Argon2 passwords · email codes</text>
-    <rect x="590" y="308" width="266" height="50" rx="10" fill="#2a2150"/>
+    <text x="723" y="288" text-anchor="middle" font-size="12" fill="#9A9EB2">JWT · Argon2 passwords · email codes</text>
+    <rect x="590" y="308" width="266" height="50" rx="10" fill="#1C2036"/>
     <text x="723" y="329" text-anchor="middle" font-weight="600">Films &amp; showtimes</text>
-    <text x="723" y="348" text-anchor="middle" font-size="12" fill="#a5a0c8">merged from Cinematica + TMDB</text>
-    <rect x="590" y="368" width="266" height="50" rx="10" fill="#2a2150"/>
+    <text x="723" y="348" text-anchor="middle" font-size="12" fill="#9A9EB2">merged from Cinematica + TMDB</text>
+    <rect x="590" y="368" width="266" height="50" rx="10" fill="#1C2036"/>
     <text x="723" y="389" text-anchor="middle" font-weight="600">Seat holds &amp; bookings</text>
-    <text x="723" y="408" text-anchor="middle" font-size="12" fill="#a5a0c8">10-minute hold · no double booking</text>
-    <rect x="590" y="428" width="266" height="50" rx="10" fill="#2a2150"/>
+    <text x="723" y="408" text-anchor="middle" font-size="12" fill="#9A9EB2">10-minute hold · no double booking</text>
+    <rect x="590" y="428" width="266" height="50" rx="10" fill="#1C2036"/>
     <text x="723" y="449" text-anchor="middle" font-weight="600">Demo checkout</text>
-    <text x="723" y="468" text-anchor="middle" font-size="12" fill="#a5a0c8">card form + 4-digit email code</text>
-    <rect x="590" y="488" width="266" height="98" rx="10" fill="#33224f"/>
+    <text x="723" y="468" text-anchor="middle" font-size="12" fill="#9A9EB2">card form + 4-digit email code</text>
+    <rect x="590" y="488" width="266" height="98" rx="10" fill="#171A2C"/>
     <text x="723" y="510" text-anchor="middle" font-weight="600">Background workers</text>
-    <text x="723" y="532" text-anchor="middle" font-size="12" fill="#a5a0c8">reminder queue · every minute</text>
-    <text x="723" y="552" text-anchor="middle" font-size="12" fill="#a5a0c8">Cinematica refresh · every 10 min</text>
-    <text x="723" y="572" text-anchor="middle" font-size="12" fill="#a5a0c8">TMDB refresh · every 24 h</text>
+    <text x="723" y="532" text-anchor="middle" font-size="12" fill="#9A9EB2">reminder queue · every minute</text>
+    <text x="723" y="552" text-anchor="middle" font-size="12" fill="#9A9EB2">Cinematica refresh · every 10 min</text>
+    <text x="723" y="572" text-anchor="middle" font-size="12" fill="#9A9EB2">TMDB refresh · every 24 h</text>
   </g>
 
   <!-- PostgreSQL -->
-  <rect x="570" y="652" width="306" height="104" rx="18" fill="#10291f" stroke="#34d399" stroke-width="2"/>
-  <text x="723" y="686" font-size="12" font-weight="700" letter-spacing="1.5" fill="#6ee7b7" text-anchor="middle">DATABASE</text>
-  <text x="723" y="712" font-size="18" font-weight="700" fill="#ffffff" text-anchor="middle">PostgreSQL 16</text>
-  <text x="723" y="736" font-size="12.5" fill="#a7f3d0" text-anchor="middle">users · seats · holds · bookings · reminders</text>
+  <rect x="570" y="652" width="306" height="104" rx="18" fill="#121524" stroke="#BDBAB4" stroke-width="2"/>
+  <text x="723" y="686" font-size="12" font-weight="700" letter-spacing="1.5" fill="#F1ECE2" text-anchor="middle">DATABASE</text>
+  <text x="723" y="712" font-size="18" font-weight="700" fill="#F1ECE2" text-anchor="middle">PostgreSQL 16</text>
+  <text x="723" y="736" font-size="12.5" fill="#BDBAB4" text-anchor="middle">users · seats · holds · bookings · reminders</text>
 
   <!-- Cinematica -->
-  <rect x="948" y="160" width="212" height="104" rx="18" fill="#0e2733" stroke="#22d3ee" stroke-width="2"/>
-  <text x="1054" y="190" font-size="12" font-weight="700" letter-spacing="1.5" fill="#67e8f9" text-anchor="middle">DATA SOURCE</text>
-  <text x="1054" y="216" font-size="17" font-weight="700" fill="#ffffff" text-anchor="middle">Cinematica</text>
-  <text x="1054" y="240" font-size="12.5" fill="#a5f3fc" text-anchor="middle">films, posters, showtimes</text>
+  <rect x="948" y="160" width="212" height="104" rx="18" fill="#121524" stroke="#8A8FA6" stroke-width="2"/>
+  <text x="1054" y="190" font-size="12" font-weight="700" letter-spacing="1.5" fill="#B7BCCF" text-anchor="middle">DATA SOURCE</text>
+  <text x="1054" y="216" font-size="17" font-weight="700" fill="#F1ECE2" text-anchor="middle">Cinematica</text>
+  <text x="1054" y="240" font-size="12.5" fill="#B7BCCF" text-anchor="middle">films, posters, showtimes</text>
 
   <!-- TMDB -->
-  <rect x="948" y="280" width="212" height="104" rx="18" fill="#0e2733" stroke="#22d3ee" stroke-width="2"/>
-  <text x="1054" y="310" font-size="12" font-weight="700" letter-spacing="1.5" fill="#67e8f9" text-anchor="middle">DATA SOURCE</text>
-  <text x="1054" y="336" font-size="17" font-weight="700" fill="#ffffff" text-anchor="middle">TMDB</text>
-  <text x="1054" y="360" font-size="12.5" fill="#a5f3fc" text-anchor="middle">movie details &amp; artwork</text>
+  <rect x="948" y="280" width="212" height="104" rx="18" fill="#121524" stroke="#8A8FA6" stroke-width="2"/>
+  <text x="1054" y="310" font-size="12" font-weight="700" letter-spacing="1.5" fill="#B7BCCF" text-anchor="middle">DATA SOURCE</text>
+  <text x="1054" y="336" font-size="17" font-weight="700" fill="#F1ECE2" text-anchor="middle">TMDB</text>
+  <text x="1054" y="360" font-size="12.5" fill="#B7BCCF" text-anchor="middle">movie details &amp; artwork</text>
 
   <!-- Email provider -->
-  <rect x="948" y="458" width="212" height="148" rx="18" fill="#2e2410" stroke="#fbbf24" stroke-width="2"/>
-  <text x="1054" y="488" font-size="12" font-weight="700" letter-spacing="1.5" fill="#fcd34d" text-anchor="middle">EMAIL DELIVERY</text>
-  <text x="1054" y="514" font-size="17" font-weight="700" fill="#ffffff" text-anchor="middle">Brevo</text>
-  <text x="1054" y="536" font-size="12.5" fill="#fde68a" text-anchor="middle">(Resend / SMTP supported)</text>
-  <text x="1054" y="564" font-size="12.5" fill="#fde68a" text-anchor="middle">sign-up &amp; payment codes,</text>
-  <text x="1054" y="582" font-size="12.5" fill="#fde68a" text-anchor="middle">tickets, reminders</text>
+  <rect x="948" y="458" width="212" height="148" rx="18" fill="#2A2418" stroke="#C9A25B" stroke-width="2"/>
+  <text x="1054" y="488" font-size="12" font-weight="700" letter-spacing="1.5" fill="#C9A25B" text-anchor="middle">EMAIL DELIVERY</text>
+  <text x="1054" y="514" font-size="17" font-weight="700" fill="#F1ECE2" text-anchor="middle">Brevo</text>
+  <text x="1054" y="536" font-size="12.5" fill="#E0BE7F" text-anchor="middle">(Resend / SMTP supported)</text>
+  <text x="1054" y="564" font-size="12.5" fill="#E0BE7F" text-anchor="middle">sign-up &amp; payment codes,</text>
+  <text x="1054" y="582" font-size="12.5" fill="#E0BE7F" text-anchor="middle">tickets, reminders</text>
 </svg>

@@ -1,42 +1,48 @@
 {
-  "name": "Parda Cinema",
-  "direction": "Aurora Glass Cinema",
-  "description": "Uzbek-first cinema booking: frosted glass over a drifting aurora, dark by default with a matching light theme.",
+  "name": "Phantora",
+  "direction": "The Darkened Auditorium",
+  "description": "Uzbek-first cinema booking: ink surfaces, ivory type and a single gold accent, dark by default with a matching ivory theme.",
   "themes": {
-    "dark": { "name": "Night Screen", "bg": "#0a0a18", "bg-elevated": "#12122a", "text": "#f5f5ff", "text-2": "#b4b4d0", "text-3": "#a0a0c0" },
-    "light": { "name": "Matinee", "bg": "#f6f5ff", "bg-elevated": "#ffffff", "text": "#14142b", "text-2": "#4a4a68", "text-3": "#61617f" }
+    "dark": { "name": "Ink", "bg": "#0B0D17", "bg-elevated": "#10131F", "text": "#F1ECE2", "text-2": "#BDBAB4", "text-3": "#9A9EB2" },
+    "light": { "name": "Ivory", "bg": "#F1ECE2", "bg-elevated": "#F8F5EE", "text": "#0B0D17", "text-2": "#3F4258", "text-3": "#5E6178" }
   },
   "colors": {
-    "aurora-violet": "#7c5cff",
-    "aurora-magenta": "#ff3d8b",
-    "aurora-cyan": "#22d3ee",
-    "aurora-amber": "#ffb547",
-    "action-from": "#7653f8",
-    "action-to": "#d61f6e",
-    "seat-available": "#34d399",
-    "seat-selected": "#7653f8",
-    "seat-premium": "#ffb547",
-    "seat-taken": "#5b5b78",
-    "success": "#22c55e",
-    "warning": "#f59e0b",
-    "danger": "#f43f5e"
+    "ink": "#0B0D17",
+    "ivory": "#F1ECE2",
+    "gold": "#C9A25B",
+    "gold-on-light": "#A8823D",
+    "dusk": "#8A8FA6",
+    "action-from": "#D3AD68",
+    "action-to": "#BC9348",
+    "seat-available": "#8A8FA6",
+    "seat-selected": "#C9A25B",
+    "seat-premium": "#F1ECE2",
+    "seat-taken": "#2A2E45",
+    "success": "#4FB58A",
+    "warning": "#D9A441",
+    "danger": "#E5645F"
   },
   "typography": {
-    "display": "Unbounded Variable (600)",
-    "body": "Manrope Variable (400-700)",
+    "display": "Syne Variable (700), headings and brand only",
+    "body": "Outfit Variable (400-700)",
+    "numerals": "Outfit, never Syne: Syne draws its zero as a round o",
+    "cyrillic-fallback": "Manrope Variable",
     "floor": "12px"
   },
-  "glass": {
-    "glass-1": "cards, chips; white 6%; blur 16px (10px phones)",
-    "glass-2": "header, hero card, sticky bars; blur 24px (16px phones)",
-    "glass-3": "modals, drawers, menu; blur 32px (20px phones)"
+  "surfaces": {
+    "glass-1": "cards, chips; ivory 4% (dark) / white 50% (light); blur 14px (10px phones)",
+    "glass-2": "header, hero card, sticky bars; ink 74% / ivory 80%; blur 22px (16px phones)",
+    "glass-3": "modals, drawers, menu; ink 93% / ivory 96%; blur 30px (20px phones)"
   },
   "breakpoints": [481, 769, 1025, 1280],
   "source": "frontend/src/styles/tokens.css",
+  "brand": "Phantora brand kit: ticket mark with one gold dot; mark drawn inline in frontend/src/ui/Brand.tsx",
   "principles": [
-    "One gradient primary action per screen, always in the same place.",
-    "Glass carries the interface; solid colour carries seat and status meaning.",
+    "Gold is the only accent; it appears where a decision is.",
+    "One gold primary action per screen, always in the same place.",
+    "Surfaces carry the interface; solid colour carries seat and status meaning.",
     "Seat state is shown by colour, pattern or icon, and text.",
+    "No motion behind content; the theatre backdrop is still.",
     "Checkout is a demo and never implies a real charge."
   ]
 }

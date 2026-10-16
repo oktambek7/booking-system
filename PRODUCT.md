@@ -35,7 +35,7 @@ This is a web app for cinemas in Uzbekistan. The default interface is Uzbek, pri
 - Booking status values are pending, confirmed, cancelled, and completed. Cancelling or expiring releases seats while preserving booking history.
 - This project has no connected payment processor. Demo confirmation must not imply a real charge.
 - Film listings, posters and showtimes come from Cinematica, with film metadata from TMDB (credited in the footer). Checkout is a demo.
-- “Parda Cinema” is a fictional demo label; no production cinema chain or catalogue was supplied.
+- “Phantora” is a fictional demo label; no production cinema chain or catalogue was supplied.
 - The payment provider is undecided and intentionally absent from demo checkout.
 
 ## Evidence on Hand
