@@ -101,24 +101,21 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
     existing = db.scalar(sa.select(User).where(sa.or_(
         User.email == email, sa.func.lower(User.nickname) == nickname
     )))
+    user = None
     if existing:
         if existing.email == email and existing.active and not existing.email_verified:
-            latest = db.scalar(sa.select(EmailOtpChallenge).where(EmailOtpChallenge.user_id == existing.id)
-                .order_by(EmailOtpChallenge.created_at.desc()))
-            now = datetime.now(timezone.utc)
-            return EmailChallengeOut(
-                email=existing.email,
-                expires_at=latest.expires_at if latest and latest.expires_at > now else now + timedelta(minutes=10),
-                resend_available_at=resend_available_at(latest.created_at) if latest else now,
-                demo_mode=False,
-                demo_code=None,
-            )
-        if existing.email == email:
+            # Someone (maybe not the mailbox owner) registered this address earlier and never verified it. The new
+            # request gets its own code, bound to its own password below, so that whoever proves the mailbox at
+            # verification is the one whose password the account ends up with.
+            user = existing
+        elif existing.email == email:
             raise HTTPException(409, "This email is already registered. Sign in or reset the password")
-        raise HTTPException(409, "This nickname is already in use")
-    user = User(name=nickname, nickname=nickname, email=email,
-                password_hash=hash_password(data.password), role=Role.CUSTOMER)
-    db.add(user)
+        else:
+            raise HTTPException(409, "This nickname is already in use")
+    password_hash = hash_password(data.password)
+    if user is None:
+        user = User(name=nickname, nickname=nickname, email=email, password_hash=password_hash, role=Role.CUSTOMER)
+        db.add(user)
     try:
         db.flush()
         recent = db.scalar(sa.select(sa.func.count(EmailOtpChallenge.id)).where(
@@ -127,7 +124,8 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
         if recent >= 3:
             raise HTTPException(429, "Too many verification emails. Try again in 10 minutes")
         code = new_code()
-        challenge = EmailOtpChallenge(user_id=user.id, code_hash=email_code_hash(user.id, code),
+        # The password the person typed travels with the code; the account takes it only once the code is proven.
+        challenge = EmailOtpChallenge(user_id=user.id, code_hash=email_code_hash(user.id, code), password_hash=password_hash,
             expires_at=datetime.now(timezone.utc) + timedelta(minutes=10))
         is_demo = send_email_code(user.email, code)
         db.add(challenge)
@@ -157,7 +155,7 @@ def resend_email_code(data: EmailResend, db: Session = Depends(get_db)):
         raise HTTPException(429, "Too many verification emails. Try again in 10 minutes")
     code = new_code()
     challenge = EmailOtpChallenge(user_id=user.id, code_hash=email_code_hash(user.id, code),
-        expires_at=datetime.now(timezone.utc) + timedelta(minutes=10))
+        password_hash=latest.password_hash if latest else None, expires_at=datetime.now(timezone.utc) + timedelta(minutes=10))
     try:
         is_demo = send_email_code(user.email, code)
         db.add(challenge)
@@ -194,6 +192,10 @@ def verify_email(data: EmailCodeVerify, request: Request, response: Response, db
         raise HTTPException(422, "Incorrect verification code")
     challenge.consumed_at = now
     user.email_verified = True
+    if challenge.password_hash:
+        # The password chosen together with this very code. An earlier, unverified registration by someone else
+        # for the same address can never leave its password on the account.
+        user.password_hash = challenge.password_hash
     sessions.start_session(db, user, request, response)
     db.commit()
     return {"access_token": make_token(user), "token_type": "bearer", "expires_in": _access_seconds(),
