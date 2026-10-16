@@ -199,6 +199,38 @@ class CrossSiteTests(SessionCase):
         origin = settings.cors_origins.split(",")[0]
         self.assertEqual(self.refresh(token, Origin=origin).status_code, 200)
 
+    def test_a_page_served_from_the_address_the_proxy_forwarded_is_our_own(self):
+        """Behind Vercel's rewrite the page's address arrives as x-forwarded-host, whatever CORS_ORIGINS lists."""
+        _, _, token = self.sign_in()
+        site = {"Origin": "https://shop.example", "X-Forwarded-Host": "shop.example", "X-Forwarded-Proto": "https"}
+        self.assertEqual(self.refresh(token, **site).status_code, 200)
+        _, _, token = self.sign_in()
+        lying = {"Origin": "https://evil.example", "X-Forwarded-Host": "shop.example", "X-Forwarded-Proto": "https"}
+        self.assertEqual(self.refresh(token, **lying).status_code, 403, "an origin that is not the forwarded host is still refused")
+
+class RefreshRateLimitTests(SessionCase):
+    def setUp(self):
+        super().setUp()
+        sql("DELETE FROM rate_limit_buckets WHERE key LIKE 'refresh%'")
+
+    def test_a_signed_in_visitors_refreshes_are_never_throttled(self):
+        _, _, token = self.sign_in()
+        for _ in range(130):                               # more than the old per-address limit of 120 in ten minutes
+            resp = self.refresh(token)
+            self.assertEqual(resp.status_code, 200, resp.text)
+            token = self.new_cookie(resp)
+
+    def test_visitors_with_no_cookie_do_not_count_against_anyone(self):
+        for _ in range(60):
+            self.assertEqual(self.client.post("/api/auth/refresh").status_code, 401)
+        _, _, token = self.sign_in()
+        self.assertEqual(self.refresh(token).status_code, 200, "a real session behind the same address still works")
+
+    def test_repeatedly_presenting_invalid_cookies_is_throttled(self):
+        statuses = [self.refresh("not-a-real-token").status_code for _ in range(40)]
+        self.assertEqual(statuses[0], 401)
+        self.assertEqual(statuses[-1], 429)
+
 class CleanupTests(SessionCase):
     def test_purge_removes_only_long_dead_tokens(self):
         user, _, _ = self.sign_in()

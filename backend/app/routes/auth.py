@@ -42,7 +42,10 @@ CODE_IP_LIMIT = (60, 600)
 CODE_ACCOUNT_FAILURES = (10, 1800)
 
 RESET_REQUEST_IP_LIMIT = (20, 3600)
-REFRESH_IP_LIMIT = (120, 600)
+# Only refreshes with a cookie that turns out to be invalid count towards this: a signed-in visitor's own refresh is
+# already authenticated, and counting it would let many visitors behind one address (a carrier or office network, or a
+# proxy that hides the real address) lock each other out.
+REFRESH_FAILURE_LIMIT = (30, 600)
 
 def _access_seconds() -> int:
     return settings.jwt_expire_minutes * 60
@@ -57,6 +60,12 @@ def require_trusted_origin(request: Request) -> None:
         return
     allowed = {o.strip().rstrip("/") for o in settings.cors_origins.split(",") if o.strip()}
     allowed.add(str(request.base_url).rstrip("/"))
+    # Behind a proxy (Vercel rewriting /api to this server) the page's own address arrives as the forwarded host. A page
+    # served from the address the request was sent to is, by definition, our own page.
+    forwarded_host = request.headers.get("x-forwarded-host", "").split(",")[0].strip()
+    if forwarded_host:
+        forwarded_proto = request.headers.get("x-forwarded-proto", "https").split(",")[0].strip() or "https"
+        allowed.add(f"{forwarded_proto}://{forwarded_host}".rstrip("/"))
     if origin.rstrip("/") not in allowed:
         raise HTTPException(403, "Cross-site request refused")
 
@@ -223,13 +232,18 @@ def login(data: Login, request: Request, response: Response, db: Session = Depen
     db.commit()
     return LoginOut(access_token=make_token(user), expires_in=_access_seconds())
 
-@router.post("/auth/refresh", response_model=Token, dependencies=[ratelimit.per_ip("refresh", *REFRESH_IP_LIMIT)])
+@router.post("/auth/refresh", response_model=Token)
 def refresh_session(request: Request, response: Response, db: Session = Depends(get_db)):
     """Trade the httpOnly refresh cookie for a new access token (and a new cookie)."""
     require_trusted_origin(request)
+    caller = ratelimit.client_ip(request)
+    ratelimit.check("refresh-failed", caller, *REFRESH_FAILURE_LIMIT)
     try:
         user, mfa = sessions.rotate_session(db, request, response)
+    except sessions.NotSignedIn as exc:
+        return JSONResponse(status_code=401, content={"detail": str(exc)})
     except sessions.SessionError as exc:
+        ratelimit.record_failure("refresh-failed", caller, REFRESH_FAILURE_LIMIT[1])
         rejected = JSONResponse(status_code=401, content={"detail": str(exc)})
         sessions.clear_cookie(rejected)
         return rejected

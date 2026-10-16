@@ -24,6 +24,9 @@ COOKIE_PATH = "/api/auth"      # the browser sends it only to the sign-in/refres
 class SessionError(Exception):
     """The refresh token cannot be used; the message is safe to show."""
 
+class NotSignedIn(SessionError):
+    """The browser sent no refresh cookie at all: an ordinary visitor, not a failed attempt."""
+
 def _hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
@@ -78,7 +81,7 @@ def rotate_session(db: Session, request: Request, response: Response) -> tuple[U
     second step. Raises SessionError; the caller commits on success."""
     raw = request.cookies.get(COOKIE_NAME)
     if not raw:
-        raise SessionError("Not signed in")
+        raise NotSignedIn("Not signed in")
     row = db.scalar(sa.select(RefreshToken).where(RefreshToken.token_hash == _hash(raw)).with_for_update())
     now = _now()
     if row is None or row.revoked_at is not None or row.expires_at <= now:

@@ -255,7 +255,7 @@ docker compose exec -e ADMIN_EMAIL=admin@example.com -e ADMIN_PASSWORD='use-a-lo
 Deploy from `render.yaml`, attach PostgreSQL, and set these private values in the service environment:
 
 - `DATABASE_URL`, `TMDB_READ_TOKEN`, `JWT_SECRET`, `OTP_SECRET`
-- `CORS_ORIGINS` to the exact production frontend origin
+- `CORS_ORIGINS` to the exact production frontend origin, and to every other address the site is served from (for example both `https://sana-booking.vercel.app` and `https://parda-booking.vercel.app`, comma separated). Cookie-authenticated calls (refresh, sign-out) also accept a page served from the host the proxy forwards in `X-Forwarded-Host`, so a missing entry no longer signs people out on reload
 - `EMAIL_MODE=brevo`, `BREVO_API_KEY`, `BREVO_FROM` (recommended for production)
 - `APP_ENVIRONMENT=production`
 
