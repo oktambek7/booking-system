@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 import asyncio
+import os
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -122,6 +123,14 @@ async def _database_reachable() -> bool:
         logger.warning("Health check: database unreachable", exc_info=True)
         return False
 
+def _build_version() -> str:
+    """Short commit id of the running build, from the host's environment (Render sets RENDER_GIT_COMMIT)."""
+    for name in ("RENDER_GIT_COMMIT", "GIT_COMMIT", "SOURCE_VERSION"):
+        value = os.environ.get(name, "").strip()
+        if value:
+            return value[:7]
+    return ""
+
 @app.get("/health/live")
 def health_live():
     """Liveness: the process is up and serving. Never touches the database."""
@@ -131,5 +140,9 @@ def health_live():
 async def health():
     """Readiness: the API can reach its database. This is the path hosting health checks should use."""
     if await _database_reachable():
-        return {"status": "ok", "database": "ok"}
+        body = {"status": "ok", "database": "ok"}
+        version = _build_version()
+        if version:
+            body["version"] = version      # which commit is running, so a deploy can be checked from the browser
+        return body
     return JSONResponse(status_code=503, content={"status": "unavailable", "database": "unreachable"})

@@ -18,6 +18,7 @@ export default function SessionDiagnostics() {
     cookiesEnabled: navigator.cookieEnabled,
     serviceWorkerControlsPage: Boolean(navigator.serviceWorker?.controller),
     secureContext: window.isSecureContext,
+    build: typeof __BUILD__ === 'string' ? __BUILD__ : 'unknown',
   }
   const report = JSON.stringify({ page, steps }, null, 2)
   return (

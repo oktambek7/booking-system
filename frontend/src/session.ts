@@ -155,7 +155,9 @@ async function assertApiHealthy(): Promise<void> {
   const timer = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS)
   try {
     const response = await fetch(`${apiBase}/health`, { cache: 'no-store', signal: controller.signal })
-    recordSessionStep('health', response.status)
+    let version = ''
+    try { const body = await response.clone().json() as { version?: unknown }; if (typeof body.version === 'string') version = `server build ${body.version}` } catch { /* not JSON */ }
+    recordSessionStep('health', response.status, version)
     // A host that has no health route (404/405) is not "down": carry on and let the refresh decide.
     if (!response.ok && response.status !== 404 && response.status !== 405) {
       throw new SessionRequestError(`The API is not ready (${response.status})`, response.status, retryAfterOf(response))
