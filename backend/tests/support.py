@@ -1,6 +1,7 @@
 """Factories and helpers shared by the database-backed tests."""
 import itertools
 import queue
+import socket
 import threading
 import time
 import uuid
@@ -200,6 +201,7 @@ class SSEReader:
         self.status: int | None = None
         self._client = httpx.Client(timeout=None)
         self._ready = threading.Event()
+        self._response = None
         self._thread = threading.Thread(target=self._read, args=(url,), daemon=True)
         self._thread.start()
         self._ready.wait(10)
@@ -207,6 +209,7 @@ class SSEReader:
     def _read(self, url: str) -> None:
         try:
             with self._client.stream("GET", url) as response:
+                self._response = response
                 self.status = response.status_code
                 self._ready.set()
                 if response.status_code != 200:
@@ -242,6 +245,15 @@ class SSEReader:
         return found
 
     def close(self) -> None:
+        """Hang up like a closed browser tab. Closing the client alone is not enough on Linux: the reader thread is
+        blocked in recv() on the same socket, so no FIN is sent until the socket is shut down explicitly."""
+        try:
+            stream = self._response.extensions["network_stream"] if self._response is not None else None
+            sock = stream.get_extra_info("socket") if stream is not None else None
+            if sock is not None:
+                sock.shutdown(socket.SHUT_RDWR)
+        except Exception:
+            pass
         self._client.close()
 
 
