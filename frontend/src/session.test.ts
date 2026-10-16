@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   apiFetch, bootSession, configureSession, endSession, getAccessToken, onSessionExpired, onTokenChange,
-  refreshAccessToken, resetSessionForTests, setAccessToken,
+  refreshAccessToken, resetSessionForTests, retryAfterMs, setAccessToken,
 } from './session'
 
 type Handler = (url: string, init?: RequestInit) => Response | Promise<Response>
@@ -163,6 +163,24 @@ describe('bootSession', () => {
     mockFetch(() => json(503))
     await expect(bootSession()).rejects.toThrow(/not ready/)
     expect(refreshCalls()).toBe(0)
+  })
+
+  it('carries on to the refresh when the host has no health route at all', async () => {
+    mockFetch((url) => isHealth(url) ? json(404) : json(200, { access_token: 'ok', expires_in: 900 }))
+    expect(await bootSession()).toBe('ok')
+  })
+
+  it('can skip the health check, so a broken check can never block signing back in', async () => {
+    mockFetch((url) => isHealth(url) ? json(503) : json(200, { access_token: 'ok', expires_in: 900 }))
+    expect(await bootSession({ skipHealthCheck: true })).toBe('ok')
+    expect(calls.map((c) => c.url)).toEqual(['https://site.example/api/auth/refresh'])
+  })
+
+  it('reports how long a rate-limited server asked us to wait', async () => {
+    mockFetch(() => new Response('{"detail":"Too many attempts"}', { status: 429, headers: { 'Retry-After': '45', 'Content-Type': 'application/json' } }))
+    const error = await bootSession({ skipHealthCheck: true }).catch((e) => e)
+    expect(error).toBeInstanceOf(Error)
+    expect(retryAfterMs(error)).toBe(45000)
   })
 
   it('gives up on a health check that hangs instead of waiting forever', async () => {

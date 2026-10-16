@@ -312,4 +312,11 @@
   @media (min-width: 769px) { .catalog-skeleton { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
   @media (min-width: 1025px) { .catalog-skeleton { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
   @media (min-width: 1280px) { .catalog-skeleton { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+
+  /* Hidden panel (?diag=1) that shows what the session requests got back. */
+  .session-diagnostics { position: fixed; left: var(--s-3); bottom: var(--s-3); z-index: 200; display: grid; gap: var(--s-2); width: min(420px, calc(100vw - 2 * var(--s-3))); max-height: 60dvh; overflow: auto; padding: var(--s-3); border-radius: var(--r-md); background: var(--bg-solid-3); border: 1px solid var(--accent-line); box-shadow: var(--shadow-2); color: var(--text); font-size: var(--fs-label); }
+  .session-diagnostics pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-2); font-family: ui-monospace, Menlo, monospace; }
+  .session-diagnostics ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; font-family: ui-monospace, Menlo, monospace; overflow-wrap: anywhere; }
+  .session-diagnostics div { display: flex; gap: var(--s-2); }
+  .session-diagnostics button { min-height: 36px; padding: 0 var(--s-3); border-radius: var(--r-pill); border: 1px solid var(--line-strong); background: var(--glass-1-bg); font-weight: 600; }
 }

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { apiFetch, bootSession, configureSession, endSession, onSessionExpired, onTokenChange, setAccessToken } from './session'
+import { apiFetch, bootSession, retryAfterMs, configureSession, endSession, onSessionExpired, onTokenChange, setAccessToken } from './session'
 import { Bell, BookmarkX, CalendarPlus, Check, ChevronDown, Eye, EyeOff, Film, Globe2, Heart, LogOut, MapPin, Menu, Moon, ShieldCheck, Sun, Ticket, UserRound, X } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import CinemaCatalog from './CinemaCatalog'
@@ -11,6 +11,7 @@ import { formatDateTime } from './dateFormat'
 import ProfileDrawer from './ProfileDrawer'
 import Modal from './ui/Modal'
 import { BrandLogo, BrandMark } from './ui/Brand'
+import SessionDiagnostics, { diagnosticsRequested } from './ui/SessionDiagnostics'
 import CodeInput from './ui/CodeInput'
 import { copy, type Lang } from './i18n/messages'
 import OfflineTickets, { OfflineBanner } from './OfflineWallet'
@@ -125,7 +126,7 @@ export default function App(){
    if(!mounted||done||running)return
    running=true;window.clearTimeout(timer)
    try{
-    const restored=await bootSession()
+    const restored=await bootSession({skipHealthCheck:attempt>=3})
     if(!restored||!mounted){done=true;setRestoring(false);return}
     setToken(restored)
     const response=await requestWithRetry(`${API}/api/auth/me`,{headers:authHeaders(restored)})
@@ -140,7 +141,7 @@ export default function App(){
     console.warn('Phantora: could not reach the server to restore the session, will retry',err)
     attempt+=1
     if(attempt>=RESTORE_PLACEHOLDER_ATTEMPTS)setRestoring(false)
-    timer=window.setTimeout(()=>void restore(),restoreDelay(attempt))
+    timer=window.setTimeout(()=>void restore(),Math.max(restoreDelay(attempt),retryAfterMs(err)))
    }finally{running=false}
   }
   retryRestore.current=()=>{attempt=0;void restore()}
@@ -173,6 +174,7 @@ async function resendEmail(){if(!pendingEmail||emailCooldown.secondsLeft)return;
  const codeLabel=lang==='ru'?'Код из email':lang==='en'?'Email code':'Email kodi'
  return <div className="app-shell" id="top">
   <div className="theatre" aria-hidden="true"/>
+  {diagnosticsRequested()&&<SessionDiagnostics/>}
   {!user&&!online&&<OfflineBanner lang={lang} hasTickets={!!offlineTickets} onOpen={()=>setShowOfflineTickets(true)}/>}
   {offlineTickets&&showOfflineTickets&&<OfflineTickets tickets={offlineTickets} lang={lang} onClose={()=>setShowOfflineTickets(false)}/>}
   {paymentOutcome&&<PaymentResult outcome={paymentOutcome} lang={lang} onClose={()=>setPaymentOutcome(null)}/>}

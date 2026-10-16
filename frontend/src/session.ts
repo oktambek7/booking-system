@@ -5,7 +5,37 @@
  * long-lived credential). The refresh token is an httpOnly cookie the browser manages; this module
  * trades it for a fresh access token shortly before the old one expires, or when the API answers 401.
  */
+import { recordSessionStep } from './sessionDiagnostics'
+
 type TokenListener = (token: string) => void
+
+/** A session request the API answered with an error (as opposed to not answering at all). */
+export class SessionRequestError extends Error {
+  readonly status: number
+  readonly retryAfterMs: number | undefined
+  constructor(message: string, status: number, retryAfterMs?: number) {
+    super(message)
+    this.status = status
+    this.retryAfterMs = retryAfterMs
+  }
+}
+
+/** How long the server asked us to wait (Retry-After on a 429/503), or 0. */
+export function retryAfterMs(error: unknown): number {
+  return error instanceof SessionRequestError ? error.retryAfterMs ?? 0 : 0
+}
+
+async function errorDetail(response: Response): Promise<string> {
+  try {
+    const body = await response.clone().json() as { detail?: unknown }
+    return typeof body.detail === 'string' ? body.detail : ''
+  } catch { return '' }
+}
+
+function retryAfterOf(response: Response): number | undefined {
+  const seconds = Number(response.headers.get('Retry-After'))
+  return Number.isFinite(seconds) && seconds > 0 ? Math.min(seconds, 300) * 1000 : undefined
+}
 
 let apiBase = ''
 let accessToken = ''
@@ -59,12 +89,20 @@ export function refreshAccessToken(): Promise<string> {
 }
 
 async function requestRefresh(): Promise<string> {
-  const response = await fetch(`${apiBase}/api/auth/refresh`, { method: 'POST', credentials: 'include' })
+  let response: Response
+  try {
+    response = await fetch(`${apiBase}/api/auth/refresh`, { method: 'POST', credentials: 'include' })
+  } catch (error) {
+    recordSessionStep('refresh', 'no answer', error instanceof Error ? error.message : String(error))
+    throw error
+  }
+  if (!response.ok) recordSessionStep('refresh', response.status, await errorDetail(response))
+  else recordSessionStep('refresh', response.status, 'ok')
   if (response.status === 401 || response.status === 403) {
     setAccessToken('')
     return ''
   }
-  if (!response.ok) throw new Error(`Session refresh failed (${response.status})`)
+  if (!response.ok) throw new SessionRequestError(`Session refresh failed (${response.status})`, response.status, retryAfterOf(response))
   const body = await response.json() as { access_token: string; expires_in?: number }
   setAccessToken(body.access_token, body.expires_in)
   return body.access_token
@@ -117,7 +155,14 @@ async function assertApiHealthy(): Promise<void> {
   const timer = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS)
   try {
     const response = await fetch(`${apiBase}/health`, { cache: 'no-store', signal: controller.signal })
-    if (!response.ok) throw new Error(`The API is not ready (${response.status})`)
+    recordSessionStep('health', response.status)
+    // A host that has no health route (404/405) is not "down": carry on and let the refresh decide.
+    if (!response.ok && response.status !== 404 && response.status !== 405) {
+      throw new SessionRequestError(`The API is not ready (${response.status})`, response.status, retryAfterOf(response))
+    }
+  } catch (error) {
+    if (!(error instanceof SessionRequestError)) recordSessionStep('health', 'no answer', error instanceof Error ? error.message : String(error))
+    throw error
   } finally {
     clearTimeout(timer)
   }
@@ -130,9 +175,10 @@ async function assertApiHealthy(): Promise<void> {
  * left holding a retired cookie. Rejects (without touching the cookie) when the API cannot be reached; the caller
  * retries later.
  */
-export async function bootSession(): Promise<string> {
+export async function bootSession(options: { skipHealthCheck?: boolean } = {}): Promise<string> {
   try { localStorage.removeItem('parda_token') } catch { /* storage unavailable: nothing to clean */ }
-  await assertApiHealthy()
+  // After several failed health checks the check itself may be what is wrong, so let the refresh try anyway.
+  if (!options.skipHealthCheck) await assertApiHealthy()
   return refreshAccessToken()
 }
 
