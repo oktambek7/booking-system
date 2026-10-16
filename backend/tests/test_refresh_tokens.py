@@ -1,4 +1,5 @@
 """Rotating httpOnly refresh-token sessions."""
+import hashlib
 import unittest
 
 from app.config import settings
@@ -121,15 +122,29 @@ class ReuseDetectionTests(SessionCase):
         second = self.refresh(token)                      # same old cookie, a moment later
         self.assertEqual((first.status_code, second.status_code), (200, 200))
         self.assertEqual(self.me(second.json()["access_token"]), 200)
-        self.assertIsNone(self.new_cookie(second), "the racing request must not rotate again")
+        self.assertIsNotNone(self.new_cookie(second), "the racing request gets a current cookie of its own")
         self.assertEqual(self.refresh(self.new_cookie(first)).status_code, 200)
+        self.assertEqual(self.refresh(self.new_cookie(second)).status_code, 200)
+
+    def test_a_browser_that_never_received_the_first_reply_keeps_a_working_session(self):
+        """The first refresh rotated the cookie but its reply was lost, so the browser still holds the old token."""
+        user, _, stale = self.sign_in()
+        self.refresh(stale)                                    # the reply to this one never arrives
+        retry = self.refresh(stale)                            # the page tries again with what it still has
+        current = self.new_cookie(retry)
+        self.assertEqual(retry.status_code, 200)
+        self.assertIsNotNone(current)
+        sql("UPDATE refresh_tokens SET rotated_at = now() - interval '1 minute' WHERE token_hash = :h", h=hashlib.sha256(stale.encode()).hexdigest())
+        self.assertEqual(self.refresh(current).status_code, 200, "the next reload, long after the grace period, still works")
+        self.assertEqual(scalar("SELECT count(*) FROM refresh_tokens WHERE user_id = :u AND revoked_at IS NOT NULL", u=user["id"]), 0)
 
     def test_parallel_refreshes_rotate_exactly_once(self):
         user, _, token = self.sign_in()
         results = run_parallel([lambda: self.refresh(token) for _ in range(6)])
         self.assertEqual([r.status_code for r in results], [200] * 6, [r.text for r in results])
-        self.assertEqual(sum(1 for r in results if self.new_cookie(r)), 1)
-        self.assertEqual(scalar("SELECT count(*) FROM refresh_tokens WHERE user_id = :u", u=user["id"]), 2)
+        self.assertEqual(sum(1 for r in results if self.new_cookie(r)), 6, "every caller ends up with a current cookie")
+        self.assertEqual(scalar("SELECT count(*) FROM refresh_tokens WHERE user_id = :u AND rotated_at IS NULL", u=user["id"]), 6)
+        self.assertEqual([self.refresh(self.new_cookie(r)).status_code for r in results], [200] * 6)
         self.assertEqual(scalar("SELECT count(*) FROM refresh_tokens WHERE user_id = :u AND revoked_at IS NOT NULL", u=user["id"]), 0)
 
 class SignOutTests(SessionCase):

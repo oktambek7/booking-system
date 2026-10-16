@@ -18,7 +18,7 @@ import PaymentResult from './PaymentResult'
 import TwoFactorLogin, { twoFactorTitle } from './TwoFactorLogin'
 import { takePaymentReference, waitForPayment, type PaymentOutcome } from './paymentReturn'
 import { clearTickets, loadTickets, saveTickets, type OfflineTicket } from './offlineTickets'
-import { RESTORE_ATTEMPTS, restoreDelay } from './restoreSchedule'
+import { RESTORE_PLACEHOLDER_ATTEMPTS, restoreDelay } from './restoreSchedule'
 
 type Booking={id:number;status:string;seat_count:number;total_price:number|string;hold_expires_at:string|null;created_at:string;ends_at:string;ticket_code:string|null;checked_in_at:string|null;refund_amount?:number|string;refund_percent?:number|null;movie_title:string;starts_at:string;cinema_name:string;auditorium_name:string;seats:string[]}
 type User={id:number;name:string;nickname:string;email:string;role:string;created_at?:string;avatar_data?:string|null;operator_cinemas?:string[]|null}
@@ -33,12 +33,18 @@ const locale=()=>{const l=localStorage.getItem('phantora_lang');return l==='en'?
 const money=(n:number|string)=>`${new Intl.NumberFormat(locale()).format(Number(n))} ${locale()==='en-US'?'UZS':"so'm"}`
 const authHeaders=(token:string)=>({Authorization:`Bearer ${token}`,'Content-Type':'application/json'})
 const profileOverrideKey=(id:number)=>`phantora_profile_override_${id}`
+const restoreLabel={uz:'Hisobingiz tiklanmoqda…',en:'Restoring your session…',ru:'Восстанавливаем сеанс…'} as const
+const ignoredNoticesKey=(id:number)=>`phantora_cleared_notifications_${id}`
+const readIgnoredNotices=(id?:number):string[]=>{if(id===undefined)return[];try{const v=JSON.parse(localStorage.getItem(ignoredNoticesKey(id))||'[]');return Array.isArray(v)?v.filter((x):x is string=>typeof x==='string'):[]}catch{return[]}}
 const clearCopy={
  uz:{label:'Xabarlarni tozalash',ask:'Barcha xabarlar tozalansinmi?',yes:'Tozalash',no:'Bekor qilish',done:'Xabarlar tozalandi.',fail:'Xabarlarni tozalab bo‘lmadi.'},
  en:{label:'Clear notifications',ask:'Clear all notifications?',yes:'Clear',no:'Cancel',done:'Notifications cleared.',fail:'Notifications could not be cleared.'},
  ru:{label:'Очистить уведомления',ask:'Очистить все уведомления?',yes:'Очистить',no:'Отмена',done:'Уведомления очищены.',fail:'Не удалось очистить уведомления.'},
 } as const
+/* The id of the signed-in account, set the moment the server returns it (React state is still stale in the same tick). */
+let knownUserId:number|undefined
 function withLocalProfileOverride(user:User):User{
+ knownUserId=user.id
  try{
   const saved=localStorage.getItem(profileOverrideKey(user.id))
   if(!saved)return user
@@ -61,7 +67,7 @@ export default function App(){
  const [confirmingClear,setConfirmingClear]=useState(false),[clearStatus,setClearStatus]=useState('')
  const notificationLabel=(item:CustomerNotification)=>t(({confirmation:'confirmationUpdate',reminder_24h:'reminder24Update',reminder_2h:'reminder2Update',waitlist_available:'waitlistUpdate',saved_movie_showtime:'savedMovieUpdate',refund:'refundUpdate'} as Record<string,string>)[item.kind]||'updates')
  const notificationState=(item:CustomerNotification)=>t(({scheduled:'queued',sent:'delivered',retrying:'retrying'} as Record<string,string>)[item.state])
- const [user,setUser]=useState<User|null>(null),[token,setToken]=useState(''),[offlineTickets,setOfflineTickets]=useState<OfflineTicket[]|null>(()=>loadTickets()?.tickets??null),[online,setOnline]=useState(()=>navigator.onLine!==false),[serverDown,setServerDown]=useState(false),[showOfflineTickets,setShowOfflineTickets]=useState(false),[paymentOutcome,setPaymentOutcome]=useState<PaymentOutcome|null>(null),[mfaChallenge,setMfaChallenge]=useState('')
+ const [user,setUser]=useState<User|null>(null),[token,setToken]=useState(''),[offlineTickets,setOfflineTickets]=useState<OfflineTicket[]|null>(()=>loadTickets()?.tickets??null),[online,setOnline]=useState(()=>navigator.onLine!==false),[restoring,setRestoring]=useState(Boolean(API)),[showOfflineTickets,setShowOfflineTickets]=useState(false),[paymentOutcome,setPaymentOutcome]=useState<PaymentOutcome|null>(null),[mfaChallenge,setMfaChallenge]=useState('')
  const [bookings,setBookings]=useState<Booking[]>([])
  const [savedMovies,setSavedMovies]=useState<SavedMovie[]>([]),[savedLoading,setSavedLoading]=useState(false),[savedBusy,setSavedBusy]=useState<number|null>(null)
  const [notifications,setNotifications]=useState<CustomerNotification[]>([]),[notificationsLoading,setNotificationsLoading]=useState(false)
@@ -81,17 +87,31 @@ export default function App(){
  const headers=useMemo(()=>authHeaders(token),[token])
  async function loadHistory(t=token){if(!t)return;const r=await apiFetch(`${API}/api/bookings`,{headers:authHeaders(t)});if(r.ok){const items=await r.json();setBookings(items);saveTickets(items)}}
  async function loadSavedMovies(t=token){if(!t){setSavedMovies([]);return}setSavedLoading(true);try{const r=await apiFetch(`${API}/api/watchlist`,{headers:authHeaders(t)});if(r.ok)setSavedMovies(await r.json())}finally{setSavedLoading(false)}}
- async function loadNotifications(t=token){if(!t){setNotifications([]);return}setNotificationsLoading(true);try{const r=await apiFetch(`${API}/api/notifications`,{headers:authHeaders(t)});if(r.ok){const items=await r.json() as CustomerNotification[];const ignored=new Set<string>(user?JSON.parse(localStorage.getItem(`phantora_cleared_notifications_${user.id}`)||'[]'):[]);setNotifications(items.filter(item=>!ignored.has(item.id)))}}finally{setNotificationsLoading(false)}}
+ async function loadNotifications(t=token):Promise<CustomerNotification[]>{
+  if(!t){setNotifications([]);return []}
+  setNotificationsLoading(true)
+  let shown:CustomerNotification[]=[]
+  try{
+   const r=await apiFetch(`${API}/api/notifications`,{headers:authHeaders(t)})
+   if(r.ok){const items=await r.json() as CustomerNotification[];const ignored=new Set<string>(readIgnoredNotices(knownUserId??user?.id));shown=items.filter(item=>!ignored.has(item.id));setNotifications(shown)}
+  }finally{setNotificationsLoading(false)}
+  return shown
+ }
  async function clearNotifications(){
   if(!token)return
   const c=clearCopy[lang]
   setConfirmingClear(false);setNotificationsLoading(true);setError('');setClearStatus('')
   try{
    const r=await apiFetch(`${API}/api/notifications`,{method:'DELETE',headers})
-   if(r.status===404){/* An API without this endpoint: hide the current notices on this device only. */if(user)localStorage.setItem(`phantora_cleared_notifications_${user.id}`,JSON.stringify(notifications.map(item=>item.id)));setNotifications([]);setClearStatus(c.done);return}
+   if(r.status===404){/* An API without this endpoint: hide the current notices on this device only. */if(user)localStorage.setItem(ignoredNoticesKey(user.id),JSON.stringify([...new Set([...readIgnoredNotices(user.id),...notifications.map(item=>item.id)])]));setNotifications([]);setClearStatus(c.done);return}
    if(!r.ok){const d=await r.json().catch(()=>({})) as {detail?:string};throw Error(typeof d.detail==='string'?d.detail:c.fail)}
-   if(user)localStorage.removeItem(`phantora_cleared_notifications_${user.id}`)
-   await loadNotifications()   // show what the server now holds instead of assuming the list is empty
+   if(user)localStorage.removeItem(ignoredNoticesKey(user.id))
+   const left=await loadNotifications()   // show what the server now holds instead of assuming the list is empty
+   if(left.length&&user){
+    /* An API that only removes delivered notices still lists the queued ones: hide them on this device too, so Clear always empties the list. */
+    localStorage.setItem(ignoredNoticesKey(user.id),JSON.stringify([...new Set([...readIgnoredNotices(user.id),...left.map(item=>item.id)])]))
+    setNotifications([])
+   }
    setClearStatus(c.done)
   }catch(e){setError(e instanceof Error?e.message:c.fail)}finally{setNotificationsLoading(false)}
  }
@@ -106,21 +126,21 @@ export default function App(){
    running=true;window.clearTimeout(timer)
    try{
     const restored=await bootSession()
-    setServerDown(false)
-    if(!restored||!mounted){done=true;return}
+    if(!restored||!mounted){done=true;setRestoring(false);return}
     setToken(restored)
     const response=await requestWithRetry(`${API}/api/auth/me`,{headers:authHeaders(restored)})
-    done=true
+    done=true;setRestoring(false)
     if(!response.ok)return
     const account=await response.json()
     if(mounted)setUser(withLocalProfileOverride(account));void loadHistory(restored);void loadSavedMovies(restored);void loadNotifications(restored);void settlePaymentReturn(restored)
    }catch(err){
-    /* The API did not answer (cold start, restart, 429/5xx, no connection). Keep trying quietly: this never ends a valid session. */
+    /* The API did not answer (asleep, restarting, being deployed). Nothing is shown: keep trying quietly until it
+       does, because a session is only ever ended by the server saying so, never by a failed attempt. */
     if(!mounted)return
-    console.warn('Phantora: could not reach the server to restore the session',err)
+    console.warn('Phantora: could not reach the server to restore the session, will retry',err)
     attempt+=1
-    if(attempt>=RESTORE_ATTEMPTS)setServerDown(true)
-    else timer=window.setTimeout(()=>void restore(),restoreDelay(attempt))
+    if(attempt>=RESTORE_PLACEHOLDER_ATTEMPTS)setRestoring(false)
+    timer=window.setTimeout(()=>void restore(),restoreDelay(attempt))
    }finally{running=false}
   }
   retryRestore.current=()=>{attempt=0;void restore()}
@@ -140,8 +160,8 @@ export default function App(){
  async function verifyEmail(e:FormEvent<HTMLFormElement>){e.preventDefault();if(!pendingEmail)return;setBusy(true);setError('');try{const code=String(new FormData(e.currentTarget).get('code'));const r=await apiFetch(`${API}/api/auth/email/verify`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:pendingEmail,code})});const a=await r.json();if(!r.ok)throw Error(a.detail||'Kod tasdiqlanmadi');setAccessToken(a.access_token,a.expires_in);setToken(a.access_token);const me=await apiFetch(`${API}/api/auth/me`,{headers:authHeaders(a.access_token)});setUser(withLocalProfileOverride(await me.json()));await loadHistory(a.access_token);await loadSavedMovies(a.access_token);await loadNotifications(a.access_token);setPendingEmail('');setDemoEmailCode('');setShowAuth(false)}catch(e){setError(e instanceof Error?e.message:'Email tasdiqlanmadi')}finally{setBusy(false)}}
 async function resendEmail(){if(!pendingEmail||emailCooldown.secondsLeft)return;setBusy(true);setError('');try{const r=await apiFetch(`${API}/api/auth/email/resend`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:pendingEmail})});const a=await r.json();if(!r.ok)throw Error(a.detail||'Email yuborilmadi');setDemoEmailCode(a.demo_code||'');emailCooldown.start(a.resend_available_at)}catch(e){setError(e instanceof Error?e.message:'Email yuborilmadi')}finally{setBusy(false)}} async function cancel(b:Booking){let question=t('cancelBooking');try{const preview=await apiFetch(`${API}/api/bookings/${b.id}/cancellation-quote`,{headers});if(preview.ok){const quote=await preview.json();if(quote.paid)question+='\n\n'+(quote.refund_percent>0?t('refundPreview').replace('{amount}',money(quote.refund_amount)).replace('{percent}',String(quote.refund_percent)):t('refundNone'))}}catch{/* the cancellation itself works without the preview */}if(!confirm(question))return;setBusy(true);setError('');try{const r=await apiFetch(`${API}/api/bookings/${b.id}/status`,{method:'PATCH',headers,body:JSON.stringify({status:'cancelled'})});const data=await r.json();if(!r.ok)throw Error(data.detail||'Booking bekor qilinmadi');await loadHistory();setNotice(Number(data.refund_amount)>0?t('refundDone').replace('{amount}',money(data.refund_amount)):lang==='en'?'Ticket cancelled and seats released.':lang==='ru'?'Билет отменён, места освобождены.':'Chipta bekor qilindi, joylar bo‘shatildi.')}catch(e){setError(e instanceof Error?e.message:'Booking bekor qilinmadi')}finally{setBusy(false)}}
  async function saveProfile(nickname:string,avatarData:string|null){if(!token||!user)return;const updated={...user,nickname,name:nickname,avatar_data:avatarData};localStorage.setItem(profileOverrideKey(user.id),JSON.stringify({nickname,avatar_data:avatarData}));setUser(updated);const response=await apiFetch(`${API}/api/auth/profile`,{method:'PATCH',headers:authHeaders(token),body:JSON.stringify({nickname,avatar_data:avatarData})});const data=await response.json();if(response.status===404){setNotice(lang==='en'?'Profile saved.':lang==='ru'?'Профиль сохранён.':'Profil saqlandi.');return}if(!response.ok)throw Error(data.detail||'Could not save your profile');setUser(withLocalProfileOverride({...data,name:data.nickname}));setNotice(lang==='en'?'Profile updated.':lang==='ru'?'Профиль обновлён.':'Profil yangilandi.')}
- function clearLocalSession(){clearTickets();setOfflineTickets(null);setToken('');setUser(null);setBookings([]);setSavedMovies([]);setNotifications([]);setShowProfile(false);setShowHistory(false);setShowNotifications(false)}
- function signOut(){clearTickets();setOfflineTickets(null);void endSession();setToken('');setUser(null);setBookings([]);setSavedMovies([]);setNotifications([]);setShowProfile(false);setShowHistory(false);setShowNotifications(false)}
+ function clearLocalSession(){knownUserId=undefined;clearTickets();setOfflineTickets(null);setToken('');setUser(null);setBookings([]);setSavedMovies([]);setNotifications([]);setShowProfile(false);setShowHistory(false);setShowNotifications(false)}
+ function signOut(){knownUserId=undefined;clearTickets();setOfflineTickets(null);void endSession();setToken('');setUser(null);setBookings([]);setSavedMovies([]);setNotifications([]);setShowProfile(false);setShowHistory(false);setShowNotifications(false)}
  if(!API)return <div className="setup-screen"><Film size={34}/><h1>Phantora</h1><p>{t('setup')}</p><p><code>VITE_API_URL</code>: {t('setupHint')}</p><button onClick={()=>location.reload()}>{t('retry')}</button></div>
  const closeMenu=()=>setMenuOpen(false)
  const openPanel=(panel:'profile'|'bookings'|'notifications')=>{closeMenu();openCustomerPanel(panel)}
@@ -153,10 +173,10 @@ async function resendEmail(){if(!pendingEmail||emailCooldown.secondsLeft)return;
  const codeLabel=lang==='ru'?'Код из email':lang==='en'?'Email code':'Email kodi'
  return <div className="app-shell" id="top">
   <div className="theatre" aria-hidden="true"/>
-  {!user&&(!online||serverDown)&&<OfflineBanner lang={lang} reason={online?'server':'offline'} hasTickets={!!offlineTickets} onOpen={()=>setShowOfflineTickets(true)} onRetry={()=>retryRestore.current()}/>}
+  {!user&&!online&&<OfflineBanner lang={lang} hasTickets={!!offlineTickets} onOpen={()=>setShowOfflineTickets(true)}/>}
   {offlineTickets&&showOfflineTickets&&<OfflineTickets tickets={offlineTickets} lang={lang} onClose={()=>setShowOfflineTickets(false)}/>}
   {paymentOutcome&&<PaymentResult outcome={paymentOutcome} lang={lang} onClose={()=>setPaymentOutcome(null)}/>}
-  <header className={`topbar ${scrolled?'is-compact':''}`}><div className="topbar-inner"><a className="brand" href="/" aria-label="Phantora home"><BrandLogo/></a><nav className="main-nav" aria-label={t('mainMenu')}><a className="nav-link is-active" href="#films" aria-current="page">{t('movies')}</a>{user&&<button type="button" className="nav-link" onClick={()=>openPanel('bookings')}>{t('history')}</button>}</nav><div className="top-actions">{!user&&<button className="button-primary signin-button" onClick={()=>{setMode('login');setShowAuth(true)}}><UserRound size={16}/>{t('login')}</button>}{user?<button className="account-trigger" aria-haspopup="true" aria-expanded={menuOpen} aria-label={t('menu')} onClick={()=>setMenuOpen(value=>!value)}><span className="account-avatar">{avatar}</span><span className="account-name">{user.nickname}</span><ChevronDown size={16}/>{hasUnread&&<span className="notify-dot" aria-hidden="true"/>}</button>:<button className="menu-trigger" aria-haspopup="true" aria-expanded={menuOpen} aria-label={t('menu')} onClick={()=>setMenuOpen(value=>!value)}><Menu size={20}/></button>}</div></div></header>
+  <header className={`topbar ${scrolled?'is-compact':''}`}><div className="topbar-inner"><a className="brand" href="/" aria-label="Phantora home"><BrandLogo/></a><nav className="main-nav" aria-label={t('mainMenu')}><a className="nav-link is-active" href="#films" aria-current="page">{t('movies')}</a>{user&&<button type="button" className="nav-link" onClick={()=>openPanel('bookings')}>{t('history')}</button>}</nav><div className="top-actions">{!user&&restoring&&<span className="session-restoring" role="status" aria-label={restoreLabel[lang]}><span aria-hidden="true"/></span>}{!user&&!restoring&&<button className="button-primary signin-button" onClick={()=>{setMode('login');setShowAuth(true)}}><UserRound size={16}/>{t('login')}</button>}{user?<button className="account-trigger" aria-haspopup="true" aria-expanded={menuOpen} aria-label={t('menu')} onClick={()=>setMenuOpen(value=>!value)}><span className="account-avatar">{avatar}</span><span className="account-name">{user.nickname}</span><ChevronDown size={16}/>{hasUnread&&<span className="notify-dot" aria-hidden="true"/>}</button>:<button className="menu-trigger" aria-haspopup="true" aria-expanded={menuOpen} aria-label={t('menu')} onClick={()=>setMenuOpen(value=>!value)}><Menu size={20}/></button>}</div></div></header>
   {menuOpen&&<><div className="menu-scrim" onClick={closeMenu}/><div className="account-menu" role="dialog" aria-label={t('menu')}>{user&&<div className="menu-head"><span className="account-avatar">{avatar}</span><div><b>{user.nickname}</b><small>{user.email}</small></div></div>}<div className="menu-list">{user&&<button type="button" className="menu-item" onClick={()=>openPanel('profile')}><UserRound/>{t('profile')}</button>}{user&&<button type="button" className="menu-item" onClick={()=>openPanel('bookings')}><Ticket/>{t('history')}</button>}{user&&<button type="button" className="menu-item" onClick={()=>openPanel('notifications')}><Bell/>{t('updates')}{hasUnread&&<span className="menu-dot" aria-hidden="true"/>}</button>}{user?.role==='admin'&&<button type="button" className="menu-item" onClick={()=>{closeMenu();setShowAdmin(true)}}><ShieldCheck/>{t('admin')}</button>}<button type="button" className="menu-item" aria-label={t('browseCinemas')} onClick={()=>{closeMenu();document.querySelector('#films')?.scrollIntoView({behavior:'smooth',block:'start'})}}><MapPin/>{t('city')}</button></div><div className="menu-section"><span className="menu-label"><Globe2/>{t('language')}</span><div className="segmented" role="radiogroup" aria-label={t('language')}>{(['uz','en','ru'] as Lang[]).map(option=><button type="button" role="radio" aria-checked={lang===option} className={lang===option?'is-active':''} key={option} onClick={()=>setLang(option)}>{option.toUpperCase()}</button>)}</div></div><div className="menu-section"><span className="menu-label">{theme==='dark'?<Moon/>:<Sun/>}{t('theme')}</span><div className="segmented" role="radiogroup" aria-label={t('theme')}><button type="button" role="radio" aria-checked={theme==='dark'} className={theme==='dark'?'is-active':''} onClick={()=>setTheme('dark')}><Moon size={15}/>{t('themeDark')}</button><button type="button" role="radio" aria-checked={theme==='light'} className={theme==='light'?'is-active':''} onClick={()=>setTheme('light')}><Sun size={15}/>{t('themeLight')}</button></div></div>{user&&<button type="button" className="menu-danger" onClick={signOutNow}><LogOut size={16}/>{t('signOut')}</button>}</div></>}
   <main><CinemaCatalog api={API} token={token} lang={lang} onSignIn={()=>{setMode('login');setShowAuth(true)}} onConfirmed={()=>{void loadHistory()}}/></main>
   <footer className="footer"><div className="footer-inner"><a className="brand" href="/" aria-label="Phantora home"><BrandLogo markSize={28} wordHeight={14}/></a><div className="footer-meta"><b>UZS · ASIA/TASHKENT</b><span>{t('footer')}</span></div><div className="footer-links"><a href="https://cinematica.uz/movies" target="_blank" rel="noreferrer">Cinematica</a><a href="https://www.themoviedb.org/" target="_blank" rel="noreferrer">TMDB</a></div></div></footer>

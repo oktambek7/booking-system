@@ -29,6 +29,11 @@
   .nav-link.is-active { color: var(--text); }
   .nav-link.is-active::after { content: ''; position: absolute; left: var(--s-3); right: var(--s-3); bottom: 4px; height: 2px; border-radius: 2px; background: var(--accent); }
 
+  /* Shown instead of "Sign in" while a returning visitor's session is being restored, so a slow server does not look like a sign-out. */
+  .session-restoring { display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--s-2); }
+  .session-restoring > span { display: block; width: 112px; height: 40px; border-radius: var(--r-pill); background: linear-gradient(100deg, var(--glass-1-bg) 30%, color-mix(in srgb, var(--text) 10%, transparent) 50%, var(--glass-1-bg) 70%); background-size: 200% 100%; border: 1px solid var(--glass-border); animation: restoring-shimmer 1.4s linear infinite; }
+  @keyframes restoring-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+
   .top-actions { display: flex; align-items: center; gap: var(--s-2); position: relative; }
 
   .account-trigger, .menu-trigger {

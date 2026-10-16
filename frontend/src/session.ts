@@ -106,20 +106,34 @@ export async function apiFetch(input: string, init: RequestInit = {}): Promise<R
   return fetch(input, { ...init, headers: withBearer(init.headers, fresh) })
 }
 
-const pause = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds))
+const HEALTH_TIMEOUT_MS = 8000
+
+/**
+ * Reject unless the API answers its health check. Unlike a refresh, a health check changes nothing, so it is safe
+ * to repeat against a server that is asleep, restarting or being deployed.
+ */
+async function assertApiHealthy(): Promise<void> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS)
+  try {
+    const response = await fetch(`${apiBase}/health`, { cache: 'no-store', signal: controller.signal })
+    if (!response.ok) throw new Error(`The API is not ready (${response.status})`)
+  } finally {
+    clearTimeout(timer)
+  }
+}
 
 /**
  * Restore a signed-in session when the page loads: the refresh cookie either yields an access token or
- * there is no session. A Render cold start or network blip is retried once and otherwise reported as an error.
+ * there is no session. The API must answer a health check first. A refresh rotates the cookie on the server, so
+ * sending one to a server that cannot reply could rotate it while the answer is lost, and the browser would be
+ * left holding a retired cookie. Rejects (without touching the cookie) when the API cannot be reached; the caller
+ * retries later.
  */
 export async function bootSession(): Promise<string> {
   try { localStorage.removeItem('parda_token') } catch { /* storage unavailable: nothing to clean */ }
-  try {
-    return await refreshAccessToken()
-  } catch {
-    await pause(1500)
-    return refreshAccessToken()
-  }
+  await assertApiHealthy()
+  return refreshAccessToken()
 }
 
 /** Sign this browser out: end the server session (best effort) and forget the in-memory token. */

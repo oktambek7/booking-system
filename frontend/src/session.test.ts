@@ -131,28 +131,49 @@ describe('refreshAccessToken', () => {
   })
 })
 
+const isHealth = (url: string) => url.endsWith('/health')
+
 describe('bootSession', () => {
   it('discards the legacy localStorage token and restores the session from the cookie', async () => {
     const removed: string[] = []
     vi.stubGlobal('localStorage', { removeItem: (key: string) => removed.push(key) })
-    mockFetch(() => json(200, { access_token: 'restored', expires_in: 900 }))
+    mockFetch((url) => isHealth(url) ? json(200, { status: 'ok' }) : json(200, { access_token: 'restored', expires_in: 900 }))
     expect(await bootSession()).toBe('restored')
     expect(removed).toContain('parda_token')
   })
 
   it('returns an empty token for a visitor who is not signed in', async () => {
-    mockFetch(() => json(401))
+    mockFetch((url) => isHealth(url) ? json(200) : json(401))
     expect(await bootSession()).toBe('')
   })
 
-  it('retries once after a network failure such as a cold start', async () => {
+  it('checks the API is healthy before it asks for a refresh, and refreshes exactly once', async () => {
+    mockFetch((url) => isHealth(url) ? json(200) : json(200, { access_token: 'ok', expires_in: 900 }))
+    await bootSession()
+    expect(calls.map((c) => c.url)).toEqual(['https://site.example/health', 'https://site.example/api/auth/refresh'])
+  })
+
+  it('never sends a refresh to a server that is not answering, so the cookie cannot be rotated into the void', async () => {
+    mockFetch(() => { throw new TypeError('Failed to fetch') })
+    await expect(bootSession()).rejects.toThrow()
+    expect(refreshCalls()).toBe(0)
+  })
+
+  it('does not refresh while the API says it is not ready (a deploy or a cold start)', async () => {
+    mockFetch(() => json(503))
+    await expect(bootSession()).rejects.toThrow(/not ready/)
+    expect(refreshCalls()).toBe(0)
+  })
+
+  it('gives up on a health check that hangs instead of waiting forever', async () => {
     vi.useFakeTimers()
-    let attempt = 0
-    mockFetch(() => { attempt += 1; if (attempt === 1) throw new TypeError('Failed to fetch'); return json(200, { access_token: 'late' }) })
+    vi.stubGlobal('fetch', vi.fn((_url: string, init?: RequestInit) => new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
+    })))
     const booting = bootSession()
-    await vi.advanceTimersByTimeAsync(1600)
-    expect(await booting).toBe('late')
-    expect(refreshCalls()).toBe(2)
+    const outcome = expect(booting).rejects.toThrow()
+    await vi.advanceTimersByTimeAsync(9000)
+    await outcome
   })
 })
 

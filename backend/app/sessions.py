@@ -88,8 +88,13 @@ def rotate_session(db: Session, request: Request, response: Response) -> tuple[U
         raise SessionError("Session expired. Sign in again")
     if row.rotated_at is not None:
         if (now - row.rotated_at).total_seconds() <= settings.refresh_reuse_grace_seconds:
-            # Another tab refreshed a moment ago and the browser's cookie already holds its successor;
-            # this request simply raced it. Hand out an access token but do not rotate again.
+            # A token that was retired a moment ago is presented again. Either another tab raced this request, or the
+            # reply to the first refresh never reached the browser (a dropped connection, a server that was restarting)
+            # and the browser still holds the old cookie. Give this holder its own successor so its cookie is current
+            # in both cases; leaving it on the retired token would sign the user out at the next reload. Presenting
+            # the retired token after the grace period is still treated as theft.
+            token, new_row = _issue(db, user.id, row.family_id, row.family_created_at, request, row.mfa)
+            set_cookie(response, token, new_row.expires_at)
             return user, row.mfa
         revoke_family(db, row.family_id)
         record(db, user, "auth.refresh_reuse_detected", "user", user.id, family_id=row.family_id)
