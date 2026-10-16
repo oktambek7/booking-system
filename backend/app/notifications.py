@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from . import telegram
 from .config import settings
 from .database import SessionLocal
-from .mail import (EmailDeliveryError, send_booking_confirmation_email, send_refund_email, send_screening_reminder_email,
+from .mail import (EmailDeliveryError, send_booking_confirmation_email, send_refund_email,
                    send_waitlist_available_email, send_saved_movie_showtime_email)
 from .models import (Booking, BookingNotification, BookingSeat, BookingStatus, Refund, Seat,
                      WaitlistEntry, WaitlistNotification, MovieWatchlist, MovieWatchlistNotification, Screening)
@@ -18,9 +18,10 @@ from .models import (Booking, BookingNotification, BookingSeat, BookingStatus, R
 logger = logging.getLogger(__name__)
 
 CONFIRMATION = "confirmation"
-REMINDER_24H = "reminder_24h"
-REMINDER_2H = "reminder_2h"
 REFUND = "refund"
+# Screening reminders (24 h and 2 h before the film) are no longer sent. Rows of these types that were queued
+# before the change are removed unsent; ones already delivered stay as history in the customer's notifications.
+RETIRED_REMINDER_EVENTS = ("reminder_24h", "reminder_2h")
 
 
 def schedule_booking_notifications(db, booking: Booking, *, include_confirmation: bool = True,
@@ -30,10 +31,6 @@ def schedule_booking_notifications(db, booking: Booking, *, include_confirmation
     events: list[tuple[str, datetime]] = []
     if include_confirmation:
         events.append((CONFIRMATION, now))
-    for event_type, offset in ((REMINDER_24H, timedelta(hours=24)), (REMINDER_2H, timedelta(hours=2))):
-        due_at = booking.screening.starts_at - offset
-        if due_at > now:
-            events.append((event_type, due_at))
     existing = set(db.scalars(sa.select(BookingNotification.event_type).where(
         BookingNotification.booking_id == booking.id)).all())
     for event_type, due_at in events:
@@ -41,18 +38,16 @@ def schedule_booking_notifications(db, booking: Booking, *, include_confirmation
             db.add(BookingNotification(booking_id=booking.id, event_type=event_type, due_at=due_at))
 
 
-def schedule_missing_reminders() -> None:
-    """Backfill reminders after a deploy without sending historical confirmations."""
-    now = datetime.now(timezone.utc)
+def retire_pending_reminders() -> int:
+    """Delete screening reminders queued before they were switched off, so none is ever sent."""
     with SessionLocal() as db:
-        bookings = db.scalars(sa.select(Booking).where(Booking.status == BookingStatus.CONFIRMED)).all()
-        for booking in bookings:
-            if booking.screening.starts_at > now:
-                schedule_booking_notifications(db, booking, include_confirmation=False, now=now)
-        try:
-            db.commit()
-        except IntegrityError:
-            db.rollback()
+        removed = db.execute(sa.delete(BookingNotification).where(
+            BookingNotification.event_type.in_(RETIRED_REMINDER_EVENTS),
+            BookingNotification.sent_at.is_(None))).rowcount
+        db.commit()
+    if removed:
+        logger.info("Phantora removed %s unsent screening reminders", removed)
+    return removed
 
 
 def _details(booking: Booking) -> dict[str, str]:
@@ -73,8 +68,7 @@ def _booking_message(event: str, booking: Booking, details: dict[str, str]) -> s
     if event == REFUND:
         return (f"Phantora Cinema: your ticket was cancelled and {booking.refund_percent or 0}% was refunded "
                 f"({booking.refund_amount:,.0f} UZS).\n{where}")
-    when = "in about 24 hours" if event == REMINDER_24H else "in about 2 hours"
-    return f"Phantora Cinema: your screening starts {when}.\n{where}\nTicket code: {details['ticket_code']}"
+    raise ValueError(f"No message for notification type {event!r}")
 
 
 def _claim(db, model, notice_id: int):
@@ -140,10 +134,6 @@ def _deliver_booking_notice(db, notice_id: int, now: datetime) -> bool:
         details = _details(booking)
         if notice.event_type == CONFIRMATION:
             send_booking_confirmation_email(booking.customer.email, amount=f"{booking.total_price:,.0f} UZS", **details)
-        elif notice.event_type == REMINDER_24H:
-            send_screening_reminder_email(booking.customer.email, when="in about 24 hours", **details)
-        elif notice.event_type == REMINDER_2H:
-            send_screening_reminder_email(booking.customer.email, when="in about 2 hours", **details)
         elif notice.event_type == REFUND:
             refund = db.scalar(sa.select(Refund).where(Refund.booking_id == booking.id))
             send_refund_email(booking.customer.email, movie=details["movie"], cinema=details["cinema"],

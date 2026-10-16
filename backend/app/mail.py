@@ -133,8 +133,7 @@ def send_booking_confirmation_email(address: str, *, movie: str, cinema: str, st
     return _send_email(address, "Your Phantora Cinema ticket is confirmed", (
         "Your ticket is confirmed. Keep this email and present the QR ticket or ticket code at entry.\n\n"
         f"Movie: {movie}\nCinema: {cinema}\nDate / time: {starts_at}\n"
-        f"Seats: {seats}\nTicket code: {ticket_code}\nAmount: {amount}\n\n"
-        "We will send reminders before the screening."
+        f"Seats: {seats}\nTicket code: {ticket_code}\nAmount: {amount}"
     ), tag="phantora-booking-confirmation")
 
 def send_refund_email(address: str, *, movie: str, cinema: str, starts_at: str, amount: str, percent: int,
@@ -151,16 +150,6 @@ def send_account_deleted_email(address: str) -> bool:
         "Your Phantora Cinema account was deleted at your request. Your personal details were erased; records of "
         "past payments are kept without your name or e-mail, as the law requires.\n\n"
         "If this was not you, contact support right away."), tag="phantora-account-deleted")
-
-def send_screening_reminder_email(address: str, *, movie: str, cinema: str, starts_at: str,
-                                  seats: str, ticket_code: str, when: str) -> bool:
-    return _send_email(address, f"Reminder: {movie} starts {when}", (
-        f"Your Phantora Cinema screening starts {when}.\n\n"
-        f"Movie: {movie}\nCinema: {cinema}\nDate / time: {starts_at}\n"
-        f"Seats: {seats}\nTicket code: {ticket_code}\n\n"
-        "Please arrive early and show your QR ticket or ticket code at entry."
-    ), tag="phantora-screening-reminder")
-
 
 def send_waitlist_available_email(address: str, *, movie: str, cinema: str, starts_at: str, seat_count: int) -> bool:
     seats = "seat" if seat_count == 1 else "seats"

@@ -13,8 +13,8 @@ from app import jobs, worker
 from app.config import settings
 from app.mail import EmailDeliveryError
 from app.main import app
-from app.notifications import deliver_due_notifications
-from tests.support import NotificationTestCase, scalar
+from app.notifications import deliver_due_notifications, retire_pending_reminders
+from tests.support import NotificationTestCase, sql
 
 class Crash(BaseException):
     """Simulates the process dying mid-batch (not an Exception, so nothing may swallow it)."""
@@ -171,12 +171,33 @@ class WorkerTests(NotificationTestCase):
                 settings.run_background_jobs = False
             self.assertEqual(start.call_count, expected_calls, f"run_background_jobs={enabled}")
 
-    def test_schedule_backfill_does_not_duplicate_reminders(self):
-        self.tickets(1)
-        before = scalar("SELECT count(*) FROM booking_notifications")
-        jobs.schedule_missing_reminders()
-        jobs.schedule_missing_reminders()
-        self.assertEqual(scalar("SELECT count(*) FROM booking_notifications"), before)
+    def kinds(self, ticket: str) -> list[str]:
+        rows = sql("SELECT n.event_type FROM booking_notifications n JOIN bookings b ON b.id = n.booking_id "
+                   "WHERE b.ticket_code = :t ORDER BY n.event_type", t=ticket)
+        return [row[0] for row in rows]
+
+    def test_a_paid_ticket_queues_only_its_confirmation(self):
+        ticket = self.tickets(1)[0]
+        self.assertEqual(self.kinds(ticket), ["confirmation"])
+
+    def test_reminders_queued_before_the_switch_off_are_removed_unsent(self):
+        ticket = self.tickets(1)[0]
+        for kind, sent in (("reminder_24h", "NULL"), ("reminder_2h", "now()")):
+            sql(f"INSERT INTO booking_notifications (booking_id, event_type, due_at, sent_at, attempts) "
+                f"SELECT id, '{kind}', now() + interval '1 day', {sent}, 0 FROM bookings WHERE ticket_code = :t", t=ticket)
+        self.assertEqual(retire_pending_reminders(), 1)
+        self.assertEqual(self.kinds(ticket), ["confirmation", "reminder_2h"])   # the delivered one stays as history
+        self.assertEqual(retire_pending_reminders(), 0)
+
+    def test_a_worker_pass_sends_no_reminder_email(self):
+        ticket = self.tickets(1)[0]
+        sql("INSERT INTO booking_notifications (booking_id, event_type, due_at, attempts) "
+            "SELECT id, 'reminder_2h', now() - interval '1 minute', 0 FROM bookings WHERE ticket_code = :t", t=ticket)
+        with mock.patch("app.notifications.send_booking_confirmation_email"), \
+                mock.patch("app.mail._send_email") as sender:
+            jobs.notification_cycle()
+        sender.assert_not_called()
+        self.assertEqual(self.kinds(ticket), ["confirmation"])
 
 if __name__ == "__main__":
     unittest.main()

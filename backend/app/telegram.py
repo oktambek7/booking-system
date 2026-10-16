@@ -119,7 +119,7 @@ def _redeem(db: Session, chat_id: int, token: str) -> str:
         existing.chat_id, existing.enabled = chat_id, True
     else:
         db.add(TelegramLink(user_id=record.user_id, chat_id=chat_id))
-    return "Connected! You will receive your ticket confirmations, reminders and refunds here."
+    return "Connected! You will receive your ticket confirmations and refunds here."
 
 def notify_user(db: Session, user_id: int, text: str) -> None:
     """Best-effort message to a customer's linked chat. Never raises: e-mail stays the primary channel."""

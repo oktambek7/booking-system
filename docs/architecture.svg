@@ -53,7 +53,7 @@
 
   <!-- Email provider -> User inbox (routed underneath) -->
   <path d="M1055,606 L1055,800 L125,800 L125,484" fill="none" stroke="#C9A25B" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#arrowAmber)"/>
-  <text x="600" y="790" font-size="13" fill="#C9A25B" text-anchor="middle">4-digit codes · ticket confirmation · reminders 24 h and 2 h before the film</text>
+  <text x="600" y="790" font-size="13" fill="#C9A25B" text-anchor="middle">4-digit codes · ticket confirmation · refund notices</text>
 
   <!-- API <-> PostgreSQL -->
   <line x1="725" y1="604" x2="725" y2="650" stroke="#BDBAB4" stroke-width="2.5" marker-start="url(#arrowGreen)" marker-end="url(#arrowGreen)"/>
@@ -108,7 +108,7 @@
     <text x="723" y="468" text-anchor="middle" font-size="12" fill="#9A9EB2">card form + 4-digit email code</text>
     <rect x="590" y="488" width="266" height="98" rx="10" fill="#171A2C"/>
     <text x="723" y="510" text-anchor="middle" font-weight="600">Background workers</text>
-    <text x="723" y="532" text-anchor="middle" font-size="12" fill="#9A9EB2">reminder queue · every minute</text>
+    <text x="723" y="532" text-anchor="middle" font-size="12" fill="#9A9EB2">notification queue · every minute</text>
     <text x="723" y="552" text-anchor="middle" font-size="12" fill="#9A9EB2">Cinematica refresh · every 10 min</text>
     <text x="723" y="572" text-anchor="middle" font-size="12" fill="#9A9EB2">TMDB refresh · every 24 h</text>
   </g>
@@ -117,7 +117,7 @@
   <rect x="570" y="652" width="306" height="104" rx="18" fill="#121524" stroke="#BDBAB4" stroke-width="2"/>
   <text x="723" y="686" font-size="12" font-weight="700" letter-spacing="1.5" fill="#F1ECE2" text-anchor="middle">DATABASE</text>
   <text x="723" y="712" font-size="18" font-weight="700" fill="#F1ECE2" text-anchor="middle">PostgreSQL 16</text>
-  <text x="723" y="736" font-size="12.5" fill="#BDBAB4" text-anchor="middle">users · seats · holds · bookings · reminders</text>
+  <text x="723" y="736" font-size="12.5" fill="#BDBAB4" text-anchor="middle">users · seats · holds · bookings · notifications</text>
 
   <!-- Cinematica -->
   <rect x="948" y="160" width="212" height="104" rx="18" fill="#121524" stroke="#8A8FA6" stroke-width="2"/>
@@ -137,5 +137,5 @@
   <text x="1054" y="514" font-size="17" font-weight="700" fill="#F1ECE2" text-anchor="middle">Brevo</text>
   <text x="1054" y="536" font-size="12.5" fill="#E0BE7F" text-anchor="middle">(Resend / SMTP supported)</text>
   <text x="1054" y="564" font-size="12.5" fill="#E0BE7F" text-anchor="middle">sign-up &amp; payment codes,</text>
-  <text x="1054" y="582" font-size="12.5" fill="#E0BE7F" text-anchor="middle">tickets, reminders</text>
+  <text x="1054" y="582" font-size="12.5" fill="#E0BE7F" text-anchor="middle">tickets, refunds</text>
 </svg>

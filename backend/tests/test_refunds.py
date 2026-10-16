@@ -206,13 +206,12 @@ class VisibilityTests(RefundCase):
     def test_the_customer_is_emailed_and_sees_it_in_their_notifications(self):
         shop, booking, _, _ = self.paid_ticket(timedelta(hours=5), points=1000, redeem=100)
         shop.set_status(booking["id"], "cancelled")
-        with mock.patch("app.notifications.send_refund_email") as sender, mock.patch("app.notifications.send_screening_reminder_email") as reminder:
+        with mock.patch("app.notifications.send_refund_email") as sender:
             sql("UPDATE booking_notifications SET due_at = now() - interval '1 minute' WHERE booking_id = :b", b=booking["id"])
             deliver_due_notifications()
         sender.assert_called_once()
         kwargs = sender.call_args.kwargs
         self.assertEqual((kwargs["percent"], kwargs["points_restored"], kwargs["amount"]), (50, 50, "10,000 UZS"))
-        reminder.assert_not_called()                         # reminders for a cancelled ticket are skipped
         listing = self.client.get("/api/notifications", headers=shop.headers).json()
         self.assertIn(("refund", "sent"), [(n["kind"], n["state"]) for n in listing])
 

@@ -15,7 +15,7 @@ from .config import settings
 from .database import SessionLocal, engine as default_engine
 from .notifications import (deliver_due_notifications, deliver_due_saved_movie_notifications,
                             deliver_due_waitlist_notifications, queue_saved_movie_notifications,
-                            queue_waitlist_notifications, schedule_missing_reminders)
+                            queue_waitlist_notifications, retire_pending_reminders)
 from .ratelimit import purge_expired as purge_expired_rate_limits
 from .sessions import purge_expired_refresh_tokens
 from .tmdb import TMDBUnavailable, sync_catalog
@@ -45,7 +45,7 @@ def notification_cycle() -> dict | None:
     with exclusive(LOCK_NOTIFICATIONS) as acquired:
         if not acquired:
             return None
-        schedule_missing_reminders()
+        retire_pending_reminders()
         purge_expired_rate_limits()
         purge_expired_refresh_tokens()
         result = {

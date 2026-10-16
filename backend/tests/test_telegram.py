@@ -250,8 +250,7 @@ class DeliveryTests(NotificationTestCase, TelegramCase):
         sql("INSERT INTO telegram_links (user_id, chat_id) VALUES (:u, :c)", u=shop.user["id"], c=chat)
         shop.set_status(booking["id"], "cancelled")
         sql("UPDATE booking_notifications SET due_at = now() - interval '1 minute' WHERE booking_id = :b AND event_type = 'refund'", b=booking["id"])
-        with mock.patch("app.notifications.send_refund_email"), mock.patch("app.notifications.send_booking_confirmation_email"), \
-                mock.patch("app.notifications.send_screening_reminder_email"):
+        with mock.patch("app.notifications.send_refund_email"), mock.patch("app.notifications.send_booking_confirmation_email"):
             deliver_due_notifications()
         self.assertTrue(any("100% was refunded" in m and "30,000" in m for m in self.messages(chat)), self.messages(chat))
 

@@ -6,9 +6,9 @@ type Lang = 'uz' | 'en' | 'ru'
 type Status = { configured: boolean; bot_username: string | null; linked: boolean }
 
 const text: Record<Lang, Record<string, string>> = {
-  uz: { title: 'Telegram xabarnomalari', hint: 'Chipta tasdig‘i, eslatmalar va pul qaytarish haqida Telegramda ham xabar oling.', connect: 'Telegramni ulash', waiting: 'Telegramda “Start” tugmasini bosing…', open: 'Telegramni ochish', connected: 'Telegram ulangan', disconnect: 'Uzish', failed: 'Telegram ulanmadi. Qayta urinib ko‘ring.' },
-  en: { title: 'Telegram notifications', hint: 'Also get ticket confirmations, reminders and refunds in Telegram.', connect: 'Connect Telegram', waiting: 'Press “Start” in Telegram…', open: 'Open Telegram', connected: 'Telegram connected', disconnect: 'Disconnect', failed: 'Could not connect Telegram. Please try again.' },
-  ru: { title: 'Уведомления в Telegram', hint: 'Получайте подтверждения билетов, напоминания и возвраты ещё и в Telegram.', connect: 'Подключить Telegram', waiting: 'Нажмите «Start» в Telegram…', open: 'Открыть Telegram', connected: 'Telegram подключён', disconnect: 'Отключить', failed: 'Не удалось подключить Telegram. Попробуйте ещё раз.' },
+  uz: { title: 'Telegram xabarnomalari', hint: 'Chipta tasdig‘i va pul qaytarish haqida Telegramda ham xabar oling.', connect: 'Telegramni ulash', waiting: 'Telegramda “Start” tugmasini bosing…', open: 'Telegramni ochish', connected: 'Telegram ulangan', disconnect: 'Uzish', failed: 'Telegram ulanmadi. Qayta urinib ko‘ring.' },
+  en: { title: 'Telegram notifications', hint: 'Also get ticket confirmations and refunds in Telegram.', connect: 'Connect Telegram', waiting: 'Press “Start” in Telegram…', open: 'Open Telegram', connected: 'Telegram connected', disconnect: 'Disconnect', failed: 'Could not connect Telegram. Please try again.' },
+  ru: { title: 'Уведомления в Telegram', hint: 'Получайте подтверждения билетов и возвраты ещё и в Telegram.', connect: 'Подключить Telegram', waiting: 'Нажмите «Start» в Telegram…', open: 'Открыть Telegram', connected: 'Telegram подключён', disconnect: 'Отключить', failed: 'Не удалось подключить Telegram. Попробуйте ещё раз.' },
 }
 
 /** Connect or disconnect the customer's Telegram chat. Renders nothing when the deployment has no bot configured. */

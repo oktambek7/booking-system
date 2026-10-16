@@ -46,7 +46,7 @@ Phantora is a web app for booking cinema seats online. You find a film, pick a s
 3. **Pick a showtime.** Filter by date, cinema, hall type (Standard or VIP), format (2D, 3D, IMAX) and language, then sort by time or price.
 4. **Choose seats.** The hall map shows which seats are free, taken or premium. Once you continue, your seats are held for you for 10 minutes.
 5. **Pay.** Enter card details (Uzcard, Humo, Visa or Mastercard) and type in the 4-digit code Phantora sends to your email.
-6. **Get reminded.** Phantora emails you twice before the film: **24 hours** before it starts and again **2 hours** before.
+6. **Keep your ticket.** Your QR ticket is emailed to you, stays in the app, and works offline at the cinema door.
 
 > **About payments:** payment is currently a demonstration. No real money is charged. The card form and email code show how the real flow will work. A licensed payment provider will be connected once Phantora is handed over to a cinema company.
 
@@ -57,7 +57,7 @@ Phantora is a web app for booking cinema seats online. You find a film, pick a s
 | **Your seats are truly yours** | Seats are held on the server for 10 minutes while you pay, and the database makes sure two people can never buy the same seat. No "sorry, this seat is gone" at the last step. |
 | **Fast checkout** | One short page: order summary, a visible hold timer, card details and a 4-digit email code. No redirects to other websites. |
 | **Made for Uzbekistan** | Prices in UZS, times in Tashkent time, local cards (Uzcard, Humo) as well as Visa and Mastercard. The interface is available in Uzbek, Russian and English, in light or dark mode. |
-| **You never miss the film** | Automatic email reminders 24 hours and 2 hours before the screening, plus a calendar file you can add to Google, Apple or Outlook calendar. |
+| **You never lose your ticket** | An emailed confirmation, a QR ticket that works offline, and a calendar file you can add to Google, Apple or Outlook calendar. |
 | **Sold out? Get notified** | Join the waitlist for a full screening and receive an email if seats free up. Save a film and receive an email when its first showtime appears. |
 | **Rewards** | Promo codes and Phantora Points (1 point = 100 UZS, up to 50% of an order) make returning visits cheaper. |
 | **Paperless entry** | Every ticket gets a QR e-ticket that staff scan once at the entrance. |
@@ -89,18 +89,18 @@ Phantora is split into three clear parts: a **frontend** the user sees, a **back
 | **SQLAlchemy + psycopg** | Talks to the database safely and consistently. |
 | **JWT + Argon2** | Secure sign-in tokens, and passwords stored with a strong one-way hash. |
 | **Hashed, expiring email codes** | The 4-digit codes expire after a few minutes, allow only a limited number of attempts, and are never stored in plain text. |
-| **Background workers** | Run on their own schedule inside the API: send reminders and alerts every minute, refresh showtimes every 10 minutes, refresh film details every 24 hours. |
-| **Brevo** (Resend and SMTP also supported) | Delivers sign-up codes, payment codes, ticket confirmations and reminders by email. |
+| **Background workers** | Run on their own schedule inside the API: send confirmations and alerts every minute, refresh showtimes every 10 minutes, refresh film details every 24 hours. |
+| **Brevo** (Resend and SMTP also supported) | Delivers sign-up codes, payment codes, ticket confirmations by email. |
 | **Docker + Render** | The API runs in a container, so it behaves the same on a laptop and in production. |
 
 ### Database (the single source of truth)
 
 | Tool | Why it is used |
 | --- | --- |
-| **PostgreSQL 16** | Stores users, halls, seats, seat holds, bookings, payments and the reminder queue. |
+| **PostgreSQL 16** | Stores users, halls, seats, seat holds, bookings, payments and the notification queue. |
 | **Row locks and unique indexes** | When two people click the same seat at the same moment, only one booking succeeds. The other person is told immediately. |
 | **Exclusion constraint on halls** | Two screenings can never be scheduled in the same hall at overlapping times. |
-| **Durable notification queue** | Every reminder is recorded in the database, so a server restart cannot send it twice or lose it. |
+| **Durable notification queue** | Every confirmation and alert is recorded in the database, so a server restart cannot send it twice or lose it. |
 
 ### Data sources
 
@@ -115,7 +115,7 @@ Phantora is split into three clear parts: a **frontend** the user sees, a **back
 - **Short seat holds.** A seat is reserved for 10 minutes during checkout. If payment is not finished, the seat is released automatically for other people.
 - **No double booking.** The database itself blocks two active bookings for the same seat and the same screening.
 - **Caching external data.** Showtimes from Cinematica are cached and refreshed in the background. If the source is briefly unavailable, Phantora keeps working from the last good copy.
-- **Reliable emails.** Reminders are queued in the database and sent by a background worker, so they go out on time and only once.
+- **Reliable emails.** Confirmations and alerts are queued in the database and sent by a background worker, so they go out on time and only once.
 - **Card data is not kept.** Only the last four digits of the card are saved on the receipt. The full number, holder name, expiry and CVV are never stored, logged or emailed.
 
 ---
@@ -131,8 +131,8 @@ Phantora is split into three clear parts: a **frontend** the user sees, a **back
 1. The **moviegoer** opens Phantora in a browser. The **React frontend** on Vercel shows films, showtimes, the seat map and checkout.
 2. Every action (sign in, hold seats, pay) is sent as a request to the **FastAPI backend** on Render.
 3. The backend reads films and showtimes from **Cinematica** and film details from **TMDB**, and keeps a cached copy.
-4. All accounts, seats, holds, bookings and reminders are stored in **PostgreSQL**, which prevents double booking.
-5. The backend sends emails through **Brevo**: the 4-digit codes, the ticket confirmation and the reminders 24 hours and 2 hours before the film, straight to the user's **inbox**.
+4. All accounts, seats, holds, bookings and notifications are stored in **PostgreSQL**, which prevents double booking.
+5. The backend sends emails through **Brevo**: the 4-digit codes, the ticket confirmation and refund notices, straight to the user's **inbox**.
 
 ---
 
@@ -165,10 +165,10 @@ Phantora is an Uzbek-first cinema discovery and seat-booking app. The React/Vite
 - [x] PostgreSQL protection against concurrent double booking and overlapping hall schedules
 - [x] Uzbek/English/Russian UI, light/dark themes, accessible date chips, and responsive cinema artwork
 - [x] Brevo transactional email delivery for signup verification, payment codes, and password resets
-- [x] Booking confirmation emails plus durable 24-hour and 2-hour screening reminders
+- [x] Durable booking confirmation emails (screening reminders were removed; reminders already queued are deleted unsent)
 - [x] Full-screening waitlist with one-time email availability alerts and self-service withdrawal
 - [x] Persistent saved-film list with one-time first-showtime email alerts
-- [x] In-app notification center for ticket confirmation, reminder, waitlist, and saved-film delivery state
+- [x] In-app notification center for ticket confirmation, waitlist, and saved-film delivery state
 - [x] Operator-managed promo campaigns with expiry, spend rules, usage limits, and checkout revalidation
 - [x] Phantora Pass points: balance, reservation during checkout, redemption, and confirmed-ticket rewards
 - [x] Live Cinematica programme discovery with five-minute refreshes and a bounded stale-cache fallback
@@ -219,7 +219,7 @@ That is the default (`PAYMENT_PROVIDER=demo`). See **Payment providers** below f
 
 On startup, Phantora fills the next seven days of missing managed demo slots from its existing active films and halls. Existing screenings and conflicting slots are preserved.
 
-The app accepts card details only to validate this one demo attempt. It stores only the last four card digits on the payment receipt. It never stores, logs, returns, or emails a card number, holder name, expiry, or CVV. Payment email codes are HMAC digests, expire after five minutes, allow five attempts, and have resend limits. A successful ticket queues one confirmation email and, when the showtime permits, reminders 24 hours and 2 hours before the screening. Each notification is recorded in PostgreSQL so a service restart cannot duplicate it.
+The app accepts card details only to validate this one demo attempt. It stores only the last four card digits on the payment receipt. It never stores, logs, returns, or emails a card number, holder name, expiry, or CVV. Payment email codes are HMAC digests, expire after five minutes, allow five attempts, and have resend limits. A successful ticket queues one confirmation email. Each notification is recorded in PostgreSQL so a service restart cannot duplicate it.
 
 TMDB provides movie metadata, not theater schedules or seat inventory. Cinematica's public data is cached for discovery only. It does not give Phantora authority to lock source seats, sell source tickets, or guarantee the source feed. A real release needs operator-owned halls/schedules and a licensed payment provider with hosted or tokenized card entry.
 
@@ -259,7 +259,7 @@ Deploy from `render.yaml`, attach PostgreSQL, and set these private values in th
 - `EMAIL_MODE=brevo`, `BREVO_API_KEY`, `BREVO_FROM` (recommended for production)
 - `APP_ENVIRONMENT=production`
 
-`TMDB_MAX_PAGES` sets the number of pages imported per category (default 5); `TMDB_SYNC_INTERVAL_HOURS` sets the refresh interval (default 24). `NOTIFICATION_POLL_SECONDS` controls the reminder queue polling interval (default 60). TMDB tokens must remain server-side. Public signup needs a transactional email sender. The application supports Brevo's HTTPS API, Resend, and SMTP. For Brevo, register and verify the sender email address, create an API key, and keep both values only in the deployment environment. A custom sending domain improves delivery reputation but is not required for initial sender-email verification.
+`TMDB_MAX_PAGES` sets the number of pages imported per category (default 5); `TMDB_SYNC_INTERVAL_HOURS` sets the refresh interval (default 24). `NOTIFICATION_POLL_SECONDS` controls the notification queue polling interval (default 60). TMDB tokens must remain server-side. Public signup needs a transactional email sender. The application supports Brevo's HTTPS API, Resend, and SMTP. For Brevo, register and verify the sender email address, create an API key, and keep both values only in the deployment environment. A custom sending domain improves delivery reputation but is not required for initial sender-email verification.
 
 Bootstrap the admin with `ADMIN_EMAIL` and a unique `ADMIN_PASSWORD` of at least 12 characters. Configure real, operator-provided cinema halls, seat plans, prices, and screening schedules through the admin tools.
 
@@ -299,7 +299,7 @@ Deletion **anonymizes** instead of removing the row, because bookings, payments 
 
 ## Telegram notifications
 
-Customers can get the same messages (ticket confirmation, 24 h and 2 h reminders, refunds, waitlist and saved-film alerts) in Telegram. It is **off until you create a bot**: talk to @BotFather, then set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME` (without the @) and a random `TELEGRAM_WEBHOOK_SECRET` (16+ characters), deploy, and register the webhook once with `python -m app.telegram_setup https://<your-api-host>/api/telegram/webhook`. A customer then presses **Connect Telegram** in their profile, taps Start in the bot, and the page shows "connected".
+Customers can get the same messages (ticket confirmation, refunds, waitlist and saved-film alerts) in Telegram. It is **off until you create a bot**: talk to @BotFather, then set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME` (without the @) and a random `TELEGRAM_WEBHOOK_SECRET` (16+ characters), deploy, and register the webhook once with `python -m app.telegram_setup https://<your-api-host>/api/telegram/webhook`. A customer then presses **Connect Telegram** in their profile, taps Start in the bot, and the page shows "connected".
 
 How it stays safe: the link token is single-use, expires in 15 minutes and only its hash is stored; the webhook accepts only requests carrying the secret registered with Telegram (compared in constant time, `403` otherwise); a chat can belong to one account only; link requests are rate-limited; messages are plain text (a film title cannot inject formatting); Telegram is sent only after the e-mail succeeded, never blocks or fails it, and a chat that blocked the bot is unlinked automatically. Only the chat id is stored, and `/stop` in the bot, the Disconnect button or deleting the account removes it. Production start-up refuses a bot token without a username and webhook secret.
 
@@ -361,7 +361,7 @@ Operator and security-relevant actions are recorded in `audit_log`: film, hall, 
 
 ## Background jobs and scaling
 
-Booking and waitlist e-mails, reminders and the Cinematica/TMDB refreshes run as scheduled jobs (`backend/app/jobs.py`).
+Booking and waitlist e-mails and the Cinematica/TMDB refreshes run as scheduled jobs (`backend/app/jobs.py`).
 
 - **Single service (default):** the API runs the jobs itself (`RUN_BACKGROUND_JOBS=true`). This is what a one-instance Render deploy uses.
 - **Several API instances:** every job takes a PostgreSQL advisory lock for its pass, so instances never run the same job twice, and each e-mail is claimed with `FOR UPDATE SKIP LOCKED` and committed on its own. Nothing is sent twice, and a crash can lose track of at most the one message in flight.

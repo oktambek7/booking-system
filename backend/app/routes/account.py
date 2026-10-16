@@ -121,7 +121,7 @@ def customer_notifications(db: Session = Depends(get_db), user: User = Depends(c
 
 @router.delete("/notifications")
 def clear_customer_notifications(db: Session = Depends(get_db), user: User = Depends(current_user)):
-    """Remove delivered notices while retaining future reminders and watchlist alerts."""
+    """Remove delivered notices while retaining undelivered ones and watchlist alerts."""
     booking_ids = sa.select(Booking.id).where(Booking.customer_id == user.id)
     waitlist_ids = sa.select(WaitlistEntry.id).where(WaitlistEntry.user_id == user.id)
     watchlist_ids = sa.select(MovieWatchlist.id).where(MovieWatchlist.user_id == user.id)
