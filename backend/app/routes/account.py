@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, timezone
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -89,7 +89,7 @@ def customer_notifications(db: Session = Depends(get_db), user: User = Depends(c
         .join(Screening, Booking.screening_id == Screening.id)
         .join(Movie, Screening.movie_id == Movie.id)
         .join(Auditorium, Screening.auditorium_id == Auditorium.id)
-        .where(Booking.customer_id == user.id)).all()
+        .where(Booking.customer_id == user.id, BookingNotification.dismissed_at.is_(None))).all()
     for notice, _, screening, movie, auditorium in booking_rows:
         items.append(CustomerNotificationOut(id=f"booking-{notice.id}", kind=notice.event_type,
             state="sent" if notice.sent_at else "retrying" if notice.attempts else "scheduled",
@@ -100,7 +100,7 @@ def customer_notifications(db: Session = Depends(get_db), user: User = Depends(c
         .join(Screening, WaitlistEntry.screening_id == Screening.id)
         .join(Movie, Screening.movie_id == Movie.id)
         .join(Auditorium, Screening.auditorium_id == Auditorium.id)
-        .where(WaitlistEntry.user_id == user.id)).all()
+        .where(WaitlistEntry.user_id == user.id, WaitlistNotification.dismissed_at.is_(None))).all()
     for notice, _, screening, movie, auditorium in waitlist_rows:
         items.append(CustomerNotificationOut(id=f"waitlist-{notice.id}", kind="waitlist_available",
             state="sent" if notice.sent_at else "retrying" if notice.attempts else "scheduled",
@@ -111,7 +111,7 @@ def customer_notifications(db: Session = Depends(get_db), user: User = Depends(c
         .join(Screening, MovieWatchlistNotification.screening_id == Screening.id)
         .join(Movie, MovieWatchlist.movie_id == Movie.id)
         .join(Auditorium, Screening.auditorium_id == Auditorium.id)
-        .where(MovieWatchlist.user_id == user.id)).all()
+        .where(MovieWatchlist.user_id == user.id, MovieWatchlistNotification.dismissed_at.is_(None))).all()
     for notice, _, screening, movie, auditorium in saved_rows:
         items.append(CustomerNotificationOut(id=f"saved-film-{notice.id}", kind="saved_movie_showtime",
             state="sent" if notice.sent_at else "retrying" if notice.attempts else "scheduled",
@@ -121,26 +121,25 @@ def customer_notifications(db: Session = Depends(get_db), user: User = Depends(c
 
 @router.delete("/notifications")
 def clear_customer_notifications(db: Session = Depends(get_db), user: User = Depends(current_user)):
-    """Remove delivered notices while retaining undelivered ones and watchlist alerts."""
+    """Empty the customer's notification list.
+
+    Delivered notices are deleted. Notices still waiting to be sent (queued or retrying) are only hidden: deleting
+    them would silently cancel a confirmation e-mail or a waitlist / saved-film alert the customer asked for, so
+    they are marked dismissed, are still delivered, and stay out of the list.
+    """
     booking_ids = sa.select(Booking.id).where(Booking.customer_id == user.id)
     waitlist_ids = sa.select(WaitlistEntry.id).where(WaitlistEntry.user_id == user.id)
     watchlist_ids = sa.select(MovieWatchlist.id).where(MovieWatchlist.user_id == user.id)
-    removed = 0
-    for statement in (
-        sa.delete(BookingNotification).where(
-            BookingNotification.booking_id.in_(booking_ids),
-            BookingNotification.sent_at.is_not(None),
-        ),
-        sa.delete(WaitlistNotification).where(
-            WaitlistNotification.waitlist_entry_id.in_(waitlist_ids),
-            WaitlistNotification.sent_at.is_not(None),
-        ),
-        sa.delete(MovieWatchlistNotification).where(
-            MovieWatchlistNotification.watchlist_id.in_(watchlist_ids),
-            MovieWatchlistNotification.sent_at.is_not(None),
-        ),
-    ):
-        result = db.execute(statement)
-        removed += result.rowcount or 0
+    mine = (
+        (BookingNotification, BookingNotification.booking_id.in_(booking_ids)),
+        (WaitlistNotification, WaitlistNotification.waitlist_entry_id.in_(waitlist_ids)),
+        (MovieWatchlistNotification, MovieWatchlistNotification.watchlist_id.in_(watchlist_ids)),
+    )
+    now = datetime.now(timezone.utc)
+    removed = hidden = 0
+    for model, belongs_to_user in mine:
+        removed += db.execute(sa.delete(model).where(belongs_to_user, model.sent_at.is_not(None))).rowcount or 0
+        hidden += db.execute(sa.update(model).where(belongs_to_user, model.sent_at.is_(None), model.dismissed_at.is_(None))
+                             .values(dismissed_at=now)).rowcount or 0
     db.commit()
-    return {"cleared_count": removed}
+    return {"cleared_count": removed, "hidden_count": hidden}

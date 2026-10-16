@@ -80,6 +80,17 @@
 
   /* Notifications */
   .notification-drawer-tools { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); margin-bottom: var(--s-3); color: var(--text-2); font-size: var(--fs-small); }
+  .notification-drawer-tools { flex-wrap: wrap; }
+  .notification-drawer-tools > p { flex: 1 1 200px; min-width: 0; }
+  .notification-drawer-tools .notification-clear, .notification-drawer-tools .notification-clear-confirm button {
+    display: inline-flex; align-items: center; justify-content: center; min-height: var(--tap); padding: 0 var(--s-3);
+    border: 1px solid var(--line-strong); border-radius: var(--r-pill); background: var(--glass-1-bg);
+    color: var(--text); font-weight: 600; font-size: var(--fs-small); text-decoration: none; white-space: nowrap;
+  }
+  .notification-drawer-tools .notification-clear:hover:not(:disabled), .notification-drawer-tools .notification-clear-confirm button:hover:not(:disabled) { border-color: var(--accent-line); color: var(--text); }
+  .notification-clear-confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); color: var(--text); font-weight: 600; }
+  .notification-drawer-tools .notification-clear-confirm .is-danger { border-color: color-mix(in srgb, var(--danger) 60%, transparent); color: var(--danger-text); }
+  .notification-clear-status { margin: calc(var(--s-1) * -1) 0 var(--s-3); color: var(--success-text); font-size: var(--fs-small); font-weight: 600; }
   .notification-list { display: grid; gap: var(--s-2); }
   .notification-row { display: grid; grid-template-columns: 10px minmax(0, 1fr); gap: var(--s-3); align-items: start; padding: var(--s-3); border-radius: var(--r-md); }
   .notification-row > div { display: grid; gap: 2px; min-width: 0; font-size: var(--fs-small); color: var(--text-2); }
